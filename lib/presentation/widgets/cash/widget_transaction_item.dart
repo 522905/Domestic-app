@@ -50,7 +50,7 @@ class TransactionItem extends StatelessWidget {
                         ),
                         SizedBox(height: 4.h),
                         Text(
-                          transaction.accountTypeText, // Use the accountTypeText getter!
+                          transaction.selectedAccount ?? transaction.paidTo ?? 'Unknown Account',
                           style: TextStyle(
                             fontSize: 13.sp,
                             color: Colors.grey[700],
@@ -76,7 +76,7 @@ class TransactionItem extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        isFromDepositsTab? transaction.createdBy! : transaction.paidTo!,
+                        _getDisplayName(),
                         style: TextStyle(
                           fontSize: 12.sp,
                           fontWeight: FontWeight.w500,
@@ -105,6 +105,15 @@ class TransactionItem extends StatelessWidget {
     );
   }
 
+  // Add this method to safely get display name
+  String _getDisplayName() {
+    if (isFromDepositsTab) {
+      return transaction.initiator ?? 'Unknown User';
+    } else {
+      return transaction.paidTo ?? transaction.selectedAccount ?? 'Unknown Recipient';
+    }
+  }
+
   Widget _buildInitiatorCircle() {
     Color backgroundColor;
     Color textColor;
@@ -127,16 +136,22 @@ class TransactionItem extends StatelessWidget {
         textColor = Colors.grey[700]!;
     }
 
+    // Use safe transaction ID display
+    final displayId = transaction.id.length > 8
+        ? transaction.id.substring(transaction.id.length - 8)
+        : transaction.id;
+
     return CircleAvatar(
       radius: 25.r,
       backgroundColor: backgroundColor,
       child: Text(
-        transaction.id,
+        displayId,
         style: TextStyle(
           color: textColor,
           fontWeight: FontWeight.bold,
-          fontSize: 12.sp,
+          fontSize: 10.sp, // Reduced font size for long IDs
         ),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -170,7 +185,7 @@ class TransactionItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12.r),
       ),
       child: Text(
-        transaction.statusText,
+        transaction.status.name.toUpperCase(),
         style: TextStyle(
           fontSize: 10.sp,
           fontWeight: FontWeight.bold,
@@ -181,19 +196,23 @@ class TransactionItem extends StatelessWidget {
   }
 
   String _formatTime(DateTime time) {
-    final now = DateTime.now();
+    try {
+      final now = DateTime.now();
 
-    // If the transaction was today
-    if (time.day == now.day && time.month == now.month && time.year == now.year) {
-      return '${DateFormat('h:mm a').format(time)}';
+      // If the transaction was today
+      if (time.day == now.day && time.month == now.month && time.year == now.year) {
+        return DateFormat('h:mm a').format(time);
+      }
+
+      // If the transaction was yesterday
+      if (time.day == now.day - 1 && time.month == now.month && time.year == now.year) {
+        return DateFormat('h:mm a').format(time);
+      }
+
+      // For older transactions
+      return DateFormat('MMM d, h:mm a').format(time);
+    } catch (e) {
+      return 'Invalid Date';
     }
-
-    // If the transaction was yesterday
-    if (time.day == now.day - 1 && time.month == now.month && time.year == now.year) {
-      return '${DateFormat('h:mm a').format(time)}';
-    }
-
-    // For older transactions
-    return '${DateFormat('MMM d, h:mm a').format(time)}';
   }
 }

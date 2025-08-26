@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'api_endpoints.dart';
-import 'package:lpg_distribution_app/core/services/token_manager.dart';
+import 'package:lpg_distribution_app/core/services/User.dart';
 
 class ApiClient {
   late final Dio _dio;
@@ -27,7 +27,7 @@ class ApiClient {
         responseBody: true,
       ));
 
-      final tokenManager = TokenManager();
+      final tokenManager = User();
       final savedToken = await tokenManager.getToken();
       if (savedToken != null) {
         _token = savedToken;
@@ -48,7 +48,7 @@ class ApiClient {
     _token = null;
     _dio.options.headers.remove('Authorization');
 
-    final tokenManager = TokenManager();
+    final tokenManager = User();
     await tokenManager.clearTokens();
   }
 

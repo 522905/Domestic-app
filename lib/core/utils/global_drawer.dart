@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart';
-import '../../presentation/pages/api_test.dart';
 import '../../presentation/pages/profile/profile_screen.dart';
 import '../../presentation/pages/reports/reports_screen.dart';
 
@@ -13,8 +11,8 @@ class GlobalDrawer {
       onTap: () {
         Navigator.push(
           GlobalDrawer.navigatorContext!,
+          MaterialPageRoute(builder: (context) => const ReportScreen()),
           // MaterialPageRoute(builder: (context) => const ReportScreen()),
-          MaterialPageRoute(builder: (context) =>  ApiTestScreen()),
         );
       },
     ),

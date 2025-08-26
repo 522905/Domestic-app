@@ -3,7 +3,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:lpg_distribution_app/core/models/inventory_request.dart';
+import 'package:lpg_distribution_app/core/models/inventory/inventory_request.dart';
 
 class PrinterService {
   static final PrinterService _instance = PrinterService._internal();
@@ -159,15 +159,15 @@ class PrinterService {
 
       // Format and print items
       String items = 'Items: ';
-      if (request.cylinders14kg > 0) {
-        items += '14.2kg: ${request.cylinders14kg} ';
-      }
-      if (request.smallCylinders > 0) {
-        items += '5kg: ${request.smallCylinders} ';
-      }
-      if (request.cylinders19kg > 0) {
-        items += '19kg: ${request.cylinders19kg}';
-      }
+      // if (request.cylinders14kg > 0) {
+      //   items += '14.2kg: ${request.cylinders14kg} ';
+      // }
+      // if (request.smallCylinders > 0) {
+      //   items += '5kg: ${request.smallCylinders} ';
+      // }
+      // if (request.cylinders19kg > 0) {
+      //   items += '19kg: ${request.cylinders19kg}';
+      // }
 
       bytes.addAll(items.codeUnits);
       bytes.addAll([10]); // Line feed

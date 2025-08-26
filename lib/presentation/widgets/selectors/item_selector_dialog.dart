@@ -5,16 +5,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/services/api_service_interface.dart';
 
 class ItemSelectorDialog extends StatefulWidget {
-  final List<String> itemTypes;
-  final List<String> nfrTypes;
+
   final Map<String, dynamic>? initialItem;
   final Function(Map<String, dynamic>) onItemAdded;
   final List<Map<String, dynamic>> availableItems;
 
   const ItemSelectorDialog({
     Key? key,
-    required this.itemTypes,
-    required this.nfrTypes,
     this.initialItem,
     required this.onItemAdded,
     required this.availableItems,
@@ -23,36 +20,67 @@ class ItemSelectorDialog extends StatefulWidget {
   @override
   State<ItemSelectorDialog> createState() => _ItemSelectorDialogState();
 
-      static Future<void> show(
+  static Future<void> show(
       BuildContext context,
       List<String> itemTypes,
       List<String> nfrTypes,
       Function(Map<String, dynamic>) onItemAdded, {
-      Map<String, dynamic>? initialItem,
-    }) async {
-      try {
-        // Fetch items dynamically
-        final apiService = context.read<ApiServiceInterface>();
-        final items = await apiService.getItemList();
+        Map<String, dynamic>? initialItem,
+      }) async {
+    try {
 
-        // Show dialog with fetched items
-        return showDialog(
-          context: context,
-          builder: (context) => ItemSelectorDialog(
-            itemTypes: itemTypes,
-            nfrTypes: nfrTypes,
-            initialItem: initialItem,
-            onItemAdded: onItemAdded,
-            availableItems: items, // Pass fetched items here
-          ),
-        );
-      } catch (e) {
+      // Fetch items dynamically
+      final apiService = context.read<ApiServiceInterface>();
+      final items = await apiService.getItemList();
+
+
+      if (items.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching items: $e')),
+          const SnackBar(content: Text('No items available from API')),
         );
+        return;
       }
+
+      // Show dialog with fetched items
+      return showDialog(
+        context: context,
+        builder: (context) => ItemSelectorDialog(
+          initialItem: initialItem,
+          onItemAdded: onItemAdded,
+          availableItems: items, // Pass fetched items here
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching items: $e')),
+      );
+    }
+  }
+
+  // Static method for DepositInventoryScreen usage
+  static Future<void> showForDeposit(
+      BuildContext context,
+      List<Map<String, dynamic>> availableItems,
+      Function(Map<String, dynamic>) onItemAdded, {
+        Map<String, dynamic>? initialItem,
+      }) {
+
+    if (availableItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No items available')),
+      );
+      return Future.value();
     }
 
+    return showDialog(
+      context: context,
+      builder: (context) => ItemSelectorDialog(
+        initialItem: initialItem,
+        onItemAdded: onItemAdded,
+        availableItems: availableItems,
+      ),
+    );
+  }
 }
 
 class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
@@ -74,13 +102,13 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
       selectedType = widget.initialItem!['type'];
       selectedNfrType = widget.initialItem!['nfrType'];
       quantity = widget.initialItem!['quantity'];
-    } else {
-      selectedType = widget.itemTypes.first;
     }
   }
 
   // Function to filter items based on search text
   void _filterItems(String searchText) {
+    print('🔍 Filtering items with search text: "$searchText"');
+
     if (searchText.isEmpty) {
       setState(() {
         filteredItems = List.from(widget.availableItems);
@@ -92,7 +120,8 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
         ).toList();
       });
     }
-}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -106,16 +135,38 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.initialItem != null ? 'Edit Item' : 'Select Item',
-              style: TextStyle(
-                fontSize: 20.sp,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0E5CA8), // Brand Blue from your guidelines
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.initialItem != null ? 'Edit Item' : 'Select Item',
+                  style: TextStyle(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0E5CA8),
+                  ),
+                ),
+                // Debug info badge
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Text(
+                    '${filteredItems.length} items',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 16.h),
-            // Search bar at the top for easier access
+
+            // Search bar
             TextField(
               controller: searchController,
               decoration: InputDecoration(
@@ -135,13 +186,43 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
               onChanged: _filterItems,
             ),
             SizedBox(height: 16.h),
-            // Display filtered items in a list similar to the image
+
+            // Items list with better debugging
             Flexible(
               child: Container(
                 constraints: BoxConstraints(
-                  maxHeight: 400.h, // Limit max height to prevent overflow
+                  maxHeight: 400.h,
                 ),
-                child: ListView.builder(
+                child: filteredItems.isEmpty
+                    ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+                      SizedBox(height: 16.h),
+                      Text(
+                        widget.availableItems.isEmpty
+                            ? 'No items loaded from API'
+                            : 'No items match your search',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16.sp,
+                        ),
+                      ),
+                      if (widget.availableItems.isEmpty) ...[
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Check console for API errors',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: 12.sp,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                )
+                    : ListView.builder(
                   shrinkWrap: true,
                   itemCount: filteredItems.length,
                   itemBuilder: (context, index) {
@@ -163,20 +244,32 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    item['item_name'],
+                                    item['item_name'] ?? 'Unknown Item',
                                     style: TextStyle(
-                                      fontSize: 16.sp,
+                                      fontSize: 15.sp,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF333333), // Dark Gray from guidelines
+                                      color: Color(0xFF333333),
                                     ),
                                   ),
                                   SizedBox(height: 4.h),
-                                  Text(
-                                    'Available: ${item['available']}',
-                                    style: TextStyle(
-                                      fontSize: 14.sp,
-                                      color: Color(0xFF666666), // Secondary text color
-                                    ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Available: ${item['available'] ?? 0}',
+                                        style: TextStyle(
+                                          fontSize: 10.sp,
+                                          color: Color(0xFF666666),
+                                        ),
+                                      ),
+                                      SizedBox(width: 10.w),
+                                      Text(
+                                        'ID: ${item['name'] ?? 'N/A'}',
+                                        style: TextStyle(
+                                          fontSize: 10.sp,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -184,14 +277,13 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
                             // Right side with add button
                             ElevatedButton(
                               onPressed: () {
-                               final selectedItemData = {
-                                    'type': item['stock_uom'] ?? 'Unknown', // Default to 'Unknown' if null
-                                    'name': item['item_name'] ?? 'Unnamed Item', // Default to 'Unnamed Item' if null
-                                    'itemId': item['name'],
-                                    'quantity': 1,
-                                    'available': item['available'].toInt(),
-                                  };
-                                // Show quantity selection dialog before adding
+                                final selectedItemData = {
+                                  'type': item['stock_uom'] ?? 'Unknown',
+                                  'name': item['item_name'] ?? 'Unnamed Item',
+                                  'itemId': item['name'],
+                                  'quantity': 1,
+                                  'available': (item['available'] ?? 0).toInt(),
+                                };
                                 _showQuantityDialog(selectedItemData);
                               },
                               style: ElevatedButton.styleFrom(
@@ -202,7 +294,7 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
                                   borderRadius: BorderRadius.circular(8.r),
                                   side: BorderSide(color: Color(0xFF0E5CA8)),
                                 ),
-                                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
                               ),
                               child: const Text(
                                 'Add',
@@ -222,7 +314,7 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
 
             SizedBox(height: 16.h),
 
-            // Cancel button at bottom
+            // Cancel button
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
@@ -324,9 +416,9 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(0xFF0E5CA8),
                 ),
-                child:const Padding(
+                child: const Padding(
                   padding: EdgeInsets.all(8.0),
-                  child:  Text(
+                  child: Text(
                     'CONFIRM',
                     style: TextStyle(
                       color: Colors.white,
@@ -341,5 +433,4 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
       ),
     );
   }
-
 }

@@ -42,13 +42,17 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // App Logo
-            Icon(
-              Icons.local_fire_department,
-              size: 100.sp,
-              color: Theme.of(context).primaryColor,
+            // Icon(
+            //   Icons.local_fire_department,
+            //   size: 100.sp,
+            //   color: Theme.of(context).primaryColor,
+            // ),
+            Image.asset(
+              'assets/images/app_icon.png',
+              width: 100.w,
+              height: 100.h,
             ),
             SizedBox(height: 24.h),
-
             // App Name
             Text(
               'LPG Distribution',
@@ -59,7 +63,6 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             SizedBox(height: 8.h),
-
             Text(
               'Digital Management System',
               style: TextStyle(

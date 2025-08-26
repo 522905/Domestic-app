@@ -85,16 +85,21 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Logo or Image
-                Icon(
-                  Icons.local_fire_department,
-                  size: 80.sp,
-                  color: Theme.of(context).primaryColor,
+                // Icon(
+                //   Icons.local_fire_department,
+                //   size: 80.sp,
+                //   color: Theme.of(context).primaryColor,
+                // ),
+                Image.asset(
+                  'assets/images/app_icon.png',
+                  width: 200.w,
+                  height: 200.h,
                 ),
                 SizedBox(height: 24.h),
 
                 // App Title
                 Text(
-                  'LPG Distribution',
+                  'Arun Gas Services',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28.sp,

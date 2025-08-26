@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/api_service_interface.dart';
+import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -14,8 +15,16 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
-  Map<String, dynamic> _userData = {};
-  String _userRole = '';
+
+  // User data variables
+  int? userId;
+  String? userName;
+  List<String>? userRoles;
+  String? userAccount;
+  String? userWarehouse;
+  String? userPhoneNumber;
+  String? userVehicleNumber;
+  String? userEmail;
 
   @override
   void initState() {
@@ -24,14 +33,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserProfile() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      final apiService = Provider.of<ApiServiceInterface>(context, listen: false);
-      final userData = await apiService.getUserProfile();
+      // Fetch all user data
+      final roles = await User().getUserRoles();
+      final _userName = await User().getUserName();
+      final _userAccount = await User().getRoleNames();
+      final _userPhoneNumber = await User().getUserPhoneNumber();
+      final _userEmail = await User().getUserEmail();
+
+      // Try to get additional data if available
+      String? _userWarehouse;
+      String? _userVehicleNumber;
+      int? _userId;
+
+      try {
+        // Add these methods to your User service if they exist
+        // _userWarehouse = await User().getUserWarehouse();
+        // _userVehicleNumber = await User().getUserVehicleNumber();
+        // _userId = await User().getUserId();
+      } catch (e) {
+        debugPrint('Optional user data not available: $e');
+      }
 
       if (mounted) {
         setState(() {
-          _userData = userData;
-          _userRole = userData['role'] ?? '';
+          userRoles = roles.map((role) => role.role).toList();
+          userName = _userName?.isNotEmpty == true ? _userName : 'User';
+          // userAccount = _userAccount;
+          userWarehouse = _userWarehouse;
+          userPhoneNumber = _userPhoneNumber;
+          userVehicleNumber = _userVehicleNumber;
+          userEmail = _userEmail;
+          userId = _userId;
           _isLoading = false;
         });
       }
@@ -41,7 +78,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e')),
+          SnackBar(
+            content: Text('Error loading profile: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -50,33 +91,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer:GlobalDrawer.getDrawer(context),
+      drawer: GlobalDrawer.getDrawer(context),
       appBar: AppBar(
         title: const Text('Profile'),
         backgroundColor: const Color(0xFF0E5CA8),
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadUserProfile,
+            tooltip: 'Refresh Profile',
+          ),
           IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: _showActionMenu,
+            tooltip: 'More Options',
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading profile...'),
+          ],
+        ),
+      )
           : RefreshIndicator(
         onRefresh: _loadUserProfile,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.all(16.sp),
+          padding: EdgeInsets.all(16.w),
           child: Column(
-            crossAxisAlignment:   CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildProfileHeader(),
               SizedBox(height: 24.h),
               _buildProfileDetails(),
               SizedBox(height: 32.h),
-              _buildLogoutButton(),
+              _buildActionButtons(),
             ],
           ),
         ),
@@ -85,45 +142,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader() {
-    return Center(
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(24.w),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF0E5CA8),
+            const Color(0xFF0E5CA8).withOpacity(0.8),
+            const Color(0xFF1976D2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0E5CA8).withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 50.r,
-            backgroundColor: const Color(0xFF0E5CA8),
-            child: Text(
-              _userData['name']?.substring(0, 1) ?? 'U',
-              style: TextStyle(
-                fontSize: 36.sp,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+          Container(
+            padding: EdgeInsets.all(4.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: 50.r,
+              backgroundColor: const Color(0xFF0E5CA8),
+              child: Text(
+                _getInitials(userName ?? 'User'),
+                style: TextStyle(
+                  fontSize: 32.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
           SizedBox(height: 16.h),
           Text(
-            _userData['name'] ?? 'User',
+            userName ?? 'User',
             style: TextStyle(
               fontSize: 24.sp,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
+            textAlign: TextAlign.center,
           ),
-          SizedBox(height: 8.h),
-          Text(
-            _formatRole(_userRole),
-            style: TextStyle(
-              fontSize: 16.sp,
-              color: Colors.grey[600],
+          if (userRoles?.isNotEmpty == true) ...[
+            SizedBox(height: 8.h),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: Colors.white.withOpacity(0.3)),
+              ),
+              child: Text(
+                userRoles!.first, // Primary role
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            _userData['id'] ?? '',
-            style: TextStyle(
-              fontSize: 14.sp,
-              color: Colors.grey[500],
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -133,154 +230,358 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Contact Information'),
+        // Account Information Section
+        if (userAccount != null || userWarehouse != null || userRoles?.isNotEmpty == true) ...[
+          _buildSectionHeader('Account Information'),
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Column(
+                children: [
+                  if (userAccount != null) ...[
+                    _buildInfoRow(
+                      Icons.account_balance,
+                      'Account',
+                      userAccount!,
+                    ),
+                  ],
+                  if (userWarehouse != null && userWarehouse != userAccount) ...[
+                    if (userAccount != null) SizedBox(height: 16.h),
+                    _buildInfoRow(
+                      Icons.warehouse,
+                      'Warehouse',
+                      userWarehouse!,
+                    ),
+                  ],
+                  if (userRoles?.isNotEmpty == true) ...[
+                    if (userAccount != null || userWarehouse != null) SizedBox(height: 16.h),
+                    _buildRolesRow(),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 24.h),
+        ],
+
+        // Contact Information Section
+        if (userPhoneNumber != null || userEmail != null) ...[
+          _buildSectionHeader('Contact Information'),
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Column(
+                children: [
+                  if (userPhoneNumber != null) ...[
+                    _buildInfoRow(
+                      Icons.phone,
+                      'Phone Number',
+                      userPhoneNumber!,
+                    ),
+                  ],
+                  if (userEmail != null) ...[
+                    if (userPhoneNumber != null) SizedBox(height: 16.h),
+                    _buildInfoRow(
+                      Icons.email,
+                      'Email',
+                      userEmail!,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 24.h),
+        ],
+
+        // Vehicle Information Section
+        if (userVehicleNumber != null) ...[
+          _buildSectionHeader('Vehicle Information'),
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: _buildInfoRow(
+                Icons.local_shipping,
+                'Vehicle Number',
+                userVehicleNumber!,
+              ),
+            ),
+          ),
+          SizedBox(height: 24.h),
+        ],
+
+        // Additional Information Section
+        _buildSectionHeader('App Information'),
         Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
           child: Padding(
-            padding: EdgeInsets.all(16.sp),
+            padding: EdgeInsets.all(16.w),
             child: Column(
               children: [
-                _buildInfoRow(Icons.email, 'Email', _userData['email'] ?? 'Not provided'),
-                SizedBox(height: 12.h),
-                _buildInfoRow(Icons.phone, 'Phone', _userData['phone'] ?? 'Not provided'),
+                _buildInfoRow(
+                  Icons.info,
+                  'App Version',
+                  '1.0.0', // You can get this from package_info_plus
+                ),
+                SizedBox(height: 16.h),
+                _buildInfoRow(
+                  Icons.access_time,
+                  'Last Login',
+                  'Today', // You can store and retrieve actual login time
+                ),
               ],
             ),
           ),
         ),
-
-        SizedBox(height: 24.h),
-
-        if (_userData['assigned_warehouses'] != null) ...[
-          _buildSectionHeader('Assigned Warehouses'),
-          Card(
-            child: Padding(
-              padding: EdgeInsets.all(16.sp),
-              child: _buildChipList(_userData['assigned_warehouses'], Icons.warehouse),
-            ),
-          ),
-          SizedBox(height: 24.h),
-        ],
-
-        if (_userData['assigned_vehicles'] != null) ...[
-          _buildSectionHeader('Assigned Vehicles'),
-          Card(
-            child: Padding(
-              padding: EdgeInsets.all(16.sp),
-              child: _buildChipList(_userData['assigned_vehicles'], Icons.local_shipping),
-            ),
-          ),
-          SizedBox(height: 24.h),
-        ],
-
-        if (_userData['permissions'] != null) ...[
-          _buildSectionHeader('Permissions'),
-          Card(
-            child: Padding(
-              padding: EdgeInsets.all(16.sp),
-              child: _buildPermissionList(_userData['permissions']),
-            ),
-          ),
-        ],
       ],
     );
   }
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8.h),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 18.sp,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF0E5CA8),
-        ),
+      padding: EdgeInsets.only(bottom: 12.h),
+      child: Row(
+        children: [
+          Container(
+            width: 4.w,
+            height: 24.h,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E5CA8),
+              borderRadius: BorderRadius.circular(2.r),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF0E5CA8),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20.sp, color: const Color(0xFF0E5CA8)),
-        SizedBox(width: 12.w),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14.sp,
-                color: Colors.grey[600],
+        Container(
+          padding: EdgeInsets.all(8.w),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0E5CA8).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: 20.sp,
+            color: const Color(0xFF0E5CA8),
+          ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w500,
+              SizedBox(height: 4.h),
+              SelectableText(
+                value,
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
               ),
+            ],
+          ),
+        ),
+        if (label == 'Phone Number' || label == 'Email') ...[
+          IconButton(
+            onPressed: () => _copyToClipboard(value, label),
+            icon: Icon(
+              Icons.copy,
+              size: 18.sp,
+              color: Colors.grey[600],
             ),
-          ],
+            tooltip: 'Copy $label',
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildRolesRow() {
+    if (userRoles == null || userRoles!.isEmpty) {
+      return _buildInfoRow(Icons.badge, 'Role', 'Not assigned');
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.all(8.w),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0E5CA8).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.badge,
+            size: 20.sp,
+            color: const Color(0xFF0E5CA8),
+          ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                userRoles!.length > 1 ? 'Roles' : 'Role',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Wrap(
+                spacing: 8.w,
+                runSpacing: 8.h,
+                children: userRoles!.map((role) {
+                  return Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF0E5CA8).withOpacity(0.1),
+                          const Color(0xFF0E5CA8).withOpacity(0.05),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20.r),
+                      border: Border.all(
+                        color: const Color(0xFF0E5CA8).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      role,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: const Color(0xFF0E5CA8),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildChipList(List<dynamic> items, IconData icon) {
-    return Wrap(
-      spacing: 8.w,
-      runSpacing: 8.h,
-      children: (items as List).map((item) {
-        return Chip(
-          avatar: Icon(icon, size: 16.sp, color: const Color(0xFF0E5CA8)),
-          label: Text(item.toString()),
-          backgroundColor: const Color(0xFF0E5CA8).withOpacity(0.1),
-          labelStyle: TextStyle(
-            color: const Color(0xFF0E5CA8),
-            fontSize: 14.sp,
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildPermissionList(List<dynamic> permissions) {
-    return Wrap(
-      spacing: 8.w,
-      runSpacing: 8.h,
-      children: (permissions as List).map((permission) {
-        return Chip(
-          avatar: Icon(
-            Icons.check_circle,
-            size: 16.sp,
-            color: Colors.green,
-          ),
-          label: Text(_formatPermission(permission.toString())),
-          backgroundColor: Colors.green.withOpacity(0.1),
-          labelStyle: TextStyle(
-            color: Colors.black87,
-            fontSize: 12.sp,
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _confirmLogout,
-        icon: const Icon(Icons.logout),
-        label: const Text('LOGOUT'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(vertical: 12.h),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.r),
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        // Edit Profile Button
+        Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(bottom: 12.h),
+          child: ElevatedButton.icon(
+            onPressed: _editProfile,
+            icon: const Icon(Icons.edit),
+            label: Text(
+              'EDIT PROFILE',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5CA8),
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 16.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 2,
+            ),
           ),
         ),
+
+        // Logout Button
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.red.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            onPressed: _confirmLogout,
+            icon: const Icon(Icons.logout),
+            label: Text(
+              'LOGOUT',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 16.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 0,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _copyToClipboard(String value, String label) {
+    // You can implement clipboard functionality here using flutter/services
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label copied to clipboard'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _editProfile() {
+    // Navigate to edit profile screen or show edit dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Edit profile feature coming soon'),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -289,59 +590,139 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
       ),
       builder: (context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.edit, color: Colors.blue),
-                title: const Text('Edit Profile'),
-                subtitle: const Text('Update your personal information'),
-                onTap: () {
+              Container(
+                width: 40.w,
+                height: 4.h,
+                margin: EdgeInsets.only(top: 12.h, bottom: 20.h),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              Text(
+                'Profile Options',
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 20.h),
+              _buildActionMenuItem(
+                Icons.edit,
+                'Edit Profile',
+                'Update your personal information',
+                Colors.blue,
+                    () {
+                  Navigator.pop(context);
+                  _editProfile();
+                },
+              ),
+              _buildActionMenuItem(
+                Icons.lock,
+                'Change Password',
+                'Update your security credentials',
+                Colors.orange,
+                    () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Edit profile not implemented yet')),
+                    const SnackBar(
+                      content: Text('Change password feature coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.lock, color: Colors.orange),
-                title: const Text('Change Password'),
-                subtitle: const Text('Update your security credentials'),
-                onTap: () {
+              _buildActionMenuItem(
+                Icons.notifications,
+                'Notification Settings',
+                'Manage your notification preferences',
+                Colors.purple,
+                    () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Change password not implemented yet')),
+                    const SnackBar(
+                      content: Text('Notification settings feature coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.notifications, color: Colors.purple),
-                title: const Text('Notification Settings'),
-                subtitle: const Text('Manage your notification preferences'),
-                onTap: () {
+              _buildActionMenuItem(
+                Icons.help,
+                'Help & Support',
+                'Get assistance and support',
+                Colors.green,
+                    () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notification settings not implemented yet')),
+                    const SnackBar(
+                      content: Text('Help & support feature coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout'),
-                subtitle: const Text('Sign out from your account'),
-                onTap: () {
+              _buildActionMenuItem(
+                Icons.logout,
+                'Logout',
+                'Sign out from your account',
+                Colors.red,
+                    () {
                   Navigator.pop(context);
                   _confirmLogout();
                 },
               ),
+              SizedBox(height: 20.h),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActionMenuItem(
+      IconData icon,
+      String title,
+      String subtitle,
+      Color color,
+      VoidCallback onTap,
+      ) {
+    return ListTile(
+      leading: Container(
+        padding: EdgeInsets.all(8.w),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color, size: 24.sp),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16.sp,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 14.sp,
+          color: Colors.grey[600],
+        ),
+      ),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        size: 16.sp,
+        color: Colors.grey[400],
+      ),
+      onTap: onTap,
     );
   }
 
@@ -354,7 +735,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-   Future<void> _logout() async {
+  Future<void> _logout() async {
     setState(() {
       _isLoading = true;
     });
@@ -364,18 +745,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await apiService.logout();
 
       if (mounted) {
-        // Navigate to login screen and clear navigation stack
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/login',
-          (route) => false,
+              (route) => false,
         );
       }
     } catch (e) {
       debugPrint('Error during logout: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error logging out: $e')),
+          SnackBar(
+            content: Text('Error logging out: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -387,29 +771,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  String _formatRole(String role) {
-    switch (role) {
-      case 'delivery_boy':
-        return 'Delivery Executive';
-      case 'cse':
-        return 'Customer Service Executive';
-      case 'cashier':
-        return 'Cashier';
-      case 'warehouse_manager':
-        return 'Warehouse Manager';
-      case 'general_manager':
-        return 'General Manager';
-      default:
-        return role.split('_')
-            .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1)}')
-            .join(' ');
+  String _getInitials(String name) {
+    List<String> nameParts = name.trim().split(RegExp(r'\s+'));
+    if (nameParts.length >= 2) {
+      return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
     }
-  }
-
-  String _formatPermission(String permission) {
-    return permission.split('_')
-        .map((word) => word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1)}')
-        .join(' ');
+    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 }
 
@@ -421,12 +788,35 @@ class LogoutConfirmationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Confirm Logout'),
-      content: const Text('Are you sure you want to logout?'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      title: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8.w),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.logout, color: Colors.red, size: 24.sp),
+          ),
+          SizedBox(width: 12.w),
+          const Text('Confirm Logout'),
+        ],
+      ),
+      content: const Text(
+        'Are you sure you want to logout from your account? You will need to login again to access the app.',
+        style: TextStyle(fontSize: 16),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('CANCEL'),
+          child: Text(
+            'CANCEL',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         ElevatedButton(
           onPressed: () async {
@@ -436,8 +826,14 @@ class LogoutConfirmationDialog extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
             foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
           ),
-          child: const Text('LOGOUT'),
+          child: const Text(
+            'LOGOUT',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );

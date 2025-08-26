@@ -3,19 +3,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lpg_distribution_app/presentation/blocs/cash/cash_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/inventory/inventory_bloc.dart';
-import 'package:lpg_distribution_app/presentation/blocs/order_form/order_form_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/orders/orders_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/vehicle/vehicle_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/login_screen.dart';
 import 'package:lpg_distribution_app/presentation/pages/main_container.dart';
-import 'package:lpg_distribution_app/presentation/pages/orders/create_order_page.dart';
+import 'package:lpg_distribution_app/presentation/pages/orders/forms/create_sale_order_page.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/forms/cash_deposit_page.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/cash_page.dart';
-import 'package:lpg_distribution_app/presentation/pages/orders/orders_page.dart';
 import 'package:lpg_distribution_app/presentation/pages/splash_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'core/network/api_client.dart';
-import 'core/services/api_service.dart';
 import 'core/services/service_provider.dart';
 import 'core/services/api_service_interface.dart';
 
@@ -34,10 +31,10 @@ void main() async {
               create: (context) => OrdersBloc(apiService: context.read<ApiServiceInterface>()),
             ),
            // Add the OrderFormBloc provider
-            BlocProvider<OrderFormBloc>(
-              create: (context) => OrderFormBloc(
-                  apiService: context.read<ApiServiceInterface>()),
-            ),
+           //  BlocProvider<OrderFormBloc>(
+           //    create: (context) => OrderFormBloc(
+           //    apiService: context.read<ApiServiceInterface>()),
+           //  ),
             BlocProvider<CashManagementBloc>(
               create: (context) => CashManagementBloc(
                   apiService: context.read<ApiServiceInterface>()),
@@ -48,6 +45,9 @@ void main() async {
                 apiService: apiService,
               ),
             ),
+          BlocProvider<VehicleBloc>(
+            create: (context) => VehicleBloc(apiService: context.read<ApiServiceInterface>()),
+          ),
         ],
         child: const MyApp(),
       ),
@@ -84,7 +84,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Wrap MaterialApp with ScreenUtilInit for responsive design
+
     return ScreenUtilInit(
       // Design size based on style guide - these dimensions should match your design mockups
       designSize: const Size(375, 812),
@@ -160,13 +160,13 @@ class _MyAppState extends State<MyApp> {
             '/dashboard': (context) => const MainContainer(),
             '/orders/create': (context) => BlocProvider.value(
               value: BlocProvider.of<OrdersBloc>(context),
-              child: const CreateOrderPage(),
+              child: const CreateSaleOrderScreen(),
             ),
             '/cash': (context) => const CashPage(),
             '/cash/deposit': (context) =>  CashDepositPage(),
             '/inventory/create': (context) => BlocProvider.value(
               value: BlocProvider.of<InventoryBloc>(context),
-              child:  const CreateOrderPage(),
+              child:  const CreateSaleOrderScreen(),
             ),
           },
         );

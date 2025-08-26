@@ -3,9 +3,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/cash_page.dart';
 import 'package:lpg_distribution_app/presentation/pages/dashboard/dashboard_screen.dart';
 import 'package:lpg_distribution_app/presentation/pages/profile/profile_screen.dart';
-import 'package:lpg_distribution_app/presentation/widgets/orders/orders_page.dart';
+import 'package:lpg_distribution_app/presentation/pages/orders/orders_page.dart';
 
-import 'inventory/inventory_request_screen.dart';
+import 'inventory/inventory_screen.dart';
 
 
 class MainContainer extends StatefulWidget {
@@ -28,7 +28,7 @@ class _MainContainerState extends State<MainContainer> {
           OrdersPage(),
           CashPage(),
            // InventoryListPage(),
-           InventoryRequestsPage(),
+           InventoryPage(),
           ProfileScreen(),
         ],
       ),

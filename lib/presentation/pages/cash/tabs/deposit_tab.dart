@@ -2,133 +2,132 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
-import 'dart:io';
-import 'package:photo_view/photo_view.dart';
-
 import '../../../../domain/entities/cash/cash_transaction.dart';
 import '../../../blocs/cash/cash_bloc.dart';
 import '../../../widgets/cash/widget_transaction_item.dart';
-import '../../../../utils/swipeButton.dart';
+import '../cash_transaction_detail_screen.dart';
 
 class DepositsTab extends StatelessWidget {
-  String? userName;
-    DepositsTab({
-      Key? key,
-      this.userName,
-    }) : super(key: key);
+  DepositsTab({
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<CashManagementBloc, CashManagementState>(
-      builder: (context, state) {
-        if (state is CashManagementLoading) {
-          return const Center(child: CircularProgressIndicator());
+    return BlocListener<CashManagementBloc, CashManagementState>(
+      listener: (context, state) {
+        // Listen for transaction updates and automatically refresh
+        if (state is TransactionActionSuccess) {
+          // Transaction was approved/rejected, data will be refreshed automatically
+          // No need to do anything here, just let the UI rebuild
         }
+      },
+      child: BlocBuilder<CashManagementBloc, CashManagementState>(
+        builder: (context, state) {
+          // Your existing builder code stays the same
+          if (state is CashManagementLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        if (state is CashManagementError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 48.sp, color: Colors.red),
-                SizedBox(height: 16.h),
-                Text(
-                  'Error loading deposit data',
-                  style: TextStyle(fontSize: 16.sp),
-                ),
-                SizedBox(height: 8.h),
-                ElevatedButton(
-                  onPressed: () => context.read<CashManagementBloc>().add(LoadCashData()),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (state is CashManagementLoaded) {
-          // Filter only deposit transactions
-          final deposits = state.filteredTransactions
-              .where((tx) => tx.type == TransactionType.deposit)
-              .toList();
-
-          if (deposits.isEmpty) {
+          if (state is CashManagementError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    size: 64.sp,
-                    color: Colors.grey[400],
-                  ),
+                  Icon(Icons.error_outline, size: 48.sp, color: Colors.red),
                   SizedBox(height: 16.h),
                   Text(
-                    'No deposits found',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      color: Colors.grey[600],
-                    ),
+                    'Error loading deposit data',
+                    style: TextStyle(fontSize: 16.sp),
                   ),
-                  SizedBox(height: 16.h),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/cash/deposit');
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Deposit'),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                    ),
+                  SizedBox(height: 8.h),
+                  ElevatedButton(
+                    onPressed: () => context.read<CashManagementBloc>().add(LoadCashData()),
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
             );
           }
 
-          // Group transactions by date
-          final groupedDeposits = _groupTransactionsByDate(deposits);
+          if (state is CashManagementLoaded) {
+            // Filter only deposit transactions
+            final deposits = state.filteredTransactions
+                .where((tx) => tx.type == TransactionType.deposit)
+                .toList();
 
-          return ListView.builder(
-            padding: EdgeInsets.only(top: 16.h, bottom: 80.h),
-            itemCount: groupedDeposits.length,
-            itemBuilder: (context, index) {
-              final date = groupedDeposits.keys.elementAt(index);
-              final dateDeposits = groupedDeposits[date]!;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                    child: Text(
-                      _formatDateHeader(date),
+            if (deposits.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      size: 64.sp,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'No deposits found',
                       style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
+                        fontSize: 16.sp,
+                        color: Colors.grey[600],
                       ),
                     ),
-                  ),
-                  ...dateDeposits
-                    .where((deposit) => deposit.paidTo == userName)
-                    .map((deposit) => TransactionItem(
-                      transaction: deposit,
-                      onTap: () => _showDepositDetails(context, deposit),
-                      isFromDepositsTab: true,
-                    ))
-                    .toList(),
-                ],
+                  ],
+                ),
               );
-            },
-          );
-        }
+            }
 
-        return const Center(child: Text('No data available'));
-      },
+            // Group transactions by date
+            final groupedDeposits = _groupTransactionsByDate(deposits);
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<CashManagementBloc>().add(RefreshCashData());
+                return await Future.delayed(const Duration(milliseconds: 500));
+              },
+              child: ListView.builder(
+                padding: EdgeInsets.only(top: 16.h, bottom: 80.h),
+                itemCount: groupedDeposits.length,
+                itemBuilder: (context, index) {
+                  final date = groupedDeposits.keys.elementAt(index);
+                  final dateDeposits = groupedDeposits[date]!;
+
+                  if (dateDeposits.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                        child: Text(
+                          _formatDateHeader(date),
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                      ...dateDeposits
+                          .map((deposit) => TransactionItem(
+                        transaction: deposit,
+                        onTap: () => _navigateToTransactionDetail(context, deposit),
+                        isFromDepositsTab: true,
+                      ))
+                          .toList(),
+                    ],
+                  );
+                },
+              ),
+            );
+          }
+          return const Center(child: Text('No data available'));
+        },
+      ),
     );
   }
 
@@ -172,307 +171,31 @@ class DepositsTab extends StatelessWidget {
     }
   }
 
-  void _showDepositDetails(BuildContext context, CashTransaction transaction) {
-    final statusColor = transaction.status == TransactionStatus.approved
-        ? const Color(0xFF4CAF50)
-        : transaction.status == TransactionStatus.rejected
-        ? const Color(0xFFF44336)
-        : const Color(0xFFFFC107);
+  void _navigateToTransactionDetail(BuildContext context, CashTransaction transaction) async {
+    // Determine if current user can approve this transaction
+    // This logic should be based on user role and transaction type
+    bool canApprove = _canUserApproveTransaction(context, transaction);
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(24.w),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.75,
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BlocProvider.value(
+          value: context.read<CashManagementBloc>(),
+          child: TransactionDetailScreen(
+            transactionId: transaction.id,
+            canApprove: canApprove,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Deposit Details',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    child: Text(
-                      transaction.statusText,
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 24.h),
-
-              _buildDetailRow('Deposit ID', transaction.id),
-              _buildDetailRow('Amount',
-                  NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN')
-                      .format(transaction.amount)),
-              _buildDetailRow('Date & Time',
-                  DateFormat('MMM d, y – h:mm a').format(transaction.createdAt)),
-              _buildDetailRow('Account Type', transaction.accountTypeText),
-
-              if (transaction.notes != null && transaction.notes!.isNotEmpty)
-                _buildDetailRow('Remarks', transaction.notes!),
-
-              if (transaction.status == TransactionStatus.rejected &&
-                  transaction.rejectionReason != null)
-
-              _buildDetailRow('createdBy', transaction.createdBy!),
-
-              if (transaction.status == TransactionStatus.rejected &&
-                  transaction.rejectionReason != null)
-                _buildDetailRow('Rejection Reason', transaction.rejectionReason!),
-
-              SizedBox(height: 32.h),
-              // Action buttons (approve/reject for pending, close for others)
-              if (transaction.status == TransactionStatus.pending) ...[
-                Container(
-                  height: 60.h,
-                  margin: EdgeInsets.symmetric(vertical: 8.h),
-                  child: SwipeActionButton(
-                    onReject: () {
-                      Navigator.pop(context);
-                      _showRejectDialog(context, transaction);
-                    },
-                    onApprove: () {
-                      Navigator.pop(context);
-                      _approveDeposit(context, transaction);
-                    },
-                  ),
-                )
-              ] else
-                Center(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      minimumSize: Size(200.w, 48.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                    ),
-                    child: const Text('Close',
-                      style: TextStyle(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showRejectDialog(BuildContext context, CashTransaction transaction) {
-    final TextEditingController reasonController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Deposit'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Please provide a reason for rejection:'),
-            SizedBox(height: 16.h),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                hintText: 'Enter reason',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please provide a rejection reason'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-                return;
-              }
-              else{
-                Navigator.pop(context);
-                _rejectDeposit(context, transaction, reasonController);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('Reject'),
-          ),
-        ],
       ),
     );
+
+    // If any action was taken (approve/reject), refresh the data
+    if (result == true && context.mounted) {
+      context.read<CashManagementBloc>().add(RefreshCashData());
+    }
   }
 
-    void _approveDeposit(BuildContext context, CashTransaction transaction) async {
-      try {
-        final bloc = context.read<CashManagementBloc>();
-        final apiService = bloc.apiService;
-
-        final result = await apiService.approveTransaction(transaction.id);
-
-        if (result != null && result['success'] == true) {
-          // Dispatch RefreshCashData to update the list
-          bloc.add(RefreshCashData());
-
-          // Show success SnackBar
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['message'] ?? 'Deposit approved successfully'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        } else {
-          // Handle failure case
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result?['message'] ?? 'Failed to approve deposit'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        // Handle exception
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Approval failed: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-
-    void _rejectDeposit(BuildContext context, CashTransaction transaction, TextEditingController rejectionReasonController) async {
-      try {
-        final bloc = context.read<CashManagementBloc>();
-        final apiService = bloc.apiService;
-
-        // Ensure rejection reason is not empty
-        final rejectionReason = rejectionReasonController.text.trim();
-        if (rejectionReason.isEmpty) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Rejection reason cannot be empty'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          return;
-        }
-
-        // Call the API to reject the transaction
-        final result = await apiService.rejectTransaction(transaction.id, {'reason': rejectionReason});
-
-        if (result != null && result['success'] == true) {
-          // Dispatch RefreshCashData to update the list
-          bloc.add(RefreshCashData());
-
-          // Show success SnackBar
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['message'] ?? 'Deposit rejected successfully'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-          Navigator.pop(context);
-        } else {
-          // Handle failure case
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result?['message'] ?? 'Failed to reject deposit'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        // Handle exception
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Rejection failed: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        Navigator.pop(context);
-      }
-    }
-
-  Widget _buildDetailRow(String label, String value, {Color? textColor}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120.w,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14.sp,
-                color: Colors.grey[600],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  bool _canUserApproveTransaction(BuildContext context, CashTransaction transaction) {
+    return transaction.status == TransactionStatus.pending;
   }
-
 }

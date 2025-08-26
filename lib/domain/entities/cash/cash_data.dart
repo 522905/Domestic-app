@@ -28,7 +28,7 @@ class CashData extends Equatable {
     todayDeposits,
     todayHandovers,
     todayRefunds,
-    customerOverview, // Include this field in props for equality checks
+    customerOverview,
   ];
 
   CashData copyWith({
@@ -38,6 +38,7 @@ class CashData extends Equatable {
     double? todayDeposits,
     double? todayHandovers,
     double? todayRefunds,
+    List<Map<String, dynamic>>? customerOverview, // FIXED: Added missing parameter
   }) {
     return CashData(
       cashInHand: cashInHand ?? this.cashInHand,
@@ -46,7 +47,7 @@ class CashData extends Equatable {
       todayDeposits: todayDeposits ?? this.todayDeposits,
       todayHandovers: todayHandovers ?? this.todayHandovers,
       todayRefunds: todayRefunds ?? this.todayRefunds,
-      customerOverview: List<Map<String, dynamic>>.from(customerOverview), // Ensure immutability
+      customerOverview: customerOverview ?? List<Map<String, dynamic>>.from(this.customerOverview), // FIXED: Properly handle customerOverview
     );
   }
 }

@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-
-import '../../blocs/orders/orders_bloc.dart';
-import '../../pages/inventory/inventory_request_screen.dart';
 
 class InventoryActionCard extends StatelessWidget {
   final String title;

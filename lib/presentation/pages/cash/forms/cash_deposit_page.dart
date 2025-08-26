@@ -1,18 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/services/api_service_interface.dart';
 import '../../../../domain/entities/cash/cash_transaction.dart';
 import '../../../../utils/dialog_utils.dart';
 import '../../../blocs/cash/cash_bloc.dart';
 
-enum AccountType {
-  refill,
-  svTv,
-  nfr,
-}
 
 class CashDepositPage extends StatefulWidget {
   const CashDepositPage({Key? key}) : super(key: key);
@@ -26,34 +21,91 @@ class _CashDepositPageState extends State<CashDepositPage> {
   final _formKey = GlobalKey<FormState>();
   final _remarksController = TextEditingController();
   final _amountController = TextEditingController();
-  final _receiptNumberController = TextEditingController();
-  String?  _selectedAccount ;
+  String? _selectedAccountType;
+  String? _selectedAccount;
 
-  AccountType _selectedAccountType = AccountType.refill;
+  // Store full objects instead of just names
+  List<Map<String, dynamic>> _accountTypeObjects = [];
+  List<Map<String, dynamic>> _paidToAccountObjects = [];
 
-  // Format currency
-  final _currencyFormat = NumberFormat.currency(
-    symbol: '₹',
-    decimalDigits: 0,
-    locale: 'en_IN',
-  );
+  // Keep these for UI display (derived from objects)
+  List<String> _accountType = [];
+  List<String> _paidToAccountList = [];
 
-  final List<Map<String, dynamic>> _accounts = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    apiService = context.read<ApiServiceInterface>(); // Initialize apiService
-    _fetchAccounts(); // Fetch accounts when the page loads
+    apiService = context.read<ApiServiceInterface>();
+    _fetchCashData();
+  }
+
+  Future<void> _fetchCashData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Fetch account type list - store full objects
+      final accountTypeResponse = await apiService.getAccountType();
+      _accountTypeObjects = List<Map<String, dynamic>>.from(accountTypeResponse);
+      final accountTypeList = _accountTypeObjects
+          .map<String>((item) => item['account_name'] as String)
+          .toList();
+
+      // Fetch paid-to account list - store full objects
+      final paidToAccountResponse = await apiService.getCashAccount();
+      _paidToAccountObjects = List<Map<String, dynamic>>.from(paidToAccountResponse);
+      final paidToAccountList = _paidToAccountObjects
+          .map<String>((item) => item['account_name'] as String)
+          .toList();
+
+      // Update state with the fetched data
+      setState(() {
+        _isLoading = false;
+        _accountType = accountTypeList;
+        _paidToAccountList = paidToAccountList;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching accounts: $e')),
+      );
+    }
+  }
+
+  // Helper function to get account type ID from name
+  int? _getAccountTypeId(String accountName) {
+    try {
+      final account = _accountTypeObjects.firstWhere(
+            (item) => item['account_name'] == accountName,
+      );
+      return account['id'] as int;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Helper function to get paid-to account ID from name
+  int? _getPaidToAccountId(String accountName) {
+    try {
+      final account = _paidToAccountObjects.firstWhere(
+            (item) => item['account_name'] == accountName,
+      );
+      return account['id'] as int;
+    } catch (e) {
+      return null;
+    }
   }
 
   @override
   void dispose() {
-    _remarksController.dispose();
-    _amountController.dispose();
-    _receiptNumberController.dispose();
     _selectedAccount = null;
+    _amountController.dispose();
+    _remarksController.dispose();
     super.dispose();
   }
 
@@ -95,18 +147,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
                         ),
                       ),
                       // Account Radio Buttons
-                      _buildAccountRadio(
-                        type: AccountType.svTv,
-                        label: 'SV/TV Account',
-                      ),
-                      _buildAccountRadio(
-                        type: AccountType.refill,
-                        label: 'Refill Account',
-                      ),
-                      _buildAccountRadio(
-                        type: AccountType.nfr,
-                        label: 'NFR Account',
-                      ),
+                      _buildDynamicAccountRadios(),
                       SizedBox(height: 8.h),
                       // Amount
                       Text(
@@ -137,8 +178,6 @@ class _CashDepositPageState extends State<CashDepositPage> {
                         },
                       ),
                       SizedBox(height: 16.h),
-
-                      // Receipt Number
                       Text(
                         'Paid To',
                         style: TextStyle(
@@ -179,9 +218,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
                           contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                         ),
                       ),
-
                       SizedBox(height: 24.h),
-
                       // Submit Button
                       SizedBox(
                         width: double.infinity,
@@ -216,204 +253,76 @@ class _CashDepositPageState extends State<CashDepositPage> {
     );
   }
 
-  Future<void> _fetchAccounts() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final response = await apiService.getAccountsList();
-      if (response['success'] == true) {
-        final accounts = response['accounts'];
-        if (accounts is List) { // Ensure accounts is a list
-          setState(() {
-            _accounts.clear();
-            _accounts.addAll(
-              accounts.map((account) =>
-                {
-                  'value': account['username'] ?? 'Unknown Account',
-                  'type': account['account_type'] ?? 'Unknown Type',
-                },
-              ).toList(),
-            );
-            _isLoading = false;
-          });
-        } else {
-          throw Exception('Invalid accounts format');
-        }
-      } else {
-        throw Exception('Failed to fetch accounts');
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching accounts: $e')),
-      );
-    }
-  }
-
-  String _getAccountLabel(AccountType type) {
-    switch (type) {
-      case AccountType.svTv:
-        return 'SV/TV Account';
-      case AccountType.refill:
-        return 'Refill Account';
-      case AccountType.nfr:
-        return 'NFR Account';
-      default:
-        return 'Unknown Account';
-    }
-  }
-
-  void _submitDeposit() {
+  void _submitDeposit() async {
     if (_formKey.currentState!.validate()) {
-      // Check if amount is valid
       final amount = double.tryParse(_amountController.text);
       if (amount == null || amount <= 0) {
         _showInvalidAmountDialog();
         return;
       }
 
-      if( _selectedAccount == null || _selectedAccount!.isEmpty) {
+      if (_selectedAccount == null || _selectedAccount!.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select Account')),
+          const SnackBar(content: Text('Please select Account Paid To')),
         );
         return;
       }
-      _showConfirmationDialog();
+
+      // Get IDs instead of names
+      final accountTypeId = _selectedAccountType != null
+          ? _getAccountTypeId(_selectedAccountType!)
+          : null;
+      final paidToAccountId = _selectedAccount != null
+          ? _getPaidToAccountId(_selectedAccount!)
+          : null;
+
+      // Validate IDs were found
+      if (accountTypeId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid account type selected')),
+        );
+        return;
+      }
+
+      if (paidToAccountId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid paid-to account selected')),
+        );
+        return;
+      }
+
+      final transaction = CashTransaction(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: TransactionType.deposit,
+        status: TransactionStatus.pending,
+        amount: amount,
+        createdAt: DateTime.now(),
+        initiator: 'D',
+        fromAccount: accountTypeId.toString(), // Send ID as string
+        selectedAccount: paidToAccountId.toString(), // Send ID as string
+        paidTo: paidToAccountId.toString(), // Send ID as string
+        createdBy: 'Current User',
+        notes: _remarksController.text.isNotEmpty ? _remarksController.text : null,
+      );
+
+      final completer = Completer<void>();
+      context.read<CashManagementBloc>().add(
+          AddTransaction(transaction, completer: completer)
+      );
+
+      try {
+        await completer.future;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Deposit submitted successfully')),
+        );
+        // Return success indicator instead of the transaction object
+        Navigator.of(context).pop(true); // Return true to indicate success
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error submitting deposit: $e')),
+        );
+      }
     }
-  }
-
-  void _showConfirmationDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.r),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(24.w),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Success icon
-              Container(
-                width: 72.w,
-                height: 72.w,
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check,
-                  color: Colors.green,
-                  size: 36.sp,
-                ),
-              ),
-              SizedBox(height: 16.h),
-
-              // Title
-              Text(
-                'Deposit Submitted',
-                style: TextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8.h),
-
-              // Description
-              Text(
-                '${_currencyFormat.format(double.parse(_amountController.text))} deposit to ${_getAccountLabel(_selectedAccountType)}',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  color: Colors.grey[700],
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              Text(
-                'has been submitted for approval',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  color: Colors.grey[700],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                'Reference ID: DEP-7321',
-                style: TextStyle(
-                  fontSize: 14.sp,
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 24.h),
-
-              // OK Button
-              SizedBox(
-                width: 120.w,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final transaction = CashTransaction(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        type: TransactionType.deposit,
-                        status: TransactionStatus.pending,
-                        amount: double.parse(_amountController.text),
-                        createdAt: DateTime.now(),
-                        initiator: 'D',
-                        accountType: _selectedAccountType == AccountType.svTv
-                            ? TransactionAccountType.svTv
-                            : _selectedAccountType == AccountType.refill
-                            ? TransactionAccountType.refill
-                            : TransactionAccountType.nfr,
-                        selectedAccount: _selectedAccount,
-                        notes: [
-                          if (_remarksController.text.isNotEmpty) _remarksController.text,
-                          if (_receiptNumberController.text.isNotEmpty) 'Receipt: ${_receiptNumberController.text}',
-                          'Account: ${_getAccountLabel(_selectedAccountType)}',
-                        ].join(' • ')
-                      );
-                    // Add transaction to the bloc
-
-                    context.read<CashManagementBloc>().add(AddTransaction(transaction));
-
-                    context.read<CashManagementBloc>().add(LoadCashData());
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Deposit submitted successfully')),
-                    );
-                    context.read<CashManagementBloc>().add(RefreshCashData());
-
-                    Navigator.of(context)
-                      ..pop(transaction) // closes the dialog
-                      ..pop(transaction); // goes back to Cash page
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24.r),
-                    ),
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
-                  ),
-                  child: Text(
-                    'OK',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _showInvalidAmountDialog() {
@@ -509,7 +418,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
     DialogUtils.showAccountSelectionDialog(
       context: context,
       isLoading: _isLoading,
-      accounts: _accounts,
+      accounts: _paidToAccountObjects, // Pass full objects instead of just names
       onAccountSelected: (selectedAccount) {
         setState(() {
           _selectedAccount = selectedAccount;
@@ -518,40 +427,44 @@ class _CashDepositPageState extends State<CashDepositPage> {
     );
   }
 
-  Widget _buildAccountRadio({required AccountType type, required String label}) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedAccountType = type;
-        });
-      },
-      borderRadius: BorderRadius.circular(4.r),
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 2.h),
-        child: Row(
-          children: [
-            Radio<AccountType>(
-              value: type,
-              groupValue: _selectedAccountType,
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedAccountType = value;
-                  });
-                }
-              },
-              activeColor: const Color(0xFF0E5CA8),
+  Widget _buildDynamicAccountRadios() {
+    return Column(
+      children: _accountType.map((accountName) {
+        return InkWell(
+          onTap: () {
+            setState(() {
+              _selectedAccountType = accountName;
+            });
+          },
+          borderRadius: BorderRadius.circular(4.r),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 2.h),
+            child: Row(
+              children: [
+                Radio<String>(
+                  value: accountName,
+                  groupValue: _selectedAccountType,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedAccountType = value;
+                      });
+                    }
+                  },
+                  activeColor: const Color(0xFF0E5CA8),
+                ),
+                Text(
+                  accountName,
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
             ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14.sp,
-                color: Colors.grey[800],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

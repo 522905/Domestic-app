@@ -1,12 +1,9 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:lpg_distribution_app/core/services/token_manager.dart';
-
-import '../../domain/entities/warehouse.dart';
-import '../models/inventory_request.dart';
+import 'package:lpg_distribution_app/core/services/User.dart';
+import '../models/inventory/inventory_request.dart';
 import '../network/api_client.dart';
-import '../network/api_endpoints.dart';
 import 'api_service_interface.dart';
 
 class ApiService implements ApiServiceInterface {
@@ -36,42 +33,40 @@ class ApiService implements ApiServiceInterface {
   }
 
   @override
-  Future<Map<String, dynamic>> login(String username, String password) async {
-    await apiClient.logout();
-    final resp = await apiClient.post(
-      apiClient.endpoints.login,
-      data: {
-        "username": username,
-        "password": password,
-      },
-      options: Options(
-        contentType: 'application/json',
-        headers: {
-          'Content-Type': 'application/json',
+    Future<Map<String, dynamic>> login(String username, String password) async {
+      await apiClient.logout();
+
+      final resp = await apiClient.post(
+        apiClient.endpoints.login,
+        data: {
+          "username": username,
+          "password": password,
         },
-      ),
-    );
+        options: Options(
+          contentType: 'application/json',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        ),
+      );
 
-    final access = resp.data['token']['access'];
-    final refresh = resp.data['token']['refresh'];
+      final access = resp.data['token']['access'];
+      final refresh = resp.data['token']['refresh'];
 
-final user = Map<String, dynamic>.from(resp.data['user']);
-final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list of strings
+      final user = Map<String, dynamic>.from(resp.data['user']);
 
-        await TokenManager().saveSession(
-          access: access,
-          refresh: refresh,
-          user: user,
-          roles: roles, // Pass the roles list instead of a single role
-        );
-    await apiClient.setToken(access);
-    return resp.data;
-  }
+      await User().saveSession(
+        access: access,
+        refresh: refresh,
+        user: user,
+      );
 
+      await apiClient.setToken(access);
+      return resp.data;
+    }
   @override
   Future<void> logout() async {
     try {
-      // No logout endpoint in FastAPI implementation, just clear token
       await apiClient.logout();
     } catch (e) {
       _handleError(e);
@@ -79,26 +74,40 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
     }
   }
 
+
+  @override
+  Future<Map<String, dynamic>> getOrderItems({
+    required String orderType,
+    String? warehouseId,
+  }) async {
+    try {
+      final queryParams = {
+        'order_type': orderType,
+      };
+
+      if (warehouseId != null) {
+        queryParams['warehouse_id'] = warehouseId;
+      }
+
+      final response = await apiClient.get(
+        apiClient.endpoints.getOrderItems,
+        queryParameters: queryParams,
+      );
+      return response.data;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+
   @override
   Future<Map<String, dynamic>> createOrder(
       Map<String, dynamic> orderData) async {
     try {
-      final accessToken = await TokenManager().getToken();
-
-      final userName = await TokenManager().getUserName();
-
-      orderData['customer_name'] = userName ?? 'Unknown User';
-
       final response = await apiClient.post(
         apiClient.endpoints.orders,
         data: orderData,
-        options: Options(
-          contentType: 'application/json',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $accessToken'
-          },
-        ),
       );
       return response.data;
     } catch (e) {
@@ -108,18 +117,14 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
   }
 
   @override
-  Future<List<dynamic>> getWarehouses() async {
+  Future<List<dynamic>> getWarehouses({String? depositType}) async {
     try {
       final response = await apiClient.get(
-          apiClient.endpoints.warehouses
+          apiClient.endpoints.warehouseListApi
       );
       if (response.statusCode == 200) {
         final data = response.data;
-        if (data is Map<String, dynamic> && data.containsKey('warehouses')) {
-          return (data['warehouses'] as List<dynamic>)
-              .map((warehouse) => Warehouse.fromJson(warehouse))
-              .toList();
-        }
+        return data;
       }
       throw Exception('Failed to load warehouses');
     } catch (e) {
@@ -128,11 +133,29 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
     }
   }
 
-  Future<List<Map<String, dynamic>>> getItemList() async {
-    final accessToken = await TokenManager().getToken();
+  @override
+  Future<List<dynamic>> getPartnerList() async {
     try {
       final response = await apiClient.get(
-        apiClient.endpoints.itemList,
+          apiClient.endpoints.partnerListApi
+      );
+      if (response.statusCode == 200) {
+        final data = response.data;
+        return data;
+      }
+      throw Exception('Failed to load warehouses');
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getItemList() async {
+    final accessToken = await User().getToken();
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.inventoryItemList,
         options: Options(
           contentType: 'application/json',
           headers: {
@@ -152,29 +175,83 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
     }
   }
 
-  // Order methods
-  @override
-  Future<List<dynamic>> getOrdersList() async {
-    try {
-      Map<String, dynamic> queryParams = {};
-      final userRole = await TokenManager().getUserRole();
-      if (userRole.contains('delivery-boy')) {
-        final userName = await TokenManager().getUserName();
-        queryParams['customer'] = userName ?? 'Unknown User';
+    @override
+    Future<Map<String, dynamic>> getUnlinkedItemList() async {
+      try {
+        final response = await apiClient.get(
+          apiClient.endpoints.unlinkedItemsList,
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
       }
+    }
 
+    @override
+    Future<Map<String, dynamic>> getMaterialRequestList() async {
+      try {
+        final response = await apiClient.get(
+          apiClient.endpoints.getMaterialRequestList,
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+    @override
+    Future<Map<String, dynamic>> getPendingSaleOrderList() async {
+      try {
+        final response = await apiClient.get(
+          apiClient.endpoints.getPendingSaleOrderList,
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+  @override
+  Future<Map<String, dynamic>> getPendingDeliveryItems(vehicleId ) async {
+    try {
       final response = await apiClient.get(
+        apiClient.endpoints.getPendingDeliveryItems,
+        queryParameters: {
+          'vehicle': vehicleId,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOrdersList(
+      {
+        int offset = 0,
+        int limit = 20,
+        Map<String, String>? filters,
+      }
+      ) async {
+    try {
+      Map<String, dynamic> queryParams = {
+        'offset': offset,
+        'limit': limit,
+        if (filters != null) ...filters,
+      };
+
+       final response = await apiClient.get(
         apiClient.endpoints.ordersList,
         queryParameters: queryParams,
       );
 
       if (response.statusCode == 200) {
-        if (response.data is Map<String, dynamic> &&
-            response.data['sales_orders'] is List<dynamic>) {
-          return response.data['sales_orders'] as List<dynamic>;
-        } else {
-          throw Exception('Unexpected response format: ${response.data}');
-        }
+        return response.data;
       } else {
         throw Exception(
             'Failed to fetch orders: ${response.statusCode}'
@@ -182,7 +259,7 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
       }
     } catch (e) {
       _handleError(e);
-      return [];
+      return {};
     }
   }
 
@@ -202,13 +279,6 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
   @override
   Future<Map<String, dynamic>> getCashSummary() async {
     Map<String, dynamic> queryParams = {};
-    final userRole = await TokenManager().getUserRole();
-    if (userRole.contains('delivery-boy')) {
-      // final userName = await TokenManager().getUserName();
-      // queryParams['customer'] = userName ?? 'Unknown User';
-      queryParams['customer'] = 'Brijesh Pandey';
-    }
-
     final response = await apiClient.get(
       queryParameters: queryParams,
       apiClient.endpoints.cashSummary,
@@ -218,6 +288,39 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
       return {
         'success': true,
         'customerOverview': response.data['customer_overview'] ?? [],
+      };
+    } else {
+      throw Exception('Failed to fetch cash summary');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getTransactionDetails(String transactionId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.transactionDetail(transactionId),
+      );
+
+      if( response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to fetch transaction details');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getCashierBalance() async {
+    final response = await apiClient.get(
+      apiClient.endpoints.cashierData,
+    );
+
+    if (response.data['success'] == true) {
+      return {
+        'success': true,
+        'cashierBalance': response.data['balance'] ?? {},
       };
     } else {
       throw Exception('Failed to fetch cash summary');
@@ -247,21 +350,32 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
       }
     }
 
+    @override
+    Future<Map<String, dynamic>> stockMaterialRequest() async {
+      final response = await apiClient.get(
+        apiClient.endpoints.stockMaterialRequestList,
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'requests': response.data['data'] !=null
+              ? List<Map<String, dynamic>>.from(response.data['data']["material_requests"] ?? [])
+              : [],
+        };
+      } else {
+        return {
+          'success': false,
+          'accounts': [],
+        };
+      }
+    }
+
   @override
   Future<Map<String, dynamic>> createTransaction(
       Map<String, dynamic> transactionData) async {
-    final userRole = await TokenManager().getUserRole();
-    final userName = await TokenManager().getUserName();
-      if(userRole.contains('delivery-boy')){
-          transactionData['customer_name'] = userName ?? 'Unknown User';
-          transactionData['payment_type'] = "Receive";
-          transactionData['mode_of_payment'] = "Cash ";
-        } else {
-          transactionData['customer_name'] = userName ?? 'Unknown User';
-          transactionData['payment_type'] = "Internal Transfer";
-        }
         final response = await apiClient.post(
-          apiClient.endpoints.cashTransactions,
+          apiClient.endpoints.paymentListApi,
           data: transactionData,
         );
         return response.data as Map<String, dynamic>;
@@ -272,7 +386,7 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
     try {
       // Change this from PUT to GET
       final response = await apiClient.get(
-          apiClient.endpoints.cashList);
+          apiClient.endpoints.paymentListApi);
       return response.data;
     } catch (e) {
       _handleError(e);
@@ -283,8 +397,7 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
   @override
   Future<List<dynamic>> getCashTransactions() async {
     final response = await apiClient.get(
-
-      apiClient.endpoints.cashList);
+        apiClient.endpoints.paymentListApi);
 
     return response.data as List<dynamic>;
 
@@ -294,7 +407,7 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
   Future<Map<String, dynamic>> approveTransaction(
     String transactionId) async {
         final response = await apiClient.post(
-          apiClient.endpoints.transactionApproval(transactionId),
+          apiClient.endpoints.transactionApprove(transactionId),
         );
         return response.data;
   }
@@ -323,57 +436,160 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
       }
     }
 
-  // Inventory methods
-  @override
-  Future<List<dynamic>> getInventory({
-    String? warehouseId,
-    String? itemType,
-    Map<String, dynamic>? filters,
-  }) async {
-    try {
-      String endpoint = warehouseId != null
-          ? '${apiClient.endpoints.inventory}/$warehouseId'  // Use inventory-items/{warehouse_id}
-          : apiClient.endpoints.inventory;
+    @override
+    Future<List<dynamic>> getInventory({
+      String? warehouseId,
+      String? itemType,
+      Map<String, dynamic>? filters,
+    }) async {
+      try {
+        String endpoint = warehouseId != null
+            ? '${apiClient.endpoints.inventory}/$warehouseId'  // Use inventory-items/{warehouse_id}
+            : apiClient.endpoints.inventory;
 
-      print(" Getting inventory from $endpoint");
+        print(" Getting inventory from $endpoint");
 
-      final response = await apiClient.get(
-        endpoint,
-        queryParameters: {
-          if (itemType != null) 'item_type': itemType,
-          if (filters != null) ...filters,
-        },
-      );
+        final response = await apiClient.get(
+          endpoint,
+          queryParameters: {
+            if (itemType != null) 'item_type': itemType,
+            if (filters != null) ...filters,
+          },
+        );
 
-      print("Inventory response: ${response.data}");
-      return response.data;
-    } catch (e) {
-      print("Error getting inventory: $e");
-      return [];
+        print("Inventory response: ${response.data}");
+        return response.data;
+      } catch (e) {
+        print("Error getting inventory: $e");
+        return [];
+      }
     }
-  }
+
+    @override
+    Future<List<InventoryRequest>> getInventoryRequests() async {
+      try {
+        final response = await apiClient.get(
+            apiClient.endpoints.stockListApi
+        );
+
+        if (response.data is List) {
+          return (response.data as List)
+              .map((json) => InventoryRequest.fromJson(json))
+              .toList();
+        }
+        return [];
+      } catch (e) {
+        _handleError(e);
+        return [];
+      }
+    }
 
   @override
-  Future<Map<String, dynamic>> transferInventory(
-      String sourceWarehouseId,
-      String destinationWarehouseId,
-      List<Map<String, dynamic>> items,
-      ) async {
+  Future<InventoryRequest> getInventoryRequestDetail(String requestId) async {
     try {
-      final response = await apiClient.post(
-        apiClient.endpoints.inventoryTransfer,
-        data: {
-          'source_warehouse_id': sourceWarehouseId,
-          'destination_warehouse_id': destinationWarehouseId,
-          'items': items,
-        },
+      final response = await apiClient.get(
+          apiClient.endpoints.stockDetailApi(requestId)
       );
-      return response.data;
+      if (response.data != null) {
+        return InventoryRequest.fromJson(response.data);
+      }
+      throw Exception('No data received');
     } catch (e) {
       _handleError(e);
-      rethrow;
+      rethrow; // Important: rethrow so bloc can handle the error
     }
   }
+
+
+    @override
+    Future<InventoryRequest> createInventoryRequest(InventoryRequest request) async {
+      try {
+        Response response;
+          response = await apiClient.post(
+            apiClient.endpoints.inventoryRequests,
+            data: request.toJson(),
+          );
+
+        // Check for HTTP status code
+        if (response.statusCode == 201) {
+          if (response.data is Map<String, dynamic>) {
+            return InventoryRequest.fromJson(response.data);
+          } else {
+            throw Exception('Invalid response format');
+          }
+        } else {
+          // Throw an exception for non-201 status codes
+          throw Exception(
+            'Failed to create inventory request: ${response.statusCode} - ${response.statusMessage}',
+          );
+        }
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+    @override
+    Future<void> approveInventoryRequest({
+      required String requestId,
+      required String requestType,
+    }) async {
+      try {
+        Response response; // Declare and ensure initialization
+          response = await apiClient.post(
+            apiClient.endpoints.approveRequestsApi(requestId),
+          );
+        print("Approval response: ${response.data}");
+      } catch (e) {
+        print("Error approving inventory request: $e");
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+    @override
+    Future<void> rejectInventoryRequest({
+      required String requestId,
+      required String reason,
+      required String requestType,
+    }) async {
+      try {
+        late Response response;
+          response = await apiClient.post(
+            apiClient.endpoints.rejectRequestsApi(requestId),
+            data: {
+              'reason': reason,
+            },
+          );
+        print("Rejection response: ${response.data}");
+      } catch (e) {
+        print("Error rejecting inventory request: $e");
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+    @override
+    Future<Map<String, dynamic>> transferInventory(
+        String sourceWarehouseId,
+        String destinationWarehouseId,
+        List<Map<String, dynamic>> items,
+        ) async {
+      try {
+        final response = await apiClient.post(
+          apiClient.endpoints.inventoryTransfer,
+          data: {
+            'source_warehouse_id': sourceWarehouseId,
+            'destination_warehouse_id': destinationWarehouseId,
+            'items': items,
+          },
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
 
   // Collection/Deposit methods
   @override
@@ -407,28 +623,28 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
       List<Map<String, dynamic>> items,
       List<String>? orderIds,
       List<String>? materialRequestIds,
-      ) async {
-    try {
-      final response = await apiClient.post(
-        apiClient.endpoints.deposit,
-        data: {
-          'vehicle_id': vehicleId,
-          'warehouse_id': warehouseId,
-          'items': items,
-          'order_ids': orderIds,
-          'material_request_ids': materialRequestIds,
-        },
-      );
-      return response.data;
-    } catch (e) {
-      _handleError(e);
-      rethrow;
-    }
+    ) async {
+      try {
+        final response = await apiClient.post(
+          apiClient.endpoints.deposit,
+          data: {
+            'vehicle_id': vehicleId,
+            'warehouse_id': warehouseId,
+            'items': items,
+            'order_ids': orderIds,
+            'material_request_ids': materialRequestIds,
+          },
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
   }
 
-  // Vehicle methods
+
   @override
-  Future<List<dynamic>> getVehicles() async {
+  Future<List<dynamic>> getVehiclesList() async {
     try {
       final response = await apiClient.get(apiClient.endpoints.vehicles);
       print("RAW VEHICLES RESPONSE: ${response.data}");
@@ -463,7 +679,6 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
     }
   }
 
-  // User methods
   @override
   Future<Map<String, dynamic>> getUserProfile() async {
     try {
@@ -572,49 +787,6 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
   }
 
   // Inventory request methods
-
-  @override
-  Future<dynamic> getCollectionRequestById(String id) async {
-    try {
-      final response = await apiClient.get(apiClient.endpoints.collectionRequestDetail(id));
-      return response.data;
-    } catch (e) {
-      _handleError(e);
-      rethrow;
-    }
-  }
-
-  @override
-  Future<List<InventoryRequest>> getInventoryRequests() async {
-    try {
-      final response = await apiClient.get(apiClient.endpoints.inventoryRequests);
-
-      if (response.data is List) {
-        return (response.data as List)
-            .map((json) => InventoryRequest.fromJson(json))
-            .toList();
-      }
-      return [];
-    } catch (e) {
-      _handleError(e);
-      return [];
-    }
-  }
-
-  @override
-  Future<InventoryRequest> createInventoryRequest(InventoryRequest request) async {
-    try {
-      final response = await apiClient.post(
-        apiClient.endpoints.inventoryRequests,
-        data: request.toJson(),
-      );
-      return InventoryRequest.fromJson(response.data);
-    } catch (e) {
-      _handleError(e);
-      rethrow;
-    }
-  }
-
   @override
   Future<InventoryRequest> updateInventoryRequest(String id, InventoryRequest request) async {
     try {
@@ -643,74 +815,15 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getInventoryItems({
-    int? warehouseId,
-    String? itemType,
-  }) async {
+  Future<dynamic> getCollectionRequestById(String id) async {
     try {
-      Map<String, dynamic> queryParams = {};
-
-      if (warehouseId != null) {
-        queryParams['warehouse_id'] = warehouseId;
-      }
-      if (itemType != null) {
-        queryParams['item_type'] = itemType;
-      }
-
-      final response = await apiClient.get(
-        '/api/inventory-items/',
-        queryParameters: queryParams,
-      );
-
-      return List<Map<String, dynamic>>.from(response.data);
+      final response = await apiClient.get(apiClient.endpoints.collectionRequestDetail(id));
+      return response.data;
     } catch (e) {
-      _handleError(e);
-      return [];
-    }
-  }
-
-  @override
-  Future<void> approveInventoryRequest({required String requestId, required String comment}) async {
-    try {
-      print("Approving inventory request: $requestId with comment: $comment");
-
-      final response = await apiClient.post(
-        '/api/inventory-requests/$requestId/approve', // Use direct endpoint
-        data: {
-          'comment': comment,
-          'approved_by': 'Manager', // You can get this from user context
-        },
-      );
-
-      print("Approval response: ${response.data}");
-    } catch (e) {
-      print("Error approving inventory request: $e");
       _handleError(e);
       rethrow;
     }
   }
-
-  @override
-  Future<void> rejectInventoryRequest({required String requestId, required String reason}) async {
-    try {
-      print("Rejecting inventory request: $requestId with reason: $reason");
-
-      final response = await apiClient.post(
-        '/api/inventory-requests/$requestId/reject', // Use direct endpoint
-        data: {
-          'reason': reason,
-          'rejected_by': 'Manager', // You can get this from user context
-        },
-      );
-
-      print("Rejection response: ${response.data}");
-    } catch (e) {
-      print("Error rejecting inventory request: $e");
-      _handleError(e);
-      rethrow;
-    }
-  }
-
 
 // Add method to get inventory requests as InventoryRequest objects
   Future<List<InventoryRequest>> getInventoryRequestObjects() async {
@@ -779,21 +892,24 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
     }
   }
 
-  @override
-  Future<void> requestOrderApproval(String orderId) async {
-    try {
-      final response = await apiClient.post(
-        '${apiClient.endpoints.orders}$orderId/approve',
-        data: {},
-      );
-      if (response.statusCode != 200) {
-        throw Exception('Failed to request approval');
+   @override
+    Future<dynamic> requestOrderApproval(String orderId) async {
+      try {
+        final response = await apiClient.post(
+          apiClient.endpoints.autoRelease,
+          data: {
+            'sales_order_name': orderId,
+          },
+        );
+        if (response.statusCode != 200) {
+          throw Exception('Failed to request approval');
+        }
+        return response.data; // Ensure the response data is returned
+      } catch (e) {
+        _handleError(e);
+        rethrow;
       }
-    } catch (e) {
-      _handleError(e);
-      rethrow;
     }
-  }
 
   @override
   Future<InventoryRequest> updateInventoryRequestObject(String id, InventoryRequest request) {
@@ -810,5 +926,56 @@ final roles = List<String>.from(user['roles'] ?? []); // Extract roles as a list
     );
     return response.data;
   }
+
+
+  // new api's'
+
+    @override
+    Future<List<dynamic>> getCashAccount() async {
+      final response = await apiClient.get(
+        queryParameters: {
+          'exclude_managed_by_me': true,
+          'account_type': 'cash',
+        },
+        apiClient.endpoints.cashDataAPI,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      } else {
+        throw Exception('Failed to fetch account type');
+      }
+    }
+
+    @override
+    Future<List<dynamic>> getBankAccount() async {
+      final response = await apiClient.get(
+        queryParameters: {
+          'account_type': 'bank',
+        },
+        apiClient.endpoints.cashDataAPI,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      } else {
+        throw Exception('Failed to fetch account type');
+      }
+    }
+
+    Future<List<dynamic>> getAccountType() async {
+      final response = await apiClient.get(
+        queryParameters: {
+          'account_type': 'receivable',
+        },
+        apiClient.endpoints.cashDataAPI,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      } else {
+        throw Exception('Failed to fetch account type');
+      }
+    }
 
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:lpg_distribution_app/core/models/inventory_request.dart';
+import 'package:lpg_distribution_app/core/models/inventory/inventory_request.dart';
 import 'package:lpg_distribution_app/core/services/api_service_interface.dart';
+import '../../../utils/error_handler.dart';
 import 'inventory_event.dart';
 import 'inventory_state.dart';
 
@@ -15,6 +16,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       : _apiService = apiService,
         super(InventoryInitial()) {
     on<LoadInventoryRequests>(_onLoadInventoryRequests);
+    on<LoadInventoryRequestDetail>(_onLoadInventoryRequestDetail);
     on<SearchInventoryRequests>(_onSearchInventoryRequests);
     on<FilterInventoryRequests>(_onFilterInventoryRequests);
     on<ToggleFavoriteRequest>(_onToggleFavoriteRequest);
@@ -25,18 +27,29 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     on<RejectInventoryRequest>(_onRejectInventoryRequest);
   }
 
+  Future<void> _onLoadInventoryRequestDetail(
+      LoadInventoryRequestDetail event,
+      Emitter<InventoryState> emit,
+      ) async {
+    try {
+      emit(InventoryDetailLoading());
+      final requestDetail = await _apiService.getInventoryRequestDetail(event.requestId);
+      emit(InventoryDetailLoaded(request: requestDetail));
+    } catch (e) {
+      emit(InventoryDetailError(message: ErrorHandler.handleError(e)));
+    }
+  }
+
   Future<void> _onApproveInventoryRequest(
       ApproveInventoryRequest event,
       Emitter<InventoryState> emit,
       ) async {
     try {
-      // Call the actual API to approve
       await _apiService.approveInventoryRequest(
         requestId: event.requestId,
-        comment: event.comment,
+        requestType: event.requestType,
       );
 
-      // Update local state
       final updatedRequests = _allRequests.map((request) {
         if (request.id == event.requestId) {
           return request.copyWith(status: 'APPROVED');
@@ -47,7 +60,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       _allRequests = updatedRequests;
       emit(InventoryLoaded(requests: updatedRequests));
     } catch (e) {
-      emit(InventoryError(message: 'Failed to approve: $e'));
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
   }
 
@@ -56,13 +69,12 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       Emitter<InventoryState> emit,
       ) async {
     try {
-      // Call the actual API to reject
       await _apiService.rejectInventoryRequest(
         requestId: event.requestId,
         reason: event.reason,
+        requestType: event.requestType,
       );
 
-      // Update local state
       final updatedRequests = _allRequests.map((request) {
         if (request.id == event.requestId) {
           return request.copyWith(status: 'REJECTED');
@@ -73,40 +85,65 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       _allRequests = updatedRequests;
       emit(InventoryLoaded(requests: updatedRequests));
     } catch (e) {
-      emit(InventoryError(message: 'Failed to reject: $e'));
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
   }
 
-  Future<void> _onLoadInventoryRequests(LoadInventoryRequests event, Emitter<InventoryState> emit) async {
+  Future<void> _onLoadInventoryRequests(
+      LoadInventoryRequests event,
+      Emitter<InventoryState> emit
+      ) async {
     try {
       emit(InventoryLoading());
       final requests = await _apiService.getInventoryRequests();
 
-      // Reverse to show newest first
-      _allRequests = requests.reversed.toList();
+      // Sort by timestamp - newest first (better than just reversing)
+      requests.sort((a, b) {
+        final dateA = DateTime.parse(a.timestamp);
+        final dateB = DateTime.parse(b.timestamp);
+        return dateB.compareTo(dateA); // Newest first
+      });
+
+      _allRequests = requests;
       emit(InventoryLoaded(requests: _allRequests));
     } catch (e) {
-      emit(InventoryError(message: "Failed to load requests: $e"));
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
   }
 
-  Future<void> _onRefreshInventoryRequests(RefreshInventoryRequests event, Emitter<InventoryState> emit) async {
+  Future<void> _onRefreshInventoryRequests(
+      RefreshInventoryRequests event,
+      Emitter<InventoryState> emit
+      ) async {
     try {
+      // Don't emit loading state for refresh to avoid UI flicker
       final requests = await _apiService.getInventoryRequests();
+
+      // Sort by timestamp - newest first (better than just reversing)
+      requests.sort((a, b) {
+        final dateA = DateTime.parse(a.timestamp);
+        final dateB = DateTime.parse(b.timestamp);
+        return dateB.compareTo(dateA); // Newest first
+      });
+
       _allRequests = requests;
-      emit(InventoryLoaded(requests: requests));
+      emit(InventoryLoaded(requests: _allRequests));
     } catch (e) {
       print("Error refreshing inventory requests: $e");
-      // Keep current state on refresh error
+      // If refresh fails, keep current state if available, otherwise show error
       if (state is InventoryLoaded) {
-        emit(state as InventoryLoaded);
+        // Keep the current state - don't re-emit the same state
+        return;
       } else {
-        emit(InventoryError(message: "Failed to refresh: $e"));
+        emit(InventoryError(message: ErrorHandler.handleError(e)));
       }
     }
   }
 
-  void _onSearchInventoryRequests(SearchInventoryRequests event, Emitter<InventoryState> emit) {
+  void _onSearchInventoryRequests(
+      SearchInventoryRequests event,
+      Emitter<InventoryState> emit
+      ) {
     if (_allRequests.isEmpty) return;
 
     final query = event.query.toLowerCase();
@@ -117,14 +154,17 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
 
     final filteredRequests = _allRequests.where((request) {
       return request.id.toLowerCase().contains(query) ||
-          request.warehouseName.toLowerCase().contains(query) ||
+          request.warehouse.toLowerCase().contains(query) ||
           request.requestedBy.toLowerCase().contains(query);
     }).toList();
 
     emit(InventoryLoaded(requests: filteredRequests));
   }
 
-  void _onFilterInventoryRequests(FilterInventoryRequests event, Emitter<InventoryState> emit) {
+  void _onFilterInventoryRequests(
+      FilterInventoryRequests event,
+      Emitter<InventoryState> emit
+      ) {
     if (_allRequests.isEmpty) return;
 
     final status = event.status;
@@ -141,11 +181,13 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     emit(InventoryLoaded(requests: filteredRequests));
   }
 
-  Future<void> _onToggleFavoriteRequest(ToggleFavoriteRequest event, Emitter<InventoryState> emit) async {
+  Future<void> _onToggleFavoriteRequest(
+      ToggleFavoriteRequest event,
+      Emitter<InventoryState> emit
+      ) async {
     try {
       await _apiService.toggleFavoriteRequest(event.requestId, event.isFavorite);
 
-      // Update local state
       final updatedRequests = _allRequests.map((request) {
         if (request.id == event.requestId) {
           return request.copyWith(isFavorite: event.isFavorite);
@@ -167,37 +209,38 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
         emit(InventoryLoaded(requests: updatedCurrentRequests));
       }
     } catch (e) {
-      emit(InventoryError(message: 'Failed to update favorite status'));
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
   }
 
-  Future<void> _onAddInventoryRequest(AddInventoryRequest event, Emitter<InventoryState> emit) async {
+  Future<void> _onAddInventoryRequest(
+      AddInventoryRequest event,
+      Emitter<InventoryState> emit
+      ) async {
     try {
       final createdRequest = await _apiService.createInventoryRequest(event.request);
 
-      // Insert at beginning (index 0) instead of end
+      // Add to the beginning of _allRequests (newest first)
       _allRequests.insert(0, createdRequest);
 
-      if (state is InventoryLoaded) {
-        final currentRequests = (state as InventoryLoaded).requests;
-        // Add to top of current list too
-        emit(InventoryLoaded(requests: [createdRequest, ...currentRequests]));
-      } else {
-        emit(InventoryLoaded(requests: [createdRequest]));
-      }
+      // Always emit the updated list with the new request at the top
+      emit(InventoryLoaded(requests: List.from(_allRequests)));
+
     } catch (e) {
-      emit(InventoryError(message: "Failed to create request: $e"));
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
   }
 
-  Future<void> _onUpdateInventoryRequest(UpdateInventoryRequest event, Emitter<InventoryState> emit) async {
+  Future<void> _onUpdateInventoryRequest(
+      UpdateInventoryRequest event,
+      Emitter<InventoryState> emit
+      ) async {
     try {
       final updatedRequest = await _apiService.updateInventoryRequest(
         event.requestId,
         event.request,
       );
 
-      // Update local state
       final index = _allRequests.indexWhere((r) => r.id == event.requestId);
       if (index != -1) {
         _allRequests[index] = updatedRequest;
@@ -213,17 +256,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
         }
       }
     } catch (e) {
-      emit(InventoryError(message: 'Failed to update request: $e'));
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
   }
-}
-
-class UpdateInventoryRequest extends InventoryEvent {
-  final String requestId;
-  final InventoryRequest request;
-
-  const UpdateInventoryRequest({
-    required this.requestId,
-    required this.request,
-  });
 }

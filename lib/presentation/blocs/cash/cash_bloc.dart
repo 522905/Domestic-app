@@ -1,17 +1,17 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:lpg_distribution_app/domain/entities/cash/cash_transaction.dart';
 import 'package:lpg_distribution_app/domain/entities/cash/cash_data.dart';
 import 'package:lpg_distribution_app/core/services/api_service_interface.dart';
-import 'package:lpg_distribution_app/presentation/pages/cash/forms/cash_deposit_page.dart';
 
-// Events
 abstract class CashEvent extends Equatable {
   @override
   List<Object?> get props => [];
 }
 
-// Add this to your CashEvent class
 class SearchCashRequest extends CashEvent {
   final String query;
 
@@ -23,15 +23,48 @@ class SearchCashRequest extends CashEvent {
 
 class LoadCashData extends CashEvent {}
 
-class AddTransaction extends CashEvent {
-  final CashTransaction transaction;
+class LoadTransactionDetails extends CashEvent {
+  final String transactionId;
 
-  AddTransaction(this.transaction);
+  LoadTransactionDetails({required this.transactionId});
 
   @override
-  List<Object?> get props => [transaction];
+  List<Object?> get props => [transactionId];
 }
 
+class AddTransaction extends CashEvent {
+  final CashTransaction transaction;
+  final Completer<void> completer;
+
+  AddTransaction(this.transaction, {required this.completer});
+
+  @override
+  List<Object?> get props => [transaction, completer];
+}
+
+class ApproveTransaction extends CashEvent {
+  final String transactionId;
+
+  ApproveTransaction({required this.transactionId});
+
+  @override
+  List<Object?> get props => [transactionId];
+}
+
+class RejectTransaction extends CashEvent {
+  final String transactionId;
+  final String reason;
+  final String? comment;
+
+  RejectTransaction({
+    required this.transactionId,
+    required this.reason,
+    this.comment,
+  });
+
+  @override
+  List<Object?> get props => [transactionId, reason, comment];
+}
 
 class UpdateTransaction extends CashEvent {
   final CashTransaction transaction;
@@ -56,8 +89,6 @@ class FilterTransactions extends CashEvent {
 
 class RefreshCashData extends CashEvent {}
 
-
-// States
 abstract class CashManagementState extends Equatable {
   @override
   List<Object?> get props => [];
@@ -67,396 +98,594 @@ class CashManagementInitial extends CashManagementState {}
 
 class CashManagementLoading extends CashManagementState {}
 
-class CashManagementLoaded extends CashManagementState {
-  final CashData cashData;
-  final List<CashTransaction> filteredTransactions;
+class TransactionDetailsLoading extends CashManagementState {}
 
-  CashManagementLoaded({
-    required this.cashData,
-    required this.filteredTransactions,
+class TransactionDetailsLoaded extends CashManagementState {
+  final CashTransaction transaction;
+
+  TransactionDetailsLoaded({required this.transaction});
+
+  @override
+  List<Object?> get props => [transaction];
+}
+
+class TransactionActionLoading extends CashManagementState {
+  final String transactionId;
+  final String action; // 'approve' or 'reject'
+
+  TransactionActionLoading({required this.transactionId, required this.action});
+
+  @override
+  List<Object?> get props => [transactionId, action];
+}
+
+class TransactionActionSuccess extends CashManagementState {
+  final String message;
+  final String transactionId;
+  final String action;
+
+  TransactionActionSuccess({
+    required this.message,
+    required this.transactionId,
+    required this.action,
   });
 
   @override
-  List<Object?> get props => [cashData, filteredTransactions];
+  List<Object?> get props => [message, transactionId, action];
+}
+
+// Add new state for transaction addition success
+class TransactionAddedSuccess extends CashManagementState {
+  final String message;
+  final CashTransaction transaction;
+
+  TransactionAddedSuccess({
+    required this.message,
+    required this.transaction,
+  });
+
+  @override
+  List<Object?> get props => [message, transaction];
+}
+
+class CashManagementLoaded extends CashManagementState {
+  final CashData cashData;
+  final List<CashTransaction> allTransactions; // All transactions
+  final List<CashTransaction> filteredTransactions; // Filtered/searched transactions
+  final String searchQuery; // Current search query
+
+  CashManagementLoaded({
+    required this.cashData,
+    required this.allTransactions,
+    required this.filteredTransactions,
+    this.searchQuery = '',
+  });
+
+  @override
+  List<Object?> get props => [cashData, allTransactions, filteredTransactions, searchQuery];
 
   CashManagementLoaded copyWith({
     CashData? cashData,
+    List<CashTransaction>? allTransactions,
     List<CashTransaction>? filteredTransactions,
+    String? searchQuery,
   }) {
     return CashManagementLoaded(
       cashData: cashData ?? this.cashData,
+      allTransactions: allTransactions ?? this.allTransactions,
       filteredTransactions: filteredTransactions ?? this.filteredTransactions,
+      searchQuery: searchQuery ?? this.searchQuery,
     );
   }
 }
 
 class CashManagementError extends CashManagementState {
   final String message;
+  final String? errorCode;
+  final dynamic rawError;
 
-  CashManagementError(this.message);
+  CashManagementError(this.message, {this.errorCode, this.rawError});
 
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, errorCode, rawError];
 }
-// Bloc
+
 class CashManagementBloc extends Bloc<CashEvent, CashManagementState> {
-
   final ApiServiceInterface apiService;
-  List<CashTransaction> _allTransactions = [];
-
-  double _toDouble(dynamic value) {
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
-  }
 
   CashManagementBloc({required this.apiService}) : super(CashManagementInitial()) {
     on<LoadCashData>(_onLoadCashData);
+    on<LoadTransactionDetails>(_onLoadTransactionDetails);
     on<RefreshCashData>(_onRefreshCashData);
     on<AddTransaction>(_onAddTransaction);
+    on<ApproveTransaction>(_onApproveTransaction);
+    on<RejectTransaction>(_onRejectTransaction);
     on<UpdateTransaction>(_onUpdateTransaction);
     on<SearchCashRequest>(_onSearchCashRequest);
-
   }
 
-   Future<void> _onLoadCashData(LoadCashData event, Emitter<CashManagementState> emit) async {
-  emit(CashManagementLoading());
-      try {
-        final transactionsData = await apiService.getCashTransactions();
+  Future<void> _onLoadCashData(LoadCashData event, Emitter<CashManagementState> emit) async {
+    emit(CashManagementLoading());
+    try {
+      // Load transactions
+      final transactionsData = await apiService.getCashTransactions();
+      final transactions = transactionsData.map<CashTransaction>((data) {
+        return CashTransaction.fromJson(data);
+      }).toList();
 
-        // Map transactionsData to CashTransaction objects
-        final transactions = transactionsData.map<CashTransaction>((data) {
-          return CashTransaction(
-            id: data['id']?.toString() ?? '',
-           type: TransactionType.values.firstWhere(
-              (transactionType) => transactionType.name == data['type'],
-              orElse: () {
-                switch (data['type']) {
-                  case 'handover':
-                  case 'deposit':
-                    return TransactionType.deposit;
-                  default:
-                    return TransactionType.deposit; // Default fallback
-                }
-              },
-            ),
-            paymentType: data['payment_type'] ?? '',
-            paymentEntryNumber: data['payment_entry_number'] ?? '',
-            paidTo: data['paid_to'] ?? '',
-            accountType: TransactionAccountType.values.firstWhere(
-              (type) => type.name == data['account_type'],
-              orElse: () => TransactionAccountType.svTv,
-            ),
+      // Load cash summary data
+      final cashSummaryResponse = await apiService.getCashSummary();
+      final cashData = _buildCashDataFromResponse(cashSummaryResponse, transactions);
 
-            modeOfPayment: data['mode_of_payment'] ?? '',
-            amount: _toDouble(data['amount'] ?? 0.0),
-            status: TransactionStatus.values.firstWhere(
-              (status) => status.name == data['status'],
-              orElse: () => TransactionStatus.pending, // Provide default value
-            ),
-            createdAt: DateTime.tryParse(data['created_at'] ?? DateTime.now().toString()) ?? DateTime.now(), // Handle null timestamp
-            selectedAccount: data['paid_to'] ?? '',
-            initiator: '',
-            rejectionReason: data['rejection_reason'] ?? '',
-            approved: data['approved'] ?? '',
-            rejected: data['rejected'] ?? '',
-            approvedBy: data['approved_by'] ?? '',
-            rejectedBy: data['rejected_by'] ?? '',
-            notes: data['notes'] ?? '',
-            createdBy: data['created_by'] ?? '',
-          );
-        }).toList();
-
-        emit(
-          CashManagementLoaded(
-            cashData: CashData(
-              cashInHand: 0.0,
-              lastUpdated: DateTime.now(), // Default value
-              pendingApprovals: 0,
-              todayDeposits: 0.0,
-              todayHandovers: 0.0,
-              todayRefunds: 0.0,
-              customerOverview: [], // Default empty list since `getCashSummary` is removed
-            ),
-        filteredTransactions: transactions,
-        ));
-      } catch (e) {
-        emit(CashManagementError('Error loading cash data: ${e.toString()}'));
-      }
+      emit(
+        CashManagementLoaded(
+          cashData: cashData,
+          allTransactions: transactions,
+          filteredTransactions: transactions,
+        ),
+      );
+    } on DioException catch (e) {
+      final errorMessage = _extractErrorMessage(e);
+      emit(CashManagementError(
+        'Error loading cash data: $errorMessage',
+        errorCode: e.response?.statusCode?.toString(),
+        rawError: e.response?.data,
+      ));
+    } catch (e) {
+      emit(CashManagementError(
+        'Unexpected error: ${e.toString()}',
+        rawError: e,
+      ));
     }
+  }
 
-   Future<void> _onRefreshCashData(RefreshCashData event, Emitter<CashManagementState> emit) async {
-      if (state is! CashManagementLoaded) {
-        add(LoadCashData());
-        return;
-      }
-
-      try {
-        final transactionsData = await apiService.getCashTransactions();
-
-        if (transactionsData.isEmpty) {
-          emit(CashManagementError('No transactions found'));
-          return;
-        }
-
-        // Map transactionsData to CashTransaction objects
-        final transactions = transactionsData.map<CashTransaction>((data) {
-          return CashTransaction(
-            id: data['id']?.toString() ?? '',
-            type: TransactionType.values.firstWhere(
-                  (transactionType) => transactionType.name == data['type'],
-              orElse: () {
-                switch (data['type']) {
-                  case 'handover':
-                  case 'deposit':
-                    return TransactionType.deposit;
-                  default:
-                    return TransactionType.deposit; // Default fallback
-                }
-              },
-            ),
-            paymentType: data['payment_type'] ?? '',
-            paymentEntryNumber: data['payment_entry_number'] ?? '',
-            paidTo: data['paid_to'] ?? '',
-            accountType: TransactionAccountType.values.firstWhere(
-                  (type) => type.name == data['account_type'],
-              orElse: () => TransactionAccountType.svTv,
-            ),
-
-            modeOfPayment: data['mode_of_payment'] ?? '',
-            amount: _toDouble(data['amount'] ?? 0.0),
-            status: TransactionStatus.values.firstWhere(
-                  (status) => status.name == data['status'],
-              orElse: () => TransactionStatus.pending, // Provide default value
-            ),
-            createdAt: DateTime.tryParse(data['created_at'] ?? DateTime.now().toString()) ?? DateTime.now(), // Handle null timestamp
-            selectedAccount: data['paid_to'] ?? '',
-            initiator: '',
-            rejectionReason: data['rejection_reason'] ?? '',
-            approved: data['approved'] ?? '',
-            rejected: data['rejected'] ?? '',
-            approvedBy: data['approved_by'] ?? '',
-            rejectedBy: data['rejected_by'] ?? '',
-            notes: data['notes'] ?? '',
-            createdBy: data['created_by'] ?? '',
-          );
-        }).toList();
-
-        // Create new CashData object
-        final newCashData = CashData(
-          cashInHand: 0.0,
-          lastUpdated: DateTime.now(),
-          pendingApprovals: transactionsData.where((tx) => tx['status'] == 'pending').length,
-          todayDeposits: _calculateTodayDeposits(transactionsData),
-          todayHandovers: _calculateTodayHandovers(transactionsData),
-          todayRefunds: 0.0,
-          customerOverview: [],
-        );
-
-        if (state is CashManagementLoaded) {
-          final currentState = state as CashManagementLoaded;
-
-          if (newCashData != currentState.cashData || transactions != currentState.filteredTransactions) {
-            emit(CashManagementLoaded(
-              cashData: newCashData,
-              filteredTransactions: transactions,
-            ));
-          } else {
-            print("No updates required.");
-          }
-        }
-      } catch (e) {
-        print("Refresh error: $e");
-        emit(CashManagementError('Failed to refresh data: ${e.toString()}'));
-      }
+  Future<void> _onLoadTransactionDetails(LoadTransactionDetails event, Emitter<CashManagementState> emit) async {
+    emit(TransactionDetailsLoading());
+    try {
+      final transactionData = await apiService.getTransactionDetails(event.transactionId);
+      final transaction = CashTransaction.fromJson(transactionData);
+      emit(TransactionDetailsLoaded(transaction: transaction));
+    } on DioException catch (e) {
+      final errorMessage = _extractErrorMessage(e);
+      emit(CashManagementError(
+        'Failed to load transaction details: $errorMessage',
+        errorCode: e.response?.statusCode?.toString(),
+        rawError: e.response?.data,
+      ));
+    } catch (e) {
+      emit(CashManagementError(
+        'Failed to load transaction details: ${e.toString()}',
+        rawError: e,
+      ));
     }
+  }
 
-    void _onAddTransaction(AddTransaction event, Emitter<CashManagementState> emit) async {
+  void _onAddTransaction(AddTransaction event, Emitter<CashManagementState> emit) async {
+    try {
+      Map<String, dynamic> requestData;
+
+      // Build request data based on transaction type
+      if (event.transaction.type == TransactionType.deposit) {
+        requestData = {
+          'type': event.transaction.type.name,
+          "payment_type": "DEPOSIT",
+          'to_account': event.transaction.selectedAccount,
+          'from_account': event.transaction.fromAccount,
+          'amount': event.transaction.amount,
+          'notes': event.transaction.notes ?? ''
+        };
+      } else if (event.transaction.type == TransactionType.handover) {
+        requestData = {
+          "payment_type": "HANDOVER",
+          'to_account': event.transaction.selectedAccount,
+          'amount': event.transaction.amount,
+        };
+
+        if (event.transaction.notes != null && event.transaction.notes!.isNotEmpty) {
+          requestData['notes'] = event.transaction.notes;
+        }
+        if (event.transaction.selectedBank != null && event.transaction.selectedBank!.isNotEmpty) {
+          requestData['bank'] = event.transaction.selectedBank;
+        }
+      } else if (event.transaction.type == TransactionType.bank) {
+        requestData = {
+          "payment_type": "BANK_DEPOSIT",
+          'amount': event.transaction.amount,
+          'to_account': event.transaction.selectedBank,
+          'bank_reference_no': event.transaction.bankReferenceNo,
+        };
+
+        if (event.transaction.notes != null && event.transaction.notes!.isNotEmpty) {
+          requestData['notes'] = event.transaction.notes;
+        }
+        if (event.transaction.receiptImagePath != null) {
+          requestData['receipt_image'] = event.transaction.receiptImagePath;
+        }
+      } else {
+        requestData = {
+          'type': event.transaction.type.name,
+          "payment_type": event.transaction.type.name.toUpperCase(),
+          'amount': event.transaction.amount,
+          'notes': event.transaction.notes ?? ''
+        };
+      }
+
+      final response = await apiService.createTransaction(requestData);
+      final newTransaction = CashTransaction.fromJson(response);
+
+      // Complete the completer first
+      event.completer.complete();
+
+      // Update the current state immediately by adding the new transaction
       if (state is CashManagementLoaded) {
         final currentState = state as CashManagementLoaded;
 
-        try {
-          final response = await apiService.createTransaction({
-            'type': event.transaction.type.name,
-            'account_type': event.transaction.accountType.name,
-            'amount': event.transaction.amount,
-            'timestamp': event.transaction.createdAt.toIso8601String(),
-            'notes': event.transaction.notes,
-            'paid_to': event.transaction.selectedAccount,
-            'bank_details': event.transaction.selectedBank,
-            'mode_of_payment': event.transaction.modeOfPayment,
-          });
-              // Create a new transaction from the API response
-             final newTransaction = CashTransaction(
-              id: response['id']?.toString() ?? '', // Convert 'id' to String
-              type: TransactionType.values.firstWhere((type) => type.name == response['type']),
-              accountType: TransactionAccountType.values.firstWhere((type) => type.name == response['account_type']),
-              amount: response['amount'],
-              status: TransactionStatus.values.firstWhere((status) => status.name == response['status']),
-              createdAt: DateTime.parse(response['timestamp']),
-              notes: response['notes'],
-              selectedAccount: response['recipient'],
-              selectedBank: response['bank_details'],
-              initiator: response['initiator'],
-              rejectionReason: response['rejection_reason'],
-              approved: response['approved'],
-              rejected: response['rejected'],
-              approvedBy: response['approved_by'],
-              rejectedBy: response['rejected_by'],
-              createdBy: response['created_by'],
-            );
+        // Add new transaction to the beginning of the list
+        final updatedAllTransactions = [newTransaction, ...currentState.allTransactions];
 
-            // Update state with the new transaction
-              final updatedTransactions = [newTransaction, ...currentState.filteredTransactions];
-              emit(currentState.copyWith(filteredTransactions: updatedTransactions));
-
-              add(RefreshCashData());
+        // Apply current search filter to updated list
+        List<CashTransaction> updatedFilteredTransactions;
+        if (currentState.searchQuery.isNotEmpty) {
+          updatedFilteredTransactions = _filterTransactions(updatedAllTransactions, currentState.searchQuery);
+        } else {
+          updatedFilteredTransactions = updatedAllTransactions;
         }
-          catch (e) {
-            print("Error adding transaction via API: $e");
-            emit(CashManagementError('Failed to add transaction: ${e.toString()}'));
-          }
+
+        // Update cash data with new statistics
+        final updatedCashData = _updateCashDataWithNewTransaction(currentState.cashData, newTransaction);
+
+        // Emit the updated state immediately - this will update the UI
+        emit(currentState.copyWith(
+          cashData: updatedCashData,
+          allTransactions: updatedAllTransactions,
+          filteredTransactions: updatedFilteredTransactions,
+        ));
+      } else {
+        // If not in loaded state, refresh all data
+        add(RefreshCashData());
       }
+
+    } on DioException catch (e) {
+      final errorMessage = _extractErrorMessage(e);
+      final error = CashManagementError(
+        'Failed to add transaction: $errorMessage',
+        errorCode: e.response?.statusCode?.toString(),
+        rawError: e.response?.data,
+      );
+
+      emit(error);
+      event.completer.completeError(error);
+    } catch (e) {
+      final error = CashManagementError(
+        'Failed to add transaction: ${e.toString()}',
+        rawError: e,
+      );
+
+      emit(error);
+      event.completer.completeError(error);
     }
+  }
+
+  Future<void> _onApproveTransaction(ApproveTransaction event, Emitter<CashManagementState> emit) async {
+    emit(TransactionActionLoading(transactionId: event.transactionId, action: 'approve'));
+
+    try {
+      final result = await apiService.approveTransaction(event.transactionId);
+
+      if (result != null && result['success'] == true) {
+        emit(TransactionActionSuccess(
+          message: result['message'] ?? 'Transaction approved successfully',
+          transactionId: event.transactionId,
+          action: 'approve',
+        ));
+
+        // Refresh the main cash data to update all lists
+        add(RefreshCashData());
+      } else {
+        emit(CashManagementError(
+          result?['message'] ?? 'Failed to approve transaction',
+          rawError: result,
+        ));
+      }
+    } on DioException catch (e) {
+      final errorMessage = _extractErrorMessage(e);
+      emit(CashManagementError(
+        'Approval failed: $errorMessage',
+        errorCode: e.response?.statusCode?.toString(),
+        rawError: e.response?.data,
+      ));
+    } catch (e) {
+      emit(CashManagementError(
+        'Approval failed: ${e.toString()}',
+        rawError: e,
+      ));
+    }
+  }
+
+  Future<void> _onRejectTransaction(RejectTransaction event, Emitter<CashManagementState> emit) async {
+    emit(TransactionActionLoading(transactionId: event.transactionId, action: 'reject'));
+
+    try {
+      final requestData = {
+        'reason': event.reason,
+        if (event.comment != null && event.comment!.isNotEmpty) 'comment': event.comment,
+      };
+
+      final result = await apiService.rejectTransaction(event.transactionId, requestData);
+
+      if (result != null && result['success'] == true) {
+        emit(TransactionActionSuccess(
+          message: result['message'] ?? 'Transaction rejected successfully',
+          transactionId: event.transactionId,
+          action: 'reject',
+        ));
+
+        // Refresh the main cash data to update all lists
+        add(RefreshCashData());
+      } else {
+        emit(CashManagementError(
+          result?['message'] ?? 'Failed to reject transaction',
+          rawError: result,
+        ));
+      }
+    } on DioException catch (e) {
+      final errorMessage = _extractErrorMessage(e);
+      emit(CashManagementError(
+        'Rejection failed: $errorMessage',
+        errorCode: e.response?.statusCode?.toString(),
+        rawError: e.response?.data,
+      ));
+    } catch (e) {
+      emit(CashManagementError(
+        'Rejection failed: ${e.toString()}',
+        rawError: e,
+      ));
+    }
+  }
+
+  Future<void> _onRefreshCashData(RefreshCashData event, Emitter<CashManagementState> emit) async {
+    try {
+      // Preserve current search query if any
+      String currentSearchQuery = '';
+      if (state is CashManagementLoaded) {
+        currentSearchQuery = (state as CashManagementLoaded).searchQuery;
+      }
+
+      // Load fresh data from API
+      final transactionsData = await apiService.getCashTransactions();
+      final transactions = transactionsData.map<CashTransaction>((data) {
+        return CashTransaction.fromJson(data);
+      }).toList();
+
+      // Load cash summary data
+      final cashSummaryResponse = await apiService.getCashSummary();
+      final cashData = _buildCashDataFromResponse(cashSummaryResponse, transactions);
+
+      // Apply current search filter if any
+      List<CashTransaction> filteredTransactions = transactions;
+      if (currentSearchQuery.isNotEmpty) {
+        filteredTransactions = _filterTransactions(transactions, currentSearchQuery);
+      }
+
+      emit(CashManagementLoaded(
+        cashData: cashData,
+        allTransactions: transactions,
+        filteredTransactions: filteredTransactions,
+        searchQuery: currentSearchQuery,
+      ));
+    } on DioException catch (e) {
+      final errorMessage = _extractErrorMessage(e);
+      emit(CashManagementError(
+        'Failed to refresh data: $errorMessage',
+        errorCode: e.response?.statusCode?.toString(),
+        rawError: e.response?.data,
+      ));
+    } catch (e) {
+      emit(CashManagementError(
+        'Failed to refresh data: ${e.toString()}',
+        rawError: e,
+      ));
+    }
+  }
 
   Future<void> _onUpdateTransaction(UpdateTransaction event, Emitter<CashManagementState> emit) async {
     if (state is CashManagementLoaded) {
       final currentState = state as CashManagementLoaded;
 
       try {
-        // Find and update the transaction
-        final index = currentState.filteredTransactions.indexWhere(
-                (tx) => tx.id == event.transaction.id
+        // Update in all transactions list
+        final updatedAllTransactions = currentState.allTransactions.map((tx) {
+          return tx.id == event.transaction.id ? event.transaction : tx;
+        }).toList();
+
+        // Apply current search filter to updated list
+        List<CashTransaction> updatedFilteredTransactions;
+        if (currentState.searchQuery.isNotEmpty) {
+          updatedFilteredTransactions = _filterTransactions(updatedAllTransactions, currentState.searchQuery);
+        } else {
+          updatedFilteredTransactions = updatedAllTransactions;
+        }
+
+        // Recalculate cash data with updated transactions
+        final pendingCount = updatedAllTransactions
+            .where((tx) => tx.status == TransactionStatus.pending)
+            .length;
+
+        final updatedCashData = currentState.cashData.copyWith(
+          lastUpdated: DateTime.now(),
+          pendingApprovals: pendingCount,
+          todayDeposits: _calculateTodayDeposits(updatedAllTransactions),
+          todayHandovers: _calculateTodayHandovers(updatedAllTransactions),
         );
 
-        if (index != -1) {
-          List<CashTransaction> updatedTransactions = List.from(currentState.filteredTransactions);
-          updatedTransactions[index] = event.transaction;
+        emit(currentState.copyWith(
+          cashData: updatedCashData,
+          allTransactions: updatedAllTransactions,
+          filteredTransactions: updatedFilteredTransactions,
+        ));
 
-          // Update cash data based on status change
-          CashData updatedCashData = currentState.cashData.copyWith(
-            lastUpdated: DateTime.now(),
-            pendingApprovals: event.transaction.status != TransactionStatus.pending &&
-                currentState.filteredTransactions[index].status == TransactionStatus.pending
-                ? currentState.cashData.pendingApprovals - 1
-                : currentState.cashData.pendingApprovals,
-          );
-
-          emit(currentState.copyWith(
-            cashData: updatedCashData,
-            filteredTransactions: updatedTransactions,
-          ));
-        } else {
-          // Transaction not found, keep current state
-          emit(currentState);
-        }
       } catch (e) {
-        // Keep current state
-        emit(currentState);
+        print('Error updating transaction: $e');
+        emit(currentState); // Emit current state on error
       }
     }
   }
 
   void _onSearchCashRequest(SearchCashRequest event, Emitter<CashManagementState> emit) {
     if (state is! CashManagementLoaded) return;
-    if (_allTransactions.isEmpty) return; // Use stored original data
 
     final currentState = state as CashManagementLoaded;
-    final query = event.query.toLowerCase();
+    final query = event.query.toLowerCase().trim();
 
+    List<CashTransaction> searchResults;
     if (query.isEmpty) {
-      // Show all original transactions when search is empty
-      emit(currentState.copyWith(filteredTransactions: _allTransactions));
-      return;
+      searchResults = currentState.allTransactions;
+    } else {
+      searchResults = _filterTransactions(currentState.allTransactions, query);
     }
 
-    // Search within ALL transactions, not filtered ones
-    final searchResults = _allTransactions.where((transaction) {
-      return transaction.id.toLowerCase().contains(query) ||
-          transaction.amount.toString().contains(query) ||
-          (transaction.notes?.toLowerCase().contains(query) ?? false) ||
-          (transaction.selectedAccount?.toLowerCase().contains(query) ?? false) ||
-          (transaction.selectedBank?.toLowerCase().contains(query) ?? false) ||
-          transaction.type.name.toLowerCase().contains(query) ||
-          transaction.status.name.toLowerCase().contains(query);
-    }).toList();
-
-    emit(currentState.copyWith(filteredTransactions: searchResults));
+    emit(currentState.copyWith(
+      filteredTransactions: searchResults,
+      searchQuery: query,
+    ));
   }
-  double _calculateTodayDeposits(List<dynamic> transactions) {
+
+  // Helper method to extract error messages from DioException
+  String _extractErrorMessage(DioException e) {
+    if (e.response?.data != null) {
+      final data = e.response!.data;
+
+      if (data is Map<String, dynamic>) {
+        // Handle field-specific errors
+        if (data.containsKey('non_field_errors') && data['non_field_errors'] is List) {
+          return (data['non_field_errors'] as List).join(', ');
+        }
+
+        // Handle general error message
+        if (data.containsKey('message')) {
+          return data['message'].toString();
+        }
+
+        if (data.containsKey('error')) {
+          return data['error'].toString();
+        }
+
+        // Handle field validation errors
+        final fieldErrors = <String>[];
+        data.forEach((key, value) {
+          if (value is List && value.isNotEmpty) {
+            fieldErrors.add('$key: ${value.join(', ')}');
+          } else if (value is String && value.isNotEmpty) {
+            fieldErrors.add('$key: $value');
+          }
+        });
+
+        if (fieldErrors.isNotEmpty) {
+          return fieldErrors.join(', ');
+        }
+      }
+
+      return data.toString();
+    }
+
+    if (e.message != null) {
+      return e.message!;
+    }
+
+    return 'Network error occurred';
+  }
+
+  // Helper method to filter transactions based on search query
+  List<CashTransaction> _filterTransactions(List<CashTransaction> transactions, String query) {
+    final lowercaseQuery = query.toLowerCase();
+    return transactions.where((transaction) {
+      return transaction.id.toLowerCase().contains(lowercaseQuery) ||
+          transaction.amount.toString().contains(lowercaseQuery) ||
+          (transaction.notes?.toLowerCase().contains(lowercaseQuery) ?? false) ||
+          (transaction.selectedAccount?.toLowerCase().contains(lowercaseQuery) ?? false) ||
+          (transaction.selectedBank?.toLowerCase().contains(lowercaseQuery) ?? false) ||
+          (transaction.requestedByName?.toLowerCase().contains(lowercaseQuery) ?? false) ||
+          (transaction.approvedByName?.toLowerCase().contains(lowercaseQuery) ?? false) ||
+          (transaction.rejectedByName?.toLowerCase().contains(lowercaseQuery) ?? false) ||
+          transaction.type.name.toLowerCase().contains(lowercaseQuery) ||
+          transaction.status.name.toLowerCase().contains(lowercaseQuery);
+    }).toList();
+  }
+
+  // Build CashData from API response and transactions
+  CashData _buildCashDataFromResponse(Map<String, dynamic> response, List<CashTransaction> transactions) {
+    final customerOverview = response['customerOverview'] as List<dynamic>? ?? [];
+    double cashInHand = 0.0;
+
+    // Extract cash in hand from customer overview if available
+    if (customerOverview.isNotEmpty) {
+      final firstAccount = customerOverview[0] as Map<String, dynamic>;
+      cashInHand = (firstAccount['availableBalance'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    return CashData(
+      cashInHand: cashInHand,
+      lastUpdated: DateTime.now(),
+      pendingApprovals: transactions.where((tx) => tx.status == TransactionStatus.pending).length,
+      todayDeposits: _calculateTodayDeposits(transactions),
+      todayHandovers: _calculateTodayHandovers(transactions),
+      todayRefunds: 0.0,
+      customerOverview: customerOverview.cast<Map<String, dynamic>>(),
+    );
+  }
+
+  // Update CashData when a new transaction is added
+  CashData _updateCashDataWithNewTransaction(CashData currentCashData, CashTransaction newTransaction) {
+    // Recalculate pending approvals count
+    int newPendingCount = currentCashData.pendingApprovals;
+    if (newTransaction.status == TransactionStatus.pending) {
+      newPendingCount += 1;
+    }
+
+    // Recalculate today's deposits and handovers
+    double newTodayDeposits = currentCashData.todayDeposits;
+    double newTodayHandovers = currentCashData.todayHandovers;
+
+    final today = DateTime.now();
+    final isToday = newTransaction.createdAt.day == today.day &&
+        newTransaction.createdAt.month == today.month &&
+        newTransaction.createdAt.year == today.year;
+
+    if (isToday) {
+      if (newTransaction.type == TransactionType.deposit) {
+        newTodayDeposits += newTransaction.amount;
+      } else if (newTransaction.type == TransactionType.handover) {
+        newTodayHandovers += newTransaction.amount;
+      }
+    }
+
+    return currentCashData.copyWith(
+      lastUpdated: DateTime.now(),
+      pendingApprovals: newPendingCount,
+      todayDeposits: newTodayDeposits,
+      todayHandovers: newTodayHandovers,
+    );
+  }
+
+  double _calculateTodayDeposits(List<CashTransaction> transactions) {
     final today = DateTime.now();
     return transactions
         .where((tx) =>
-    tx['type'] == 'deposit' &&
-        DateTime.parse(tx['date']).day == today.day &&
-        DateTime.parse(tx['date']).month == today.month &&
-        DateTime.parse(tx['date']).year == today.year)
-        .fold(0.0, (sum, tx) => sum + _toDouble(tx['amount']));
+    tx.type == TransactionType.deposit &&
+        tx.createdAt.day == today.day &&
+        tx.createdAt.month == today.month &&
+        tx.createdAt.year == today.year)
+        .fold(0.0, (sum, tx) => sum + tx.amount);
   }
 
-  double _calculateTodayHandovers(List<dynamic> transactions) {
+  double _calculateTodayHandovers(List<CashTransaction> transactions) {
     final today = DateTime.now();
     return transactions
         .where((tx) =>
-    tx['type'] == 'handover' &&
-        DateTime.parse(tx['date']).day == today.day &&
-        DateTime.parse(tx['date']).month == today.month &&
-        DateTime.parse(tx['date']).year == today.year)
-        .fold(0.0, (sum, tx) => sum + _toDouble(tx['amount']));
+    tx.type == TransactionType.handover &&
+        tx.createdAt.day == today.day &&
+        tx.createdAt.month == today.month &&
+        tx.createdAt.year == today.year)
+        .fold(0.0, (sum, tx) => sum + tx.amount);
   }
-
-  List<CashTransaction> _convertApiTransactions(List<dynamic> transactionsData) {
-    return transactionsData.map<CashTransaction>((data) {
-      // Map API transaction type to your enum
-      TransactionType type = TransactionType.deposit;
-      switch (data['type']) {
-        case 'deposit':
-          type = TransactionType.deposit;
-          break;
-        case 'handover':
-          type = TransactionType.handover;
-          break;
-        case 'bank':
-          type = TransactionType.bank;
-          break;
-      }
-
-      // Map API status to your enum
-      TransactionStatus status = TransactionStatus.pending;
-      switch (data['status']) {
-        case 'pending':
-          status = TransactionStatus.pending;
-          break;
-        case 'approved':
-        case 'completed':
-          status = TransactionStatus.approved;
-          break;
-        case 'rejected':
-          status = TransactionStatus.rejected;
-          break;
-      }
-
-      // Determine account type from API data
-      TransactionAccountType accountType = TransactionAccountType.svTv;
-      if (data['account'] == 'Refill Account') {
-        accountType = TransactionAccountType.refill;
-      }
-
-      return CashTransaction(
-        id: data['id'],
-        type: type,
-        accountType: accountType,
-        amount: _toDouble(data['amount']),
-        status: status,
-        createdAt: DateTime.parse(data['date']),
-        initiator: data['type']?.toString().substring(0, 1).toUpperCase() ?? 'U',
-        selectedAccount: data['notes']?.contains('handover') ? 'Recipient' : null,
-        selectedBank: data['type'] == 'bank' ? data['account'] : null,
-      );
-    }).toList();
-
-  }
-
 }

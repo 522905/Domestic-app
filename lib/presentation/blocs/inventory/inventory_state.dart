@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../core/models/inventory_request.dart';
+import 'package:lpg_distribution_app/core/models/inventory/inventory_request.dart';
 
 abstract class InventoryState extends Equatable {
   const InventoryState();
@@ -25,6 +25,27 @@ class InventoryError extends InventoryState {
   final String message;
 
   const InventoryError({required this.message});
+
+  @override
+  List<Object> get props => [message];
+}
+
+// New states for detail loading
+class InventoryDetailLoading extends InventoryState {}
+
+class InventoryDetailLoaded extends InventoryState {
+  final InventoryRequest request;
+
+  const InventoryDetailLoaded({required this.request});
+
+  @override
+  List<Object> get props => [request];
+}
+
+class InventoryDetailError extends InventoryState {
+  final String message;
+
+  const InventoryDetailError({required this.message});
 
   @override
   List<Object> get props => [message];

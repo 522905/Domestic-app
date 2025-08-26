@@ -1,334 +1,319 @@
-import 'package:equatable/equatable.dart';
+// lib/presentation/blocs/orders/orders_bloc.dart
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../domain/entities/order.dart';
+import 'orders_event.dart';
+import 'orders_state.dart';
 
-// Events
-abstract class OrdersEvent extends Equatable {
-  const OrdersEvent();
-
-  @override
-  List<Object?> get props => [];
-}
-
-class LoadOrders extends OrdersEvent {
-  final String? statusFilter;
-
-  const LoadOrders({this.statusFilter});
-
-  @override
-  List<Object?> get props => [statusFilter];
-}
-
-class FilterOrders extends OrdersEvent {
-  final String? searchQuery;
-  final String? statusFilter;
-  final String? typeFilter;
-  final String? dateFilter;
-
-  const FilterOrders({
-    this.searchQuery,
-    this.statusFilter,
-    this.typeFilter,
-    this.dateFilter,
-  });
-
-  @override
-  List<Object?> get props => [searchQuery, statusFilter, typeFilter, dateFilter];
-}
-
-class AddOrder extends OrdersEvent {
-  final Order order;
-
-  const AddOrder(this.order);
-
-  @override
-  List<Object> get props => [order];
-}
-
-class RequestOrderApproval extends OrdersEvent {
-  final String orderId;
-
-  const RequestOrderApproval(this.orderId);
-
-  @override
-  List<Object> get props => [orderId];
-}
-
-class RejectOrder extends OrdersEvent {
-  final String orderId;
-  final String reason;
-
-  const RejectOrder(this.orderId, this.reason);
-
-  @override
-  List<Object> get props => [orderId, reason];
-}
-
-class RefreshOrders extends OrdersEvent {}
-
-// States
-abstract class OrdersState extends Equatable {
-  const OrdersState();
-
-  @override
-  List<Object?> get props => [];
-}
-
-class OrdersInitial extends OrdersState {}
-
-class OrdersLoading extends OrdersState {}
-
-class OrdersLoaded extends OrdersState {
-  final List<Order> orders;
-  final String? currentStatusFilter;
-  final String? currentSearchQuery;
-
-  const OrdersLoaded({
-    required this.orders,
-    this.currentStatusFilter,
-    this.currentSearchQuery,
-  });
-
-  @override
-  List<Object?> get props => [orders, currentStatusFilter, currentSearchQuery];
-}
-
-class OrdersError extends OrdersState {
-  final String message;
-
-  const OrdersError(this.message);
-
-  @override
-  List<Object> get props => [message];
-}
-
-// BLoC
 class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
   final ApiServiceInterface apiService;
+  static const int _pageLimit = 10;
   List<Order> _allOrders = [];
 
-  OrdersBloc({required this.apiService}) : super(OrdersInitial()) {
+  OrdersBloc({required this.apiService}) : super(const OrdersInitial()) {
     on<LoadOrders>(_onLoadOrders);
-    on<FilterOrders>(_onFilterOrders);
-    on<AddOrder>(_onAddOrder);
+    on<LoadMoreOrders>(_onLoadMoreOrders);
+    on<ApplyFilters>(_onApplyFilters);
+    on<ClearFilters>(_onClearFilters);
     on<RefreshOrders>(_onRefreshOrders);
+    on<SearchOrders>(_onSearchOrders);
     on<RequestOrderApproval>(_onRequestOrderApproval);
-    // on<RejectOrder>(_onRejectOrder);
   }
 
-    Future<void> _onLoadOrders(LoadOrders event, Emitter<OrdersState> emit) async {
-      emit(OrdersLoading());
-      try {
-        final response = await apiService.getOrdersList();
-
-        final orders = response.map<Order>((data) {
-          final items = (data['items'] as List<dynamic>).map<OrderItem>((itemData) {
-            return OrderItem(
-              id: itemData['id'] ?? '',
-              name: itemData['item_name'] ?? '',
-              quantity: (itemData['qty'] ?? 0.0).toInt(),
-              unit: itemData['unit'] ?? '',
-              rate: itemData['rate'] ?? 0.0,
-              amount: itemData['amount'] ?? 0.0,
-              description: itemData['description'] ?? '',
-              itemCode: itemData['item_code'] ?? '',
-              warehouse: itemData['warehouse'] ?? '',
-              orderId: data['name'] ?? '',
-              orderType: 'Sales Order',
-              status: data['status'] ?? '',
-              createdAt: data['transaction_date'] != null
-                  ? DateTime.parse(data['transaction_date'])
-                  : DateTime.now(),
-              grandTotal: data['grand_total']?.toString() ?? '',
-            );
-          }).toList();
-
-          return Order(
-            id: data['name'] ?? '',
-            orderNumber: data['name'] ?? '',
-            orderType: 'Sales Order',
-            status: data['status'] ?? '',
-            createdAt: data['transaction_date'] != null
-              ? DateTime.parse(data['transaction_date'])
-              : DateTime.now(),
-            items: items,
-            warehouseId: '',
-            vehicleId: '',
-            grandTotal: data['grand_total']?.toString() ?? '',
-          );
-        }).toList();
-
-        _allOrders = orders;
-        emit(OrdersLoaded(
-          orders: orders,
-          currentStatusFilter: event.statusFilter,
-        ));
-      } catch (e) {
-        emit(OrdersError('Failed to load orders: $e'));
-      }
-    }
-
-  Future<void> _onFilterOrders(FilterOrders event, Emitter<OrdersState> emit) async {
-    if (state is OrdersLoaded) {
-      final currentState = state as OrdersLoaded;
-
-      List<Order> filteredOrders = List.from(_allOrders);
-
-      // Apply status filter
-      if (event.statusFilter != null && event.statusFilter!.isNotEmpty) {
-        filteredOrders = filteredOrders
-            .where((order) => order.status.toLowerCase() == event.statusFilter!.toLowerCase())
-            .toList();
+  Future<void> _onLoadOrders(LoadOrders event, Emitter<OrdersState> emit) async {
+    try {
+      if (event.refresh) {
+        emit(const OrdersLoading());
+      } else if (state is OrdersLoaded) {
+        final currentState = state as OrdersLoaded;
+        emit(currentState.copyWith(isLoadingMore: true));
       }
 
-      // Apply search query filter
-      if (event.searchQuery != null && event.searchQuery!.isNotEmpty) {
-        filteredOrders = filteredOrders.where((order) {
-          return order.orderNumber.toLowerCase().contains(event.searchQuery!.toLowerCase()) ||
-              order.orderType.toLowerCase().contains(event.searchQuery!.toLowerCase()) ||
-              order.items.any((item) => item.name.toLowerCase().contains(event.searchQuery!.toLowerCase()));
-        }).toList();
-      }
+      final response = await apiService.getOrdersList(
+        offset: 0,
+        limit: _pageLimit,
+        filters: event.filters,
+      );
 
-      // Apply type filter
-      if (event.typeFilter != null && event.typeFilter!.isNotEmpty) {
-        filteredOrders = filteredOrders
-            .where((order) => order.orderType.toLowerCase() == event.typeFilter!.toLowerCase())
-            .toList();
-      }
+      final orders = _parseOrdersFromResponse(response);
+      final availableFilters = _parseFiltersFromResponse(response);
+      final hasMore = response['has_more'] ?? false;
+
+      // Update internal cache
+      _allOrders = orders;
 
       emit(OrdersLoaded(
-        orders: filteredOrders,
-        currentStatusFilter: event.statusFilter ?? currentState.currentStatusFilter,
-        currentSearchQuery: event.searchQuery ?? currentState.currentSearchQuery,
+        orders: orders,
+        hasMore: hasMore,
+        currentOffset: _pageLimit,
+        availableFilters: availableFilters,
+        appliedFilters: event.filters ?? {},
+        isLoadingMore: false,
+      ));
+    } catch (e) {
+      emit(OrdersError(
+        message: _getErrorMessage(e),
+        canRetry: true,
       ));
     }
   }
 
-  void _onAddOrder(AddOrder event, Emitter<OrdersState> emit) {
-    if (state is OrdersLoaded) {
-      final currentState = state as OrdersLoaded;
+  Future<void> _onLoadMoreOrders(LoadMoreOrders event, Emitter<OrdersState> emit) async {
+    if (state is! OrdersLoaded) return;
 
-      // Check if order already exists to prevent duplicates
-      final existingOrderIndex = _allOrders.indexWhere((order) => order.id == event.order.id);
-      if (existingOrderIndex != -1) {
-        // Update existing order instead of adding duplicate
-        _allOrders[existingOrderIndex] = event.order;
-      } else {
-        // Add to internal cache only if it doesn't exist
-        _allOrders.insert(0, event.order);
-      }
+    final currentState = state as OrdersLoaded;
+    if (!currentState.hasMore || currentState.isLoadingMore) return;
 
-      // Update displayed orders
-      final updatedOrders = List<Order>.from(currentState.orders);
-      final existingDisplayIndex = updatedOrders.indexWhere((order) => order.id == event.order.id);
+    try {
+      emit(currentState.copyWith(isLoadingMore: true));
 
-      // Check if new order should be visible based on current filter
-      bool shouldShow = true;
-      if (currentState.currentStatusFilter != null) {
-        shouldShow = event.order.status.toLowerCase() ==
-            currentState.currentStatusFilter!.toLowerCase();
-      }
+      final response = await apiService.getOrdersList(
+        offset: currentState.currentOffset,
+        limit: _pageLimit,
+        filters: currentState.appliedFilters.isNotEmpty ? currentState.appliedFilters : null,
+      );
 
-      if (shouldShow) {
-        if (existingDisplayIndex != -1) {
-          // Update existing order in display list
-          updatedOrders[existingDisplayIndex] = event.order;
-        } else {
-          // Add new order to display list
-          updatedOrders.insert(0, event.order);
-        }
-      } else if (existingDisplayIndex != -1) {
-        // Remove from display if it no longer matches filter
-        updatedOrders.removeAt(existingDisplayIndex);
-      }
+      final newOrders = _parseOrdersFromResponse(response);
+      final hasMore = response['has_more'] ?? false;
+
+      // Combine existing orders with new orders
+      final allOrders = List<Order>.from(currentState.orders)..addAll(newOrders);
+
+      // Update internal cache
+      _allOrders = allOrders;
+
+      emit(currentState.copyWith(
+        orders: allOrders,
+        hasMore: hasMore,
+        currentOffset: currentState.currentOffset + _pageLimit,
+        isLoadingMore: false,
+      ));
+    } catch (e) {
+      emit(currentState.copyWith(
+        isLoadingMore: false,
+      ));
+      // Could emit error state or show snackbar - for now just stop loading
+    }
+  }
+
+  Future<void> _onApplyFilters(ApplyFilters event, Emitter<OrdersState> emit) async {
+    try {
+      emit(const OrdersLoading());
+
+      final response = await apiService.getOrdersList(
+        offset: 0,
+        limit: _pageLimit,
+        filters: event.filters,
+      );
+
+      final orders = _parseOrdersFromResponse(response);
+      final availableFilters = _parseFiltersFromResponse(response);
+      final hasMore = response['has_more'] ?? false;
+
+      // Update internal cache
+      _allOrders = orders;
 
       emit(OrdersLoaded(
-        orders: updatedOrders,
-        currentStatusFilter: currentState.currentStatusFilter,
-        currentSearchQuery: currentState.currentSearchQuery,
+        orders: orders,
+        hasMore: hasMore,
+        currentOffset: _pageLimit,
+        availableFilters: availableFilters,
+        appliedFilters: event.filters,
+        isLoadingMore: false,
+      ));
+    } catch (e) {
+      emit(OrdersError(
+        message: _getErrorMessage(e),
+        canRetry: true,
       ));
     }
+  }
+
+  Future<void> _onClearFilters(ClearFilters event, Emitter<OrdersState> emit) async {
+    add(const LoadOrders(refresh: true, filters: {}));
   }
 
   Future<void> _onRefreshOrders(RefreshOrders event, Emitter<OrdersState> emit) async {
     if (state is OrdersLoaded) {
       final currentState = state as OrdersLoaded;
-      add(LoadOrders(statusFilter: currentState.currentStatusFilter));
+      add(LoadOrders(
+        refresh: true,
+        filters: currentState.appliedFilters,
+      ));
     } else {
-      add(const LoadOrders());
+      add(const LoadOrders(refresh: true));
+    }
+  }
+
+  void _onSearchOrders(SearchOrders event, Emitter<OrdersState> emit) {
+    if (state is OrdersLoaded) {
+      final currentState = state as OrdersLoaded;
+      emit(currentState.copyWith(searchQuery: event.query));
     }
   }
 
   Future<void> _onRequestOrderApproval(RequestOrderApproval event, Emitter<OrdersState> emit) async {
     try {
-      // Call API to request approval
-      await apiService.requestOrderApproval(event.orderId);
+      // Store the current state before making API call
+      OrdersLoaded? currentOrdersState;
+      if (state is OrdersLoaded) {
+        currentOrdersState = state as OrdersLoaded;
+      }
 
-      // Update order status locally
-      _updateOrderStatus(event.orderId, 'Processing', emit);
+      // Call the approval API
+      final response = await apiService.requestOrderApproval(event.orderId);
+
+      // Emit the response state with the API response and current orders
+      emit(OrdersLoadedWithResponse(
+        response: response,
+        orders: currentOrdersState?.orders ?? _allOrders,
+      ));
+
+      // Update the order status locally if needed
+      _updateOrderStatusLocally(event.orderId, 'Processing');
+
+      // After a brief delay, return to the normal OrdersLoaded state
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      if (currentOrdersState != null) {
+        // Get the updated orders after status change
+        final updatedOrders = _getUpdatedOrdersList(currentOrdersState.orders, event.orderId, 'Processing');
+
+        emit(currentOrdersState.copyWith(
+          orders: updatedOrders,
+        ));
+      }
 
     } catch (e) {
-      emit(OrdersError('Failed to request approval: $e'));
+      emit(OrdersError(
+        message: 'Failed to request approval: $e',
+        canRetry: true,
+      ));
     }
   }
 
-  // Future<void> _onRejectOrder(RejectOrder event, Emitter<OrdersState> emit) async {
-  //   try {
-  //     // Call API to reject order
-  //     await apiService.rejectOrder(event.orderId, event.reason);
-  //
-  //     // Update order status locally
-  //     _updateOrderStatus(event.orderId, 'Rejected', emit);
-  //
-  //   } catch (e) {
-  //     emit(OrdersError('Failed to reject order: $e'));
-  //   }
-  // }
+  List<Order> _getUpdatedOrdersList(List<Order> currentOrders, String orderId, String newStatus) {
+    return currentOrders.map((order) {
+      if (order.id == orderId) {
+        return order.copyWith(status: newStatus);
+      }
+      return order;
+    }).toList();
+  }
 
-  void _updateOrderStatus(String orderId, String newStatus, Emitter<OrdersState> emit) {
+  void _updateOrderStatusLocally(String orderId, String newStatus) {
+    // Update in internal cache
+    final orderIndex = _allOrders.indexWhere((order) => order.id == orderId);
+    if (orderIndex != -1) {
+      _allOrders[orderIndex] = _allOrders[orderIndex].copyWith(status: newStatus);
+    }
+
+    // Update current state if it's OrdersLoaded
+    if (state is OrdersLoaded) {
+      final currentState = state as OrdersLoaded;
+      final displayOrderIndex = currentState.orders.indexWhere((order) => order.id == orderId);
+
+      if (displayOrderIndex != -1) {
+        final updatedOrders = List<Order>.from(currentState.orders);
+        updatedOrders[displayOrderIndex] = updatedOrders[displayOrderIndex].copyWith(status: newStatus);
+
+        emit(currentState.copyWith(orders: updatedOrders));
+      }
+    }
+  }
+
+  List<Order> _parseOrdersFromResponse(Map<String, dynamic> response) {
+    final data = response['data'] as List? ?? [];
+    return data.map((orderData) => Order.fromJson(orderData)).toList();
+  }
+
+  Map<String, List<FilterOption>> _parseFiltersFromResponse(Map<String, dynamic> response) {
+    final facets = response['facets'] as Map<String, dynamic>? ?? {};
+    final Map<String, List<FilterOption>> filters = {};
+
+    facets.forEach((key, value) {
+      if (value is List) {
+        filters[key] = value
+            .map((item) => FilterOption.fromJson(item))
+            .where((option) => option.value.isNotEmpty)
+            .toList();
+      }
+    });
+
+    return filters;
+  }
+
+  String _getErrorMessage(dynamic error) {
+    if (error.toString().contains('No internet')) {
+      return 'No internet connection. Please check your network.';
+    } else if (error.toString().contains('timeout')) {
+      return 'Request timeout. Please try again.';
+    } else if (error.toString().contains('404')) {
+      return 'Orders not found.';
+    } else if (error.toString().contains('500')) {
+      return 'Server error. Please try again later.';
+    } else if (error.toString().contains('401') || error.toString().contains('403')) {
+      return 'Authentication failed. Please login again.';
+    } else {
+      return 'Failed to load orders. Please try again.';
+    }
+  }
+
+  // Method to add new order (for create order functionality)
+  void addNewOrder(Order order) {
     if (state is OrdersLoaded) {
       final currentState = state as OrdersLoaded;
 
-      // Update in internal cache
-      final cacheIndex = _allOrders.indexWhere((order) => order.id == orderId);
-      if (cacheIndex != -1) {
-        _allOrders[cacheIndex] = Order(
-          id: _allOrders[cacheIndex].id,
-          orderNumber: _allOrders[cacheIndex].orderNumber,
-          orderType: _allOrders[cacheIndex].orderType,
-          status: newStatus,
-          createdAt: _allOrders[cacheIndex].createdAt,
-          items: _allOrders[cacheIndex].items,
-          warehouseId: _allOrders[cacheIndex].warehouseId,
-          vehicleId: _allOrders[cacheIndex].vehicleId,
-          grandTotal: _allOrders[cacheIndex].grandTotal,
-        );
-      }
+      // Add to internal cache
+      _allOrders.insert(0, order);
 
-      // Update in displayed orders
-      final displayIndex = currentState.orders.indexWhere((order) => order.id == orderId);
+      // Add to displayed orders if it matches current filters
+      final updatedOrders = List<Order>.from(currentState.orders);
+      updatedOrders.insert(0, order);
+
+      emit(currentState.copyWith(orders: updatedOrders));
+    }
+  }
+
+  // Method to update existing order
+  void updateOrder(Order updatedOrder) {
+    // Update in internal cache
+    final cacheIndex = _allOrders.indexWhere((order) => order.id == updatedOrder.id);
+    if (cacheIndex != -1) {
+      _allOrders[cacheIndex] = updatedOrder;
+    }
+
+    // Update in current state
+    if (state is OrdersLoaded) {
+      final currentState = state as OrdersLoaded;
+      final displayIndex = currentState.orders.indexWhere((order) => order.id == updatedOrder.id);
+
       if (displayIndex != -1) {
         final updatedOrders = List<Order>.from(currentState.orders);
-        updatedOrders[displayIndex] = Order(
-          id: updatedOrders[displayIndex].id,
-          orderNumber: updatedOrders[displayIndex].orderNumber,
-          orderType: updatedOrders[displayIndex].orderType,
-          status: newStatus,
-          createdAt: updatedOrders[displayIndex].createdAt,
-          items: updatedOrders[displayIndex].items,
-          warehouseId: updatedOrders[displayIndex].warehouseId,
-          vehicleId: updatedOrders[displayIndex].vehicleId,
-          grandTotal: updatedOrders[displayIndex].grandTotal,
-        );
+        updatedOrders[displayIndex] = updatedOrder;
 
-        emit(OrdersLoaded(
-          orders: updatedOrders,
-          currentStatusFilter: currentState.currentStatusFilter,
-          currentSearchQuery: currentState.currentSearchQuery,
-        ));
+        emit(currentState.copyWith(orders: updatedOrders));
       }
     }
+  }
+
+  // Method to remove order
+  void removeOrder(String orderId) {
+    // Remove from internal cache
+    _allOrders.removeWhere((order) => order.id == orderId);
+
+    // Remove from current state
+    if (state is OrdersLoaded) {
+      final currentState = state as OrdersLoaded;
+      final updatedOrders = currentState.orders.where((order) => order.id != orderId).toList();
+
+      emit(currentState.copyWith(orders: updatedOrders));
+    }
+  }
+
+  @override
+  Future<void> close() {
+    _allOrders.clear();
+    return super.close();
   }
 }

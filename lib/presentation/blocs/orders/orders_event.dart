@@ -8,43 +8,54 @@ abstract class OrdersEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class FetchOrders extends OrdersEvent {
-  final Map<String, dynamic>? filters;
-  final int page;
-  final int pageSize;
+class LoadOrders extends OrdersEvent {
+  final bool refresh;
+  final Map<String, String>? filters;
 
-  const FetchOrders({
+  const LoadOrders({
+    this.refresh = true,
     this.filters,
-    this.page = 1,
-    this.pageSize = 20,
   });
 
   @override
-  List<Object?> get props => [filters, page, pageSize];
+  List<Object?> get props => [refresh, filters];
 }
 
-class ApproveOrder extends OrdersEvent {
-  final String orderId;
-  final String comment;
-
-  const ApproveOrder({
-    required this.orderId,
-    required this.comment,
-  });
-
-  @override
-  List<Object?> get props => [orderId, comment];
+class LoadMoreOrders extends OrdersEvent {
+  const LoadMoreOrders();
 }
 
-class RejectOrder extends OrdersEvent {
-  final String orderId;
-  final String reason;
+class ApplyFilters extends OrdersEvent {
+  final Map<String, String> filters;
 
-  const RejectOrder({
-    required this.orderId,
-    required this.reason,
-  });
+  const ApplyFilters(this.filters);
 
   @override
-  List<Object?> get props => [orderId, reason];
+  List<Object?> get props => [filters];
+}
+
+class ClearFilters extends OrdersEvent {
+  const ClearFilters();
+}
+
+class RefreshOrders extends OrdersEvent {
+  const RefreshOrders();
+}
+
+class SearchOrders extends OrdersEvent {
+  final String query;
+
+  const SearchOrders(this.query);
+
+  @override
+  List<Object?> get props => [query];
+}
+
+class RequestOrderApproval extends OrdersEvent {
+  final String orderId;
+
+  const RequestOrderApproval(this.orderId);
+
+  @override
+  List<Object> get props => [orderId];
 }

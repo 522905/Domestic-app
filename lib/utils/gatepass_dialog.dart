@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
-import 'package:lpg_distribution_app/core/models/inventory_request.dart';
+import 'package:lpg_distribution_app/core/models/inventory/inventory_request.dart';
 import 'package:lpg_distribution_app/core/services/printer_service.dart';
 import 'bluethooth_printer_widget.dart';
 
@@ -24,18 +24,6 @@ class _GatepassDialogState extends State<GatepassDialog>  {
 
   String _formatItemsList(InventoryRequest request) {
     final List<String> items = [];
-
-    if (request.cylinders14kg > 0) {
-      items.add('14.2kg: ${request.cylinders14kg}');
-    }
-
-    if (request.smallCylinders > 0) {
-      items.add('5kg: ${request.smallCylinders}');
-    }
-
-    if (request.cylinders19kg > 0) {
-      items.add('19kg: ${request.cylinders19kg}');
-    }
 
     return items.join(' | ');
   }
@@ -251,6 +239,7 @@ class _GatepassDialogState extends State<GatepassDialog>  {
     );
   }
 }
+
 class SimpleGatepassDialog extends StatefulWidget {
   final Map<String, dynamic> gatepassData;
 

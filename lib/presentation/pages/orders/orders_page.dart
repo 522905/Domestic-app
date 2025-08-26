@@ -1,52 +1,753 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
+import '../../../core/services/User.dart';
+import '../../../core/utils/global_drawer.dart';
+import '../../blocs/orders/orders_bloc.dart';
+import '../../blocs/orders/orders_event.dart';
+import '../../blocs/orders/orders_state.dart';
+import '../../../domain/entities/order.dart';
+import 'forms/create_sale_order_page.dart';
+import 'order_details_page.dart';
 
-class OrdersPage extends StatelessWidget {
+class OrdersPage extends StatefulWidget {
   const OrdersPage({Key? key}) : super(key: key);
+
+  @override
+  State<OrdersPage> createState() => _OrdersPageState();
+}
+
+class _OrdersPageState extends State<OrdersPage> {
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  List<String> _userRole = [];
+
+  // Filter selections
+  String? _selectedVehicle;
+  String? _selectedWarehouse;
+  String? _selectedStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+    _scrollController.addListener(_onScroll);
+    context.read<OrdersBloc>().add(const LoadOrders());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final userRole = await User().getUserRoles();
+      setState(() {
+        _userRole = userRole.map((userRole) => userRole.role).toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load data: $e')),
+      );
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+      context.read<OrdersBloc>().add(const LoadMoreOrders());
+    }
+  }
+
+  bool _isGeneralManager() {
+    return _userRole.contains('General Manager');
+  }
+
+  void _applyFilters() {
+    final filters = <String, String>{};
+
+    if (_selectedVehicle != null && _selectedVehicle!.isNotEmpty) {
+      filters['vehicle'] = _selectedVehicle!;
+    }
+    if (_selectedWarehouse != null && _selectedWarehouse!.isNotEmpty) {
+      filters['warehouse'] = _selectedWarehouse!;
+    }
+    if (_selectedStatus != null && _selectedStatus!.isNotEmpty) {
+      filters['status'] = _selectedStatus!;
+    }
+
+    context.read<OrdersBloc>().add(ApplyFilters(filters));
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _selectedVehicle = null;
+      _selectedWarehouse = null;
+      _selectedStatus = null;
+      _searchController.clear();
+    });
+    context.read<OrdersBloc>().add(const ClearFilters());
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: GlobalDrawer.getDrawer(context),
       appBar: AppBar(
-        title: const Text('Orders'),
-        centerTitle: true,
+        title: const Text(
+          'Orders',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color(0xFF0E5CA8),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              context.read<OrdersBloc>().add(const RefreshOrders());
+            },
+          ),
+        ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
+        children: [
+          _buildSearchAndFilterSection(),
+          Expanded(
+            child: BlocBuilder<OrdersBloc, OrdersState>(
+              builder: (context, state) {
+                if (state is OrdersLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (state is OrdersLoaded) {
+                  return _buildOrdersList(state);
+                } else if (state is OrdersLoadedWithResponse) {
+                  // Handle the response state but show the orders list
+                  // This ensures the list doesn't disappear after approval
+                  final ordersState = OrdersLoaded(
+                    orders: state.orders,
+                    hasMore: false, // Assuming no pagination info in response state
+                    currentOffset: 0,
+                    availableFilters: const {},
+                    appliedFilters: const {},
+                  );
+                  return _buildOrdersList(ordersState);
+                } else if (state is OrdersError) {
+                  return _buildErrorState(state);
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: (_userRole.contains('Delivery Boy') || _userRole.contains('General Manager'))
+          ? FloatingActionButton(
+        heroTag: 'order_page_screen',
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => BlocProvider.value(
+                value: BlocProvider.of<OrdersBloc>(context),
+                child: const CreateSaleOrderScreen(),
+              ),
+            ),
+          );
+        },
+        backgroundColor: const Color(0xFF0E5CA8),
+        child: const Icon(Icons.add, color: Colors.white),
+      )
+          : null,
+    );
+  }
+
+  Widget _buildSearchAndFilterSection() {
+    return BlocBuilder<OrdersBloc, OrdersState>(
+      builder: (context, state) {
+        return Container(
+          color: Colors.white,
+          child: Column(
+            children: [
+              // Search Bar
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search orders...',
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: 16.sp),
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: EdgeInsets.symmetric(vertical: 12.h),
+                  ),
+                  onChanged: (value) {
+                    context.read<OrdersBloc>().add(SearchOrders(value));
+                  },
+                ),
+              ),
+
+              // Filter Section
+              if (state is OrdersLoaded && state.availableFilters.isNotEmpty)
+                _buildFilters(state),
+
+              // Applied Filters Display
+              if (state is OrdersLoaded && state.hasFiltersApplied)
+                _buildAppliedFilters(state),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilters(OrdersLoaded state) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
           children: [
-            Icon(
-              Icons.receipt_long,
-              size: 64.sp,
-              color: Theme.of(context).primaryColor,
-            ),
-            SizedBox(height: 16.h),
-            Text(
-              'Orders',
-              style: TextStyle(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.bold,
+            // Vehicle Filter - Show for GM or if vehicle options exist
+            if ((_isGeneralManager() || state.availableFilters.containsKey('vehicle')) &&
+                state.availableFilters['vehicle']?.isNotEmpty == true)
+              _buildFilterChip(
+                label: 'Vehicle',
+                value: _selectedVehicle,
+                options: state.availableFilters['vehicle'] ?? [],
+                onSelected: (value) {
+                  setState(() {
+                    _selectedVehicle = value;
+                  });
+                  _applyFilters();
+                },
               ),
-            ),
-            SizedBox(height: 8.h),
-            Text(
-              'Manage orders and transactions',
-              style: TextStyle(
-                fontSize: 14.sp,
-                color: Colors.grey[600],
+
+            SizedBox(width: 8.w),
+
+            // Warehouse Filter
+            if (state.availableFilters.containsKey('warehouse') &&
+                state.availableFilters['warehouse']?.isNotEmpty == true)
+              _buildFilterChip(
+                label: 'Warehouse',
+                value: _selectedWarehouse,
+                options: state.availableFilters['warehouse'] ?? [],
+                onSelected: (value) {
+                  setState(() {
+                    _selectedWarehouse = value;
+                  });
+                  _applyFilters();
+                },
               ),
-            ),
+
+            SizedBox(width: 8.w),
+
+            // Status Filter
+            if (state.availableFilters.containsKey('status') &&
+                state.availableFilters['status']?.isNotEmpty == true)
+              _buildFilterChip(
+                label: 'Status',
+                value: _selectedStatus,
+                options: state.availableFilters['status'] ?? [],
+                onSelected: (value) {
+                  setState(() {
+                    _selectedStatus = value;
+                  });
+                  _applyFilters();
+                },
+              ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'create_order',
-        onPressed: () {
-          // Navigate to create order page
-          Navigator.pushNamed(context, '/orders/create');
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required String? value,
+    required List<FilterOption> options,
+    required Function(String?) onSelected,
+  }) {
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value ?? label,
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: value != null ? Colors.white : Colors.grey[800],
+            ),
+          ),
+          SizedBox(width: 4.w),
+          Icon(
+            Icons.arrow_drop_down,
+            size: 16.sp,
+            color: value != null ? Colors.white : Colors.grey[800],
+          ),
+        ],
+      ),
+      selected: value != null,
+      selectedColor: const Color(0xFF0E5CA8),
+      backgroundColor: Colors.grey[200],
+      onSelected: (_) => _showFilterDialog(label, options, onSelected),
+    );
+  }
+
+  Widget _buildAppliedFilters(OrdersLoaded state) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      child: Row(
+        children: [
+          Expanded(
+            child: Wrap(
+              spacing: 8.w,
+              runSpacing: 4.h,
+              children: [
+                if (state.searchQuery?.isNotEmpty == true)
+                  _buildAppliedFilterChip('Search: ${state.searchQuery}'),
+                ...state.appliedFilters.entries.map(
+                      (entry) => _buildAppliedFilterChip('${entry.key}: ${entry.value}'),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            icon: Icon(Icons.clear, size: 16.sp),
+            label: Text('Clear All', style: TextStyle(fontSize: 12.sp)),
+            onPressed: _clearAllFilters,
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFF44336),
+              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppliedFilterChip(String label) {
+    return Chip(
+      label: Text(
+        label,
+        style: TextStyle(fontSize: 11.sp, color: Colors.white),
+      ),
+      backgroundColor: const Color(0xFF0E5CA8).withOpacity(0.8),
+      deleteIcon: Icon(Icons.close, size: 14.sp, color: Colors.white),
+      onDeleted: () {
+        _removeSingleFilter(label);
+      },
+    );
+  }
+
+  void _removeSingleFilter(String label) {
+    if (label.startsWith('Search: ')) {
+      // Clear search
+      _searchController.clear();
+      context.read<OrdersBloc>().add(const SearchOrders(''));
+    } else if (label.contains(': ')) {
+      // Parse filter type and value
+      final parts = label.split(': ');
+      final filterType = parts[0].toLowerCase();
+
+      setState(() {
+        switch (filterType) {
+          case 'vehicle':
+            _selectedVehicle = null;
+            break;
+          case 'warehouse':
+            _selectedWarehouse = null;
+            break;
+          case 'status':
+            _selectedStatus = null;
+            break;
+        }
+      });
+
+      // Apply filters without the removed one
+      _applyFilters();
+    }
+  }
+
+  void _showFilterDialog(String filterType, List<FilterOption> options, Function(String?) onSelected) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Select $filterType'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('All'),
+                leading: Radio<String?>(
+                  value: null,
+                  groupValue: filterType == 'Vehicle' ? _selectedVehicle :
+                  filterType == 'Warehouse' ? _selectedWarehouse : _selectedStatus,
+                  onChanged: (value) {
+                    Navigator.pop(context);
+                    onSelected(value);
+                  },
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onSelected(null);
+                },
+              ),
+              ...options.map((option) => ListTile(
+                title: Text('${option.value} (${option.count})'),
+                leading: Radio<String>(
+                  value: option.value,
+                  groupValue: filterType == 'Vehicle' ? _selectedVehicle :
+                  filterType == 'Warehouse' ? _selectedWarehouse : _selectedStatus,
+                  onChanged: (value) {
+                    Navigator.pop(context);
+                    onSelected(value);
+                  },
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onSelected(option.value);
+                },
+              )),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersList(OrdersLoaded state) {
+    final orders = state.filteredOrders;
+
+    if (orders.isEmpty && !state.hasFiltersApplied) {
+      return _buildEmptyState();
+    } else if (orders.isEmpty && state.hasFiltersApplied) {
+      return _buildNoResultsState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<OrdersBloc>().add(const RefreshOrders());
+      },
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        itemCount: orders.length + (state.hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == orders.length) {
+            // Loading indicator at the bottom
+            return Container(
+              padding: EdgeInsets.all(16.h),
+              child: Center(
+                child: state.isLoadingMore
+                    ? const CircularProgressIndicator()
+                    : const SizedBox.shrink(),
+              ),
+            );
+          }
+          return _buildOrderCard(orders[index]);
         },
-        backgroundColor: Theme.of(context).colorScheme.secondary, // Brand Orange
-        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(Order order) {
+    String formattedDate = DateFormat('MMM d, yyyy').format(order.transactionDate);
+
+    Color statusColor = _getStatusColor(order.status);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<OrdersBloc>(context),
+              child: OrderDetailsPage(order: order),
+            ),
+          ),
+        );
+      },
+      child: Card(
+        margin: EdgeInsets.only(bottom: 8.h),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(16.sp),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      order.orderNumber,
+                      style: TextStyle(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[1000],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      order.status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                order.customerName,
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[800],
+                ),
+              ),
+              SizedBox(height: 4.h),
+              Row(
+                children: [
+                  Icon(Icons.local_shipping, size: 14.sp, color: Colors.grey[600]),
+                  SizedBox(width: 4.w),
+                  Expanded(
+                    child: Text(
+                      order.vehicle,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Icon(Icons.warehouse, size: 14.sp, color: Colors.grey[600]),
+                  SizedBox(width: 4.w),
+                  Flexible(
+                    child: Text(
+                      order.warehouse,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8.h),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formattedDate,
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        'Qty: ${order.totalQty}',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '₹${order.grandTotal.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        color: Colors.grey[800],
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'to deliver and bill':
+        return const Color(0xFFFFC107); // Yellow
+      case 'on hold':
+        return const Color(0xFFF44336); // Red
+      case 'completed':
+      case 'delivered':
+        return const Color(0xFF4CAF50); // Green
+      case 'draft':
+        return const Color(0xFF9E9E9E); // Grey
+      default:
+        return const Color(0xFF2196F3); // Blue
+    }
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt_long,
+            size: 64.sp,
+            color: Colors.grey[400],
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            'No orders found',
+            style: TextStyle(
+              fontSize: 18.sp,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'Create a new order using the + button',
+            style: TextStyle(
+              fontSize: 14.sp,
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoResultsState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 64.sp,
+            color: Colors.grey[400],
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            'No orders match your filters',
+            style: TextStyle(
+              fontSize: 18.sp,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'Try adjusting your search or filters',
+            style: TextStyle(
+              fontSize: 14.sp,
+              color: Colors.grey[500],
+            ),
+          ),
+          SizedBox(height: 16.h),
+          ElevatedButton(
+            onPressed: _clearAllFilters,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5CA8),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Clear Filters'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(OrdersError state) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64.sp,
+            color: Colors.grey[400],
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            'Oops! Something went wrong',
+            style: TextStyle(
+              fontSize: 18.sp,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32.w),
+            child: Text(
+              state.message,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          if (state.canRetry) ...[
+            SizedBox(height: 16.h),
+            ElevatedButton.icon(
+              onPressed: () {
+                context.read<OrdersBloc>().add(const RefreshOrders());
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5CA8),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
