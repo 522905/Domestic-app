@@ -27,15 +27,18 @@ class SelectableDepositItem {
 
     // Add type-specific fields
     if (metadata['sales_order_item'] != null) {
-      payload["sales_order_item"] = metadata['sales_order_item'];
+      payload["sales_order_detail_ref"] = metadata['sales_order_item'];
     }
+    if (metadata['sales_order'] != null) {
+      payload["sales_order_ref"] = metadata['sales_order'];
+    }
+    //TODO verify keys with material request
     if (metadata['material_request'] != null) {
       payload["material_request"] = metadata['material_request'];
     }
     if (metadata['item_row_name'] != null) {
       payload["item_row_name"] = metadata['item_row_name'];
     }
-
     return payload;
   }
 }

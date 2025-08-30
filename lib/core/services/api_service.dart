@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lpg_distribution_app/core/services/User.dart';
+import 'package:path/path.dart';
 import '../models/inventory/inventory_request.dart';
 import '../network/api_client.dart';
 import 'api_service_interface.dart';
@@ -49,9 +52,9 @@ class ApiService implements ApiServiceInterface {
           },
         ),
       );
-
       final access = resp.data['token']['access'];
       final refresh = resp.data['token']['refresh'];
+      final company = Map<String, dynamic>.from(resp.data['company']);
 
       final user = Map<String, dynamic>.from(resp.data['user']);
 
@@ -59,11 +62,75 @@ class ApiService implements ApiServiceInterface {
         access: access,
         refresh: refresh,
         user: user,
+        company: company
       );
 
       await apiClient.setToken(access);
       return resp.data;
     }
+
+    @override
+    Future<List<UserCompany>> companyList() async {
+      try {
+          final response = await apiClient.get(
+            apiClient.endpoints.companyList,
+        );
+        if (response.statusCode == 200) {
+          final data = response.data;
+          final List<dynamic> allowedCompanies = data['allowed'];
+          return allowedCompanies.map((company) => UserCompany.fromJson(company)).toList();
+        } else {
+          throw Exception('Failed to fetch companies');
+        }
+      } catch (e) {
+        debugPrint('Error fetching companies: $e');
+        rethrow;
+      }
+    }
+
+  @override
+  Future<void> switchCompany(int? companyId) async {
+    try {
+      final refreshToken = await User().getRefreshToken();
+      if (refreshToken == null) {
+        throw Exception('No refresh token found');
+      }
+
+      final response = await apiClient.post(
+        apiClient.endpoints.switchCompany,
+        data: {
+          'refresh': refreshToken,
+          'company_id': companyId,
+        },
+      );
+
+      if ( response.statusCode == 200) {
+        final data = response.data;
+
+        // Update tokens with new access token (refresh stays same)
+        await User().saveTokens(
+          token: data['access'],
+          refreshToken: refreshToken, // Keep existing refresh token
+        );
+
+        // Save company info from API response (not selectedCompany)
+        await User().saveCompany(
+          companyId: data['company']['id'],
+          companyName: data['company']['name'],
+          companyShortCode: data['company']['short_code'],
+        );
+
+        // Update API client token for future requests
+        await apiClient.setToken(data['access']);
+      } else {
+        throw Exception('Failed to switch company: ${response?.statusMessage}');
+      }
+    } catch (e) {
+      // Let the calling widget handle UI error display
+      rethrow;
+    }
+  }
+
   @override
   Future<void> logout() async {
     try {
@@ -74,6 +141,56 @@ class ApiService implements ApiServiceInterface {
     }
   }
 
+  @override
+  Future<Map<String, dynamic>> getOrdersList(
+      {
+        int offset = 0,
+        int limit = 20,
+        Map<String, String>? filters,
+      }
+      ) async {
+    try {
+      Map<String, dynamic> queryParams = {
+        'offset': offset,
+        'limit': limit,
+        if (filters != null) ...filters,
+      };
+
+      final response = await apiClient.get(
+        apiClient.endpoints.ordersData,
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception(
+            'Failed to fetch orders: ${response.statusCode}'
+        );
+      }
+    } catch (e) {
+      _handleError(e);
+      return {};
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOrderDetails(String orderId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.orderDetails(orderId),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to fetch order details: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      return {};
+    }
+  }
 
   @override
   Future<Map<String, dynamic>> getOrderItems({
@@ -99,7 +216,6 @@ class ApiService implements ApiServiceInterface {
       rethrow;
     }
   }
-
 
   @override
   Future<Map<String, dynamic>> createOrder(
@@ -231,39 +347,6 @@ class ApiService implements ApiServiceInterface {
   }
 
   @override
-  Future<Map<String, dynamic>> getOrdersList(
-      {
-        int offset = 0,
-        int limit = 20,
-        Map<String, String>? filters,
-      }
-      ) async {
-    try {
-      Map<String, dynamic> queryParams = {
-        'offset': offset,
-        'limit': limit,
-        if (filters != null) ...filters,
-      };
-
-       final response = await apiClient.get(
-        apiClient.endpoints.ordersList,
-        queryParameters: queryParams,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data;
-      } else {
-        throw Exception(
-            'Failed to fetch orders: ${response.statusCode}'
-        );
-      }
-    } catch (e) {
-      _handleError(e);
-      return {};
-    }
-  }
-
-  @override
   Future<Map<String, dynamic>> getOrderDetail(String orderId) async {
     try {
       final response = await apiClient.get(
@@ -277,21 +360,14 @@ class ApiService implements ApiServiceInterface {
   }
 
   @override
-  Future<Map<String, dynamic>> getCashSummary() async {
+  Future<Map<String, dynamic>> getPartnerAccountBalance() async {
     Map<String, dynamic> queryParams = {};
     final response = await apiClient.get(
       queryParameters: queryParams,
-      apiClient.endpoints.cashSummary,
+      apiClient.endpoints.partnerAccountBalance,
     );
 
-    if (response.data['success'] == true) {
-      return {
-        'success': true,
-        'customerOverview': response.data['customer_overview'] ?? [],
-      };
-    } else {
-      throw Exception('Failed to fetch cash summary');
-    }
+    return response.data;
   }
 
   @override
@@ -314,14 +390,11 @@ class ApiService implements ApiServiceInterface {
   @override
   Future<Map<String, dynamic>> getCashierBalance() async {
     final response = await apiClient.get(
-      apiClient.endpoints.cashierData,
+      apiClient.endpoints.cashierAccountBalance,
     );
 
-    if (response.data['success'] == true) {
-      return {
-        'success': true,
-        'cashierBalance': response.data['balance'] ?? {},
-      };
+    if (response.data != null) {
+      return response.data;
     } else {
       throw Exception('Failed to fetch cash summary');
     }
@@ -926,9 +999,6 @@ class ApiService implements ApiServiceInterface {
     );
     return response.data;
   }
-
-
-  // new api's'
 
     @override
     Future<List<dynamic>> getCashAccount() async {

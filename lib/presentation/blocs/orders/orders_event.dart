@@ -59,3 +59,13 @@ class RequestOrderApproval extends OrdersEvent {
   @override
   List<Object> get props => [orderId];
 }
+
+// NEW EVENT FOR ORDER DETAILS
+class LoadOrderDetails extends OrdersEvent {
+  final String id;
+
+  const LoadOrderDetails(this.id);
+
+  @override
+  List<Object> get props => [id];
+}

@@ -38,6 +38,7 @@ class _InventoryPageState extends State<InventoryPage>
   // TODO remove this simply
   List<Map<String, dynamic>> warehousesItemData = [];
 
+
   List<String> _userRole = [];
   String? _userName = '';
   bool _isLoading = true;
@@ -149,7 +150,7 @@ class _InventoryPageState extends State<InventoryPage>
         backgroundColor: const Color(0xFF0E5CA8),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Color(0xFFFFFFFF)),
             onPressed: () {
               context
                   .read<InventoryBloc>()
@@ -443,6 +444,7 @@ class _InventoryPageState extends State<InventoryPage>
     final isDepositRequest = request.requestType == 'DEPOSIT';
     final isTransferRequest = request.requestType == 'TRANSFER';
 
+    final dtLocal = DateTime.parse(request.timestamp).toLocal();
     return Card(
       margin: EdgeInsets.only(bottom: 5.h, top: 4.h),
       child: InkWell(
@@ -561,14 +563,10 @@ class _InventoryPageState extends State<InventoryPage>
                         color: Colors.grey[600],
                       ),
                       SizedBox(width: 4.w),
-                      Text(
-                        DateFormat('dd-MM-yyyy HH:mm')
-                            .format(DateTime.parse(request.timestamp)),
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          color: Colors.grey[600],
-                        ),
-                      ),
+                          Text(
+                              DateFormat('dd-MM-yyyy hh:mm').format(dtLocal),
+                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                        )
                     ],
                   ),
                   if (request.status == 'PENDING')

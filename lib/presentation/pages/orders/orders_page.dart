@@ -468,8 +468,12 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
+  String formatUpdatedAtAbsolute(DateTime? dt) {
+    if (dt == null) return 'Unknown';
+    return DateFormat('MMM dd, yyyy • h:mm a').format(dt.toLocal());
+  }
+
   Widget _buildOrderCard(Order order) {
-    String formattedDate = DateFormat('MMM d, yyyy').format(order.transactionDate);
 
     Color statusColor = _getStatusColor(order.status);
 
@@ -519,18 +523,18 @@ class _OrdersPageState extends State<OrdersPage> {
                       order.status,
                       style: TextStyle(
                         color: statusColor,
-                        fontSize: 10.sp,
+                        fontSize: 15.sp,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 8.h),
+              SizedBox(height: 2.h),
               Text(
-                order.customerName,
+                'Created - By : ${order.createdBy}',
                 style: TextStyle(
-                  fontSize: 16.sp,
+                  fontSize: 12.sp,
                   fontWeight: FontWeight.w500,
                   color: Colors.grey[800],
                 ),
@@ -565,7 +569,7 @@ class _OrdersPageState extends State<OrdersPage> {
                   ),
                 ],
               ),
-              SizedBox(height: 8.h),
+              SizedBox(height: 2.h),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -573,15 +577,15 @@ class _OrdersPageState extends State<OrdersPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        formattedDate,
+                        'Qty: ${order.totalQty}',
                         style: TextStyle(
-                          fontSize: 12.sp,
+                          fontSize: 14.sp,
                           color: Colors.grey[600],
                         ),
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        'Qty: ${order.totalQty}',
+                        'Date: ${formatUpdatedAtAbsolute(order.transactionDate)}',
                         style: TextStyle(
                           fontSize: 12.sp,
                           color: Colors.grey[600],
@@ -599,7 +603,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       '₹${order.grandTotal.toStringAsFixed(0)}',
                       style: TextStyle(
                         color: Colors.grey[800],
-                        fontSize: 14.sp,
+                        fontSize: 16.sp,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -616,7 +620,7 @@ class _OrdersPageState extends State<OrdersPage> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'to deliver and bill':
-        return const Color(0xFFFFC107); // Yellow
+        return const Color(0xFFF9A825); // Yellow
       case 'on hold':
         return const Color(0xFFF44336); // Red
       case 'completed':

@@ -14,7 +14,7 @@ import '../../../blocs/vehicle/vehicle_bloc.dart';
 import '../../../blocs/vehicle/vehicle_state.dart';
 import '../../../blocs/vehicle/vehicle_event.dart';
 import '../../../widgets/inventory/deposit/material_request_items_widget.dart';
-import '../../../widgets/inventory/deposit/sales_order_items_widget.dart';
+import '../../../widgets/inventory/deposit/SalesOrderItemsWidget/sales_order_items_widget.dart';
 import '../../../widgets/inventory/deposit/unlinked_items_widget.dart';
 import '../../../widgets/selectors/vehicle_selector_dialog.dart';
 import '../../../widgets/selectors/warehouse_selector_dialog.dart';
@@ -42,11 +42,10 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
   String? _selectedWarehouse;
   String? _selectedWarehouseId;
   String? _selectedWarehouseName;
-
-  // State
   bool _isSubmitting = false;
   bool _isLoadingData = true;
   final List<SelectableDepositItem> _selectedItems = [];
+  final List<SelectedReturn> _selectedReturns = [];
 
   // Data
   DepositData? _depositData;
@@ -84,6 +83,121 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
           break;
         case DepositData.salesOrder:
           itemData = await apiService.getPendingSaleOrderList();
+          // itemData ={
+          //   "customer": "AZEPH2516F",
+          //   "orders": [
+          //     {
+          //       "sales_order": "SAL-ORD-2025-00158",
+          //       "transaction_date": "2025-08-28",
+          //       "status": "On Hold",
+          //       "sales_order_item": "pjjkl63bs2",
+          //       "item_code": "M00104",
+          //       "warehouse": "Sherpur Godown - AIG",
+          //       "qty_ordered": 5.0,
+          //       "qty_returned": 0.0,
+          //       "balance_qty": 5.0
+          //     },
+          //     {
+          //       "sales_order": "SAL-ORD-2025-00158",
+          //       "transaction_date": "2025-08-28",
+          //       "status": "On Hold",
+          //       "sales_order_item": "pjjvjn455a",
+          //       "item_code": "M00087",
+          //       "warehouse": "Sherpur Godown - AIG",
+          //       "qty_ordered": 5.0,
+          //       "qty_returned": 0.0,
+          //       "balance_qty": 5.0
+          //     },
+          //     {
+          //       "sales_order": "SAL-ORD-2025-00159",
+          //       "transaction_date": "2025-08-28",
+          //       "status": "On Hold",
+          //       "sales_order_item": "psi2satm1b",
+          //       "item_code": "M00087",
+          //       "warehouse": "Sherpur Godown - AIG",
+          //       "qty_ordered": 4.0,
+          //       "qty_returned": 0.0,
+          //       "balance_qty": 4.0
+          //     },
+          //     {
+          //       "sales_order": "SAL-ORD-2025-00159",
+          //       "transaction_date": "2025-08-28",
+          //       "status": "On Hold",
+          //       "sales_order_item": "psif59f5l4",
+          //       "item_code": "M00104",
+          //       "warehouse": "Sherpur Godown - AIG",
+          //       "qty_ordered": 4.0,
+          //       "qty_returned": 0.0,
+          //       "balance_qty": 4.0
+          //     },
+          //     {
+          //       "sales_order": "SAL-ORD-2025-00157",
+          //       "transaction_date": "2025-08-27",
+          //       "status": "On Hold",
+          //       "sales_order_item": "3mrqnbcgvd",
+          //       "item_code": "M00087",
+          //       "warehouse": "Sherpur Godown - AIG",
+          //       "qty_ordered": 10.0,
+          //       "qty_returned": 0.0,
+          //       "balance_qty": 10.0
+          //     }
+          //   ],
+          //   "summary_by_item_code": {
+          //     "M00104": {
+          //       "balance_qty": 9.0,
+          //       "item_description": "5 Kg LPG Cylinder - Filled",
+          //       "eligible_returns": {
+          //         "empty": [
+          //           {
+          //             "item_code": "M00105",
+          //             "description": "5 Kg LPG Cylinder - Empty"
+          //           },
+          //           {
+          //             "item_code": "M0010101",
+          //             "description": "5 Kg LPG Cylinder - Empty"
+          //           },
+          //           {
+          //             "item_code": "M00101010",
+          //             "description": "5 Kg LPG Cylinder - Empty"
+          //           }
+          //         ],
+          //         "defective": [
+          //           {
+          //             "item_code": "M00101",
+          //             "description": "5 Kg LPG Cylinder - Defective"
+          //           },
+          //           {
+          //             "item_code": "M001010",
+          //             "description": "5 Kg LPG Cylinder - Defective"
+          //           }
+          //         ]
+          //       }
+          //     },
+          //     "M00087": {
+          //       "balance_qty": 19.0,
+          //       "item_description": "14.2 Kg LPG Cylinder - Filled",
+          //       "eligible_returns": {
+          //         "empty": [
+          //           {
+          //             "item_code": "M00088",
+          //             "description": "14.2 Kg LPG Cylinder - Empty"
+          //           }
+          //         ],
+          //         "defective": [
+          //           {
+          //             "item_code": "M00108",
+          //             "description": "14.2 Kg LPG Cylinder - defective"
+          //           },
+          //           {
+          //             "item_code": "M08080",
+          //             "description": "14.2 Kg LPG Cylinder - defective"
+          //           }
+          //         ]
+          //       }
+          //     }
+          //   },
+          //   "total_balance_qty": 28.0
+          // };
           break;
         case DepositData.materialRequest:
           itemData = await apiService.getMaterialRequestList();
@@ -302,13 +416,12 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
       case DepositData.salesOrder:
         return SalesOrderItemsWidget(
           depositData: _depositData as SalesOrderDepositData,
-          selectedItems: _selectedItems,
-          onItemsChanged: (items) {
+          onReturnsChanged: (returns) { // Changed from onItemsChanged
             setState(() {
-              _selectedItems.clear();
-              _selectedItems.addAll(items);
+              _selectedReturns.clear();
+              _selectedReturns.addAll(returns);
             });
-            setPageState(() {}); // Update the page immediately
+            setPageState(() {});
           },
         );
       case DepositData.materialRequest:
@@ -333,12 +446,21 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
 
 
   void _showConfirmDepositDialog() {
-    if (_selectedItems.isEmpty) {
+
+    bool hasItems = widget.depositType == DepositData.salesOrder
+        ? _selectedReturns.isNotEmpty
+        : _selectedItems.isNotEmpty;
+
+    if (!hasItems) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please add at least one item')),
       );
       return;
     }
+
+    if (widget.depositType == DepositData.salesOrder
+        ? _selectedReturns.isEmpty
+        : _selectedItems.isEmpty)
 
     if (_selectedWarehouseId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -471,9 +593,43 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final requestId = 'DP-$timestamp';
 
-      final itemsForApi = _selectedItems.map((item) {
-        return item.toApiPayload(item.metadata['selected_qty'] ?? 0);
-      }).toList();
+      List<Map<String, dynamic>> itemsForApi;
+
+      if (widget.depositType == DepositData.salesOrder) {
+        // Convert SelectedReturn to API payload
+        itemsForApi = _selectedReturns.map((returnItem) {
+          Map<String, dynamic> payload = {
+            'item_code': returnItem.returnItemCode,
+            'item_name': returnItem.returnItemDescription,
+            'qty': returnItem.qty.toInt(),
+            'return_type': "Deposit",
+            'sales_order_ref': returnItem.againstSalesOrder,
+            'sales_order_detail_ref': returnItem.againstSalesOrderItem,
+            // 'against_sales_order': returnItem.againstSalesOrder,
+            // 'sales_order_detail_ref': returnItem.againstSalesOrderItem,
+            // 'against_item_code': returnItem.againstItemCode,
+            // 'against_item_description': returnItem.againstItemDescription,
+          };
+
+          // Add defective-specific fields if applicable
+          if (returnItem.isDefective) {
+            payload.addAll({
+              'cylinder_number': returnItem.cylinderNumber,
+              'tare_weight': returnItem.tareWeight,
+              'gross_weight': returnItem.grossWeight,
+              'net_weight': returnItem.netWeight,
+              'fault_type': returnItem.faultType,
+            });
+          }
+
+          return payload;
+        }).toList();
+      } else {
+        // Handle other deposit types (existing logic)
+        itemsForApi = _selectedItems.map((item) {
+          return item.toApiPayload(item.metadata['selected_qty'] ?? 0);
+        }).toList();
+      }
 
       final newRequest = InventoryRequest(
         requestType: 'DEPOSIT',
@@ -567,10 +723,20 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
   Map<String, int> _calculateDepositSummary() {
     Map<String, int> summary = {};
 
-    for (var item in _selectedItems) {
-      String itemName = item.displayName;
-      int quantity = item.metadata['selected_qty'] ?? 0;
-      summary[itemName] = (summary[itemName] ?? 0) + quantity;
+    if (widget.depositType == DepositData.salesOrder) {
+      // Handle sales order returns
+      for (var returnItem in _selectedReturns) {
+        String itemName = '${returnItem.returnItemCode} - ${returnItem.returnItemDescription}';
+        int quantity = returnItem.qty.toInt();
+        summary[itemName] = (summary[itemName] ?? 0) + quantity;
+      }
+    } else {
+      // Handle other deposit types
+      for (var item in _selectedItems) {
+        String itemName = item.displayName;
+        int quantity = item.metadata['selected_qty'] ?? 0;
+        summary[itemName] = (summary[itemName] ?? 0) + quantity;
+      }
     }
 
     return summary;
@@ -605,7 +771,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
           SliverToBoxAdapter(
             child: Column(
               children: [
-                // Deposit Type Info Header - More compact
+                // Deposit Type Info Header
                 Container(
                   margin: EdgeInsets.fromLTRB(12.w, 8.h, 12.w, 4.h),
                   padding: EdgeInsets.all(12.w),
@@ -662,7 +828,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                   ),
                 ),
 
-                // Vehicle Selection Card - More compact
+                // Vehicle Selection Card
                 BlocBuilder<VehicleBloc, VehicleState>(
                   builder: (context, vehicleState) {
                     if (vehicleState is VehicleLoaded) {
@@ -739,7 +905,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                   },
                 ),
 
-                // Warehouse Selection Card - More compact
+                // Warehouse Selection Card
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
                   decoration: BoxDecoration(
@@ -790,7 +956,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                   ),
                 ),
 
-                // Items Section Header (only if selections made)
+                // Items Section Header
                 if (_selectedWarehouseId != null && _selectedVehicleId != null)
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -818,7 +984,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
 
           // Items List or Empty State
           if (_selectedWarehouseId != null && _selectedVehicleId != null)
-            _selectedItems.isEmpty
+            (widget.depositType == DepositData.salesOrder ? _selectedReturns.isEmpty : _selectedItems.isEmpty)
                 ? SliverFillRemaining(
               child: Center(
                 child: Column(
@@ -854,125 +1020,268 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
             )
                 : SliverList(
               delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                  final item = _selectedItems[index];
-                  return Container(
-                    margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 3.h),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFF0E5CA8), width: 1.5),
-                      borderRadius: BorderRadius.circular(8.r),
-                      color: Colors.white,
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(10.w),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(6.w),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  _depositTypeIcon,
-                                  color: const Color(0xFF0E5CA8),
-                                  size: 16.sp,
-                                ),
-                              ),
-                              SizedBox(width: 10.w),
-                              Expanded(
-                                child: Column(
+                (context, index) {
+                  if (widget.depositType == DepositData.salesOrder) {
+                        // Group similar returns before displaying
+                        final groupedReturns = <String, List<SelectedReturn>>{};
+
+                        for (final returnItem in _selectedReturns) {
+                          String groupKey = '${returnItem.returnItemCode}_${returnItem.returnType}_${returnItem.againstSalesOrderItem}';
+                          if (returnItem.isDefective) {
+                            groupKey += '_${returnItem.cylinderNumber}_${returnItem.faultType}';
+                          }
+                          groupedReturns.putIfAbsent(groupKey, () => []).add(returnItem);
+                        }
+
+                        final returnGroup = groupedReturns.values.elementAt(index);
+                        final firstReturn = returnGroup.first;
+                        final totalQty = returnGroup.fold(0.0, (sum, item) => sum + item.qty);
+
+                        return Container(
+                          margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 3.h),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFF0E5CA8), width: 1.5),
+                            borderRadius: BorderRadius.circular(8.r),
+                            color: Colors.white,
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(10.w),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      item.displayName,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14.sp,
+                                    Container(
+                                      padding: EdgeInsets.all(6.w),
+                                      decoration: BoxDecoration(
+                                        color: firstReturn.isEmpty
+                                            ? Colors.green.withOpacity(0.1)
+                                            : Colors.orange.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        firstReturn.isEmpty ? Icons.autorenew : Icons.warning,
+                                        color: firstReturn.isEmpty ? Colors.green : Colors.orange,
+                                        size: 16.sp,
                                       ),
                                     ),
-                                    SizedBox(height: 3.h),
-                                    Text(
-                                      'Code: ${item.itemCode}',
-                                      style: TextStyle(
-                                        fontSize: 11.sp,
-                                        color: Colors.grey[600],
+                                    SizedBox(width: 10.w),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${firstReturn.returnItemCode} - ${firstReturn.returnItemDescription}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14.sp,
+                                            ),
+                                          ),
+                                          SizedBox(height: 3.h),
+                                          Text(
+                                            'Against: ${firstReturn.againstItemCode} (${firstReturn.againstSalesOrder})',
+                                            style: TextStyle(
+                                              fontSize: 11.sp,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(4.r),
+                                      ),
+                                      child: Text(
+                                        'Qty: ${totalQty.toInt()}',
+                                        style: TextStyle(
+                                          fontSize: 11.sp,
+                                          color: const Color(0xFF0E5CA8),
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4.r),
-                                ),
-                                child: Text(
-                                  'Qty: ${item.metadata['selected_qty'] ?? 0}',
-                                  style: TextStyle(
-                                    fontSize: 11.sp,
-                                    color: const Color(0xFF0E5CA8),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8.h),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SizedBox(
-                                  height: 28.h,
-                                  child: OutlinedButton(
-                                    onPressed: _showItemSelectionDialog,
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: const Color(0xFF0E5CA8),
-                                      side: BorderSide(color: const Color(0xFF0E5CA8)),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(6.r),
+                                SizedBox(height: 8.h),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 28.h,
+                                        child: OutlinedButton(
+                                          onPressed: _showItemSelectionDialog,
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: const Color(0xFF0E5CA8),
+                                            side: BorderSide(color: const Color(0xFF0E5CA8)),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(6.r),
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                          child: Text('Edit', style: TextStyle(fontSize: 11.sp)),
+                                        ),
                                       ),
-                                      padding: EdgeInsets.zero,
                                     ),
-                                    child: Text('Edit', style: TextStyle(fontSize: 11.sp)),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 6.w),
-                              Expanded(
-                                child: SizedBox(
-                                  height: 28.h,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _selectedItems.removeAt(index);
-                                      });
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(6.r),
+                                    SizedBox(width: 6.w),
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 28.h,
+                                        child: ElevatedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              // Remove all items in the group
+                                              for (final returnItem in returnGroup) {
+                                                _selectedReturns.removeWhere((item) => item.id == returnItem.id);
+                                                (_depositData as SalesOrderDepositData).removeSelectedReturn(returnItem.id);
+                                              }
+                                            });
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(6.r),
+                                            ),
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                          child: Text('Remove', style: TextStyle(fontSize: 11.sp)),
+                                        ),
                                       ),
-                                      padding: EdgeInsets.zero,
                                     ),
-                                    child: Text('Remove', style: TextStyle(fontSize: 11.sp)),
-                                  ),
+                                  ],
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ],
+                        );
+                      }
+                  else {
+                    // Existing code for other deposit types
+                    final item = _selectedItems[index];
+                    return Container(
+                      margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 3.h),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFF0E5CA8), width: 1.5),
+                        borderRadius: BorderRadius.circular(8.r),
+                        color: Colors.white,
                       ),
-                    ),
-                  );
+                      child: Padding(
+                        padding: EdgeInsets.all(10.w),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(6.w),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    _depositTypeIcon,
+                                    color: const Color(0xFF0E5CA8),
+                                    size: 16.sp,
+                                  ),
+                                ),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.displayName,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14.sp,
+                                        ),
+                                      ),
+                                      SizedBox(height: 3.h),
+                                      Text(
+                                        'Sale order: ${item.metadata['sales_order']}',
+                                        style: TextStyle(
+                                          fontSize: 11.sp,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4.r),
+                                  ),
+                                  child: Text(
+                                    'Qty: ${item.metadata['selected_qty'] ?? 0}',
+                                    style: TextStyle(
+                                      fontSize: 11.sp,
+                                      color: const Color(0xFF0E5CA8),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8.h),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 28.h,
+                                    child: OutlinedButton(
+                                      onPressed: _showItemSelectionDialog,
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFF0E5CA8),
+                                        side: const BorderSide(color: Color(0xFF0E5CA8)),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(6.r),
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                      ),
+                                      child: Text('Edit', style: TextStyle(fontSize: 11.sp)),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 6.w),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 28.h,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _selectedItems.removeAt(index);
+                                        });
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(6.r),
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                      ),
+                                      child: Text('Remove', style: TextStyle(fontSize: 11.sp)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
                 },
-                childCount: _selectedItems.length,
+                childCount: widget.depositType == DepositData.salesOrder
+                    ? _getGroupedReturnsCount()
+                    : _selectedItems.length,
               ),
             )
           else
@@ -1001,8 +1310,8 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
             ),
         ],
       ),
-      // Bottom Summary and Submit Button (Fixed at bottom) - More compact
-      bottomNavigationBar: _selectedItems.isNotEmpty
+      // Bottom Summary and Submit Button
+      bottomNavigationBar: (widget.depositType == DepositData.salesOrder ? _selectedReturns.isNotEmpty : _selectedItems.isNotEmpty)
           ? Container(
         padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
@@ -1019,7 +1328,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Summary - More compact
+            // Summary
             Container(
               constraints: BoxConstraints(maxHeight: 120.h),
               child: SingleChildScrollView(
@@ -1068,7 +1377,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                       if (_calculateDepositSummary().isNotEmpty) ...[
                         Padding(
                           padding: EdgeInsets.symmetric(vertical: 4.h),
-                          child: Divider(thickness: 1, color: Colors.grey, height: 1),
+                          child: const Divider(thickness: 1, color: Colors.grey, height: 1),
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1140,6 +1449,20 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
       )
           : null,
     );
+  }
+
+  int _getGroupedReturnsCount() {
+    final groupedReturns = <String, List<SelectedReturn>>{};
+
+    for (final returnItem in _selectedReturns) {
+      String groupKey = '${returnItem.returnItemCode}_${returnItem.returnType}_${returnItem.againstSalesOrderItem}';
+      if (returnItem.isDefective) {
+        groupKey += '_${returnItem.cylinderNumber}_${returnItem.faultType}';
+      }
+      groupedReturns.putIfAbsent(groupKey, () => []).add(returnItem);
+    }
+
+    return groupedReturns.length;
   }
 
 }

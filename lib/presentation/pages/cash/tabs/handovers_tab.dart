@@ -34,7 +34,7 @@ class HandoversTab extends StatelessWidget {
                 SizedBox(height: 8.h),
                 ElevatedButton(
                   onPressed: () =>
-                      context.read<CashManagementBloc>().add(LoadCashData()),
+                      context.read<CashManagementBloc>().add(RefreshCashData()),
                   child: const Text('Retry'),
                 ),
               ],

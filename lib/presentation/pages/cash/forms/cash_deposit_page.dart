@@ -8,7 +8,6 @@ import '../../../../domain/entities/cash/cash_transaction.dart';
 import '../../../../utils/dialog_utils.dart';
 import '../../../blocs/cash/cash_bloc.dart';
 
-
 class CashDepositPage extends StatefulWidget {
   const CashDepositPage({Key? key}) : super(key: key);
 
@@ -309,6 +308,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
       context.read<CashManagementBloc>().add(
           AddTransaction(transaction, completer: completer)
       );
+      context.read<CashManagementBloc>().add(RefreshCashData());
 
       try {
         await completer.future;

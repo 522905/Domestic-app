@@ -26,15 +26,15 @@ class SelectableOrderItem {
 
   factory SelectableOrderItem.fromJson(Map<String, dynamic> json, String bucketType) {
     // Safely convert actual_qty to int
-    int actualQty = 0;
-    final actualQtyValue = json['actual_qty'];
-    if (actualQtyValue != null) {
-      if (actualQtyValue is int) {
-        actualQty = actualQtyValue;
-      } else if (actualQtyValue is double) {
-        actualQty = actualQtyValue.toInt();
-      } else if (actualQtyValue is String) {
-        actualQty = int.tryParse(actualQtyValue) ?? 0;
+    int projectedQty = 0;
+    final projectedQtyValue = json["projected_qty"];
+    if (projectedQtyValue != null) {
+      if (projectedQtyValue is int) {
+        projectedQty = projectedQtyValue;
+      } else if (projectedQtyValue is double) {
+        projectedQty = projectedQtyValue.toInt();
+      } else if (projectedQtyValue is String) {
+        projectedQty = int.tryParse(projectedQtyValue) ?? 0;
       }
     }
 
@@ -44,7 +44,7 @@ class SelectableOrderItem {
       itemName: json['item_name'] ?? '',
       description: json['description'] ?? '',
       type: bucketType,
-      maxQuantity: actualQty,
+      maxQuantity: projectedQty,
       availabilityStatus: json['availability_status'] ?? 'Unknown',
       metadata: {
         'item_group': json['item_group'],
@@ -53,7 +53,7 @@ class SelectableOrderItem {
         'projected_qty': _safeToInt(json['projected_qty']),
         'mappings': json['mappings'] ?? [],
         'availability_status': json['availability_status'],
-        'actual_qty': actualQty,
+        'actual_qty': projectedQty,
         ...json,
       },
     );

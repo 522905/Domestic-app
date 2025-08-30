@@ -39,7 +39,7 @@ class _BluetoothPrinterWidgetState extends State<BluetoothPrinterWidget> {
       bool locationEnabled = await Permission.locationWhenInUse.serviceStatus.isEnabled;
       if (!locationEnabled) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enable Location services for Bluetooth scanning')),
+          const SnackBar(content: Text('Please enable Location services for Bluetooth scanning')),
         );
         return;
       }

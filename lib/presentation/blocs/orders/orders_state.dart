@@ -110,6 +110,44 @@ class OrdersLoadedWithResponse extends OrdersState {
   List<Object?> get props => [response, orders];
 }
 
+// NEW STATES FOR ORDER DETAILS
+class OrderDetailsLoading extends OrdersState {
+  final String orderName;
+
+  const OrderDetailsLoading(this.orderName);
+
+  @override
+  List<Object> get props => [orderName];
+}
+
+class OrderDetailsLoaded extends OrdersState {
+  final Order detailedOrder;
+  final String orderName;
+
+  const OrderDetailsLoaded({
+    required this.detailedOrder,
+    required this.orderName,
+  });
+
+  @override
+  List<Object> get props => [detailedOrder, orderName];
+}
+
+class OrderDetailsError extends OrdersState {
+  final String message;
+  final String orderName;
+  final bool canRetry;
+
+  const OrderDetailsError({
+    required this.message,
+    required this.orderName,
+    this.canRetry = true,
+  });
+
+  @override
+  List<Object> get props => [message, orderName, canRetry];
+}
+
 class FilterOption {
   final String value;
   final int count;

@@ -1,11 +1,17 @@
 // lib/core/services/api_service_interface.dart
 import '../models/inventory/inventory_request.dart';
+import 'User.dart';
 
 abstract class ApiServiceInterface {
 
   Future<void> initialize(String baseUrl);
   // Auth methods
   Future<Map<String, dynamic>> login(String username, String password);
+  Future<List<UserCompany>>companyList();
+  Future<void> switchCompany(
+        int ? companyId,
+    );
+
   Future<void> logout();
   Future<Map<String, dynamic>> getUserProfile();
   Future<Map<String, dynamic>> getOrderDetail(String orderId);
@@ -23,7 +29,7 @@ abstract class ApiServiceInterface {
       List<Map<String, dynamic>> items,
       );
 
-  Future<Map<String, dynamic>> getCashSummary();
+  Future<Map<String, dynamic>> getPartnerAccountBalance();
   Future<Map<String, dynamic>> getCashierBalance();
   Future<Map<String, dynamic>> getAccountsList();
   Future<List<dynamic>> getCashAccount();
@@ -132,4 +138,7 @@ abstract class ApiServiceInterface {
     required String orderType,
     String? warehouseId,  // Add this optional parameter
   });
+
+  Future<Map<String, dynamic>> getOrderDetails(String orderId);
+
 }

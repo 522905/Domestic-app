@@ -18,6 +18,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     on<RefreshOrders>(_onRefreshOrders);
     on<SearchOrders>(_onSearchOrders);
     on<RequestOrderApproval>(_onRequestOrderApproval);
+    on<LoadOrderDetails>(_onLoadOrderDetails); // NEW HANDLER
   }
 
   Future<void> _onLoadOrders(LoadOrders event, Emitter<OrdersState> emit) async {
@@ -192,6 +193,30 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     }
   }
 
+  // NEW METHOD FOR LOADING ORDER DETAILS
+  Future<void> _onLoadOrderDetails(LoadOrderDetails event, Emitter<OrdersState> emit) async {
+    try {
+      emit(OrderDetailsLoading(event.id));
+
+      final response = await apiService.getOrderDetails(event.id);
+
+      // Parse the sales_order_data into Order entity
+      final salesOrderData = response['sales_order_data'] as Map<String, dynamic>;
+      final detailedOrder = Order.fromJson(salesOrderData);
+
+      emit(OrderDetailsLoaded(
+        detailedOrder: detailedOrder,
+        orderName: event.id,
+      ));
+    } catch (e) {
+      emit(OrderDetailsError(
+        message: _getErrorMessage(e),
+        orderName: event.id,
+        canRetry: true,
+      ));
+    }
+  }
+
   List<Order> _getUpdatedOrdersList(List<Order> currentOrders, String orderId, String newStatus) {
     return currentOrders.map((order) {
       if (order.id == orderId) {
@@ -249,13 +274,13 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     } else if (error.toString().contains('timeout')) {
       return 'Request timeout. Please try again.';
     } else if (error.toString().contains('404')) {
-      return 'Orders not found.';
+      return 'Order not found.';
     } else if (error.toString().contains('500')) {
       return 'Server error. Please try again later.';
     } else if (error.toString().contains('401') || error.toString().contains('403')) {
       return 'Authentication failed. Please login again.';
     } else {
-      return 'Failed to load orders. Please try again.';
+      return 'Failed to load data. Please try again.';
     }
   }
 

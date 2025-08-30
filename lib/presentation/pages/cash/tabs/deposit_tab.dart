@@ -42,7 +42,7 @@ class DepositsTab extends StatelessWidget {
                   ),
                   SizedBox(height: 8.h),
                   ElevatedButton(
-                    onPressed: () => context.read<CashManagementBloc>().add(LoadCashData()),
+                    onPressed: () => context.read<CashManagementBloc>().add(RefreshCashData()),
                     child: const Text('Retry'),
                   ),
                 ],

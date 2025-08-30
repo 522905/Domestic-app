@@ -20,6 +20,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isRefreshing = false;
   String? _userName;
   List<String> _userRoles = [];
+  UserCompany? activeCompany;
 
   // Dashboard Statistics
   final Map<String, dynamic> _dashboardStats = {
@@ -50,11 +51,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final userName = await User().getUserName();
       final userRole = await User().getUserRoles();
+      final _activeCompany = await User().getActiveCompany();
 
       if (mounted) {
         setState(() {
           _userName = userName?.isNotEmpty == true ? userName : 'User';
           _userRoles = userRole.map((userRole) => userRole.role).toList();
+          activeCompany = _activeCompany;
         });
       }
     } catch (e) {
@@ -324,6 +327,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String userName = _userName?.split(' ').first ?? 'User';
     String roleDisplay = _formatUserRoles();
 
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(24.w),
@@ -385,7 +389,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     SizedBox(height: 4.h),
                     Text(
-                      roleDisplay,
+                    '$roleDisplay  (${activeCompany!.shortCode})',
                       style: TextStyle(
                         fontSize: 14.sp,
                         color: const Color(0xFF0E5CA8),
@@ -1366,7 +1370,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<String> formattedRoles = _userRoles.map((role) {
       switch (role.toLowerCase()) {
         case 'delivery boy':
-          return 'Delivery Executive';
+          return 'Delivery Boy';
         case 'warehouse manager':
           return 'Warehouse Manager';
         case 'general manager':

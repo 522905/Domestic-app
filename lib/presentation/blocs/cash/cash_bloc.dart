@@ -7,6 +7,9 @@ import 'package:lpg_distribution_app/domain/entities/cash/cash_transaction.dart'
 import 'package:lpg_distribution_app/domain/entities/cash/cash_data.dart';
 import 'package:lpg_distribution_app/core/services/api_service_interface.dart';
 
+import '../../../core/services/User.dart';
+import '../../../domain/entities/cash/partner_balance.dart';
+
 abstract class CashEvent extends Equatable {
   @override
   List<Object?> get props => [];
@@ -194,9 +197,9 @@ class CashManagementBloc extends Bloc<CashEvent, CashManagementState> {
   final ApiServiceInterface apiService;
 
   CashManagementBloc({required this.apiService}) : super(CashManagementInitial()) {
-    on<LoadCashData>(_onLoadCashData);
-    on<LoadTransactionDetails>(_onLoadTransactionDetails);
+    // on<LoadCashData>(_onLoadCashData);
     on<RefreshCashData>(_onRefreshCashData);
+    on<LoadTransactionDetails>(_onLoadTransactionDetails);
     on<AddTransaction>(_onAddTransaction);
     on<ApproveTransaction>(_onApproveTransaction);
     on<RejectTransaction>(_onRejectTransaction);
@@ -204,40 +207,45 @@ class CashManagementBloc extends Bloc<CashEvent, CashManagementState> {
     on<SearchCashRequest>(_onSearchCashRequest);
   }
 
-  Future<void> _onLoadCashData(LoadCashData event, Emitter<CashManagementState> emit) async {
-    emit(CashManagementLoading());
-    try {
-      // Load transactions
-      final transactionsData = await apiService.getCashTransactions();
-      final transactions = transactionsData.map<CashTransaction>((data) {
-        return CashTransaction.fromJson(data);
-      }).toList();
-
-      // Load cash summary data
-      final cashSummaryResponse = await apiService.getCashSummary();
-      final cashData = _buildCashDataFromResponse(cashSummaryResponse, transactions);
-
-      emit(
-        CashManagementLoaded(
-          cashData: cashData,
-          allTransactions: transactions,
-          filteredTransactions: transactions,
-        ),
-      );
-    } on DioException catch (e) {
-      final errorMessage = _extractErrorMessage(e);
-      emit(CashManagementError(
-        'Error loading cash data: $errorMessage',
-        errorCode: e.response?.statusCode?.toString(),
-        rawError: e.response?.data,
-      ));
-    } catch (e) {
-      emit(CashManagementError(
-        'Unexpected error: ${e.toString()}',
-        rawError: e,
-      ));
-    }
-  }
+  // Future<void> _onLoadCashData(LoadCashData event, Emitter<CashManagementState> emit) async {
+  //   emit(CashManagementLoading());
+  //   try {
+  //
+  //     final roles = await User().getUserRoles();
+  //     final userRoleList = roles.map((role) => role.role).toList();
+  //     final isDeliveryBoy = userRoleList.contains('Delivery Boy');
+  //     final isCashier = userRoleList.contains('Cashier');
+  //     // Load transactions
+  //     final transactionsData = await apiService.getCashTransactions();
+  //     final transactions = transactionsData.map<CashTransaction>((data) {
+  //       return CashTransaction.fromJson(data);
+  //     }).toList();
+  //
+  //
+  //     final cashSummaryResponse = await apiService.getPartnerAccountBalance();
+  //     final cashData = _buildCashDataFromResponse(cashSummaryResponse, transactions);
+  //
+  //     emit(
+  //       CashManagementLoaded(
+  //         cashData: cashData,
+  //         allTransactions: transactions,
+  //         filteredTransactions: transactions,
+  //       ),
+  //     );
+  //   } on DioException catch (e) {
+  //     final errorMessage = _extractErrorMessage(e);
+  //     emit(CashManagementError(
+  //       'Error loading cash data: $errorMessage',
+  //       errorCode: e.response?.statusCode?.toString(),
+  //       rawError: e.response?.data,
+  //     ));
+  //   } catch (e) {
+  //     emit(CashManagementError(
+  //       'Unexpected error: ${e.toString()}',
+  //       rawError: e,
+  //     ));
+  //   }
+  // }
 
   Future<void> _onLoadTransactionDetails(LoadTransactionDetails event, Emitter<CashManagementState> emit) async {
     emit(TransactionDetailsLoading());
@@ -445,11 +453,15 @@ class CashManagementBloc extends Bloc<CashEvent, CashManagementState> {
 
   Future<void> _onRefreshCashData(RefreshCashData event, Emitter<CashManagementState> emit) async {
     try {
-      // Preserve current search query if any
       String currentSearchQuery = '';
       if (state is CashManagementLoaded) {
         currentSearchQuery = (state as CashManagementLoaded).searchQuery;
       }
+
+      final roles = await User().getUserRoles();
+      final userRoleList = roles.map((role) => role.role).toList();
+      final isDeliveryBoy = userRoleList.contains('Delivery Boy');
+      final isCashier = userRoleList.contains('Cashier');
 
       // Load fresh data from API
       final transactionsData = await apiService.getCashTransactions();
@@ -457,11 +469,17 @@ class CashManagementBloc extends Bloc<CashEvent, CashManagementState> {
         return CashTransaction.fromJson(data);
       }).toList();
 
-      // Load cash summary data
-      final cashSummaryResponse = await apiService.getCashSummary();
-      final cashData = _buildCashDataFromResponse(cashSummaryResponse, transactions);
+      Map<String, dynamic> summaryResponse = {};
+      if (isDeliveryBoy) {
+        summaryResponse = await apiService.getPartnerAccountBalance(); // Partner data
+      }
+      if (isCashier) {
+        summaryResponse = await apiService.getCashierBalance(); // Cashier data
+      }
 
+      final cashData = _buildCashDataFromResponse(summaryResponse, transactions, userRoleList);
       // Apply current search filter if any
+
       List<CashTransaction> filteredTransactions = transactions;
       if (currentSearchQuery.isNotEmpty) {
         filteredTransactions = _filterTransactions(transactions, currentSearchQuery);
@@ -612,28 +630,54 @@ class CashManagementBloc extends Bloc<CashEvent, CashManagementState> {
     }).toList();
   }
 
-  // Build CashData from API response and transactions
-  CashData _buildCashDataFromResponse(Map<String, dynamic> response, List<CashTransaction> transactions) {
-    final customerOverview = response['customerOverview'] as List<dynamic>? ?? [];
-    double cashInHand = 0.0;
+  CashData _buildCashDataFromResponse(Map<String, dynamic> response, List<CashTransaction> transactions, List<String> userRoles) {
+    final isDeliveryBoy = userRoles.contains('Delivery Boy');
+    final isCashier = userRoles.contains('Cashier');
 
-    // Extract cash in hand from customer overview if available
-    if (customerOverview.isNotEmpty) {
-      final firstAccount = customerOverview[0] as Map<String, dynamic>;
-      cashInHand = (firstAccount['availableBalance'] as num?)?.toDouble() ?? 0.0;
+    double cashInHand = 0.0;
+    List<PartnerBalance> partners = [];
+    int totalPartners = 0;
+    List<Map<String, dynamic>> customerOverview = [];
+    List<Map<String, dynamic>> cashierAccounts = [];
+
+    if (isDeliveryBoy && response.containsKey('partners')) {
+      final partnersData = response['partners'] as List<dynamic>? ?? [];
+      partners = partnersData.map((partnerData) => PartnerBalance.fromJson(partnerData)).toList();
+      totalPartners = response['total_partners'] as int? ?? partners.length;
+
+      if (partners.isNotEmpty && partners.first.balanceData.isNotEmpty) {
+        cashInHand = partners.first.balanceData.first.availableBalance;
+      }
     }
 
-    return CashData(
-      cashInHand: cashInHand,
-      lastUpdated: DateTime.now(),
-      pendingApprovals: transactions.where((tx) => tx.status == TransactionStatus.pending).length,
-      todayDeposits: _calculateTodayDeposits(transactions),
-      todayHandovers: _calculateTodayHandovers(transactions),
-      todayRefunds: 0.0,
-      customerOverview: customerOverview.cast<Map<String, dynamic>>(),
-    );
-  }
+    if (isCashier && response.containsKey('accounts')) {
+      final accountsData = response['accounts'] as List<dynamic>? ?? [];
+      cashierAccounts = accountsData.cast<Map<String, dynamic>>();
 
+      if (cashierAccounts.isNotEmpty) {
+        final balanceData = cashierAccounts[0]['balance_data'] as Map<String, dynamic>?;
+        if (balanceData != null && balanceData['message'] is Map<String, dynamic>) {
+          final message = balanceData['message'] as Map<String, dynamic>;
+          if (message.isNotEmpty) {
+            cashInHand = (message.values.first as num?)?.toDouble() ?? 0.0;
+          }
+        }
+      }
+    }
+
+  return CashData(
+    cashInHand: cashInHand,
+    lastUpdated: DateTime.now(),
+    pendingApprovals: transactions.where((tx) => tx.status == TransactionStatus.pending).length,
+    todayDeposits: _calculateTodayDeposits(transactions),
+    todayHandovers: _calculateTodayHandovers(transactions),
+    todayRefunds: 0.0,
+    customerOverview: customerOverview,
+    partners: partners,
+    totalPartners: totalPartners,
+    cashierAccounts: cashierAccounts,
+  );
+}
   // Update CashData when a new transaction is added
   CashData _updateCashDataWithNewTransaction(CashData currentCashData, CashTransaction newTransaction) {
     // Recalculate pending approvals count

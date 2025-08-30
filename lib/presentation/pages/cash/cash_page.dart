@@ -7,20 +7,14 @@ import 'package:lpg_distribution_app/presentation/pages/cash/tabs/all_transactio
 import 'package:lpg_distribution_app/presentation/pages/cash/tabs/bank_tab.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/tabs/deposit_tab.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/tabs/handovers_tab.dart';
-import 'package:lpg_distribution_app/presentation/widgets/error_dialog.dart';
 import '../../../core/services/User.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/service_provider.dart';
 import '../../../core/utils/global_drawer.dart';
+import '../../../domain/entities/cash/partner_balance.dart';
 import '../../blocs/cash/cash_bloc.dart';
 import 'forms/bank_deposit_page.dart';
 import 'forms/handover_screen.dart';
-
-enum AccountType {
-  refill,
-  svTv,
-  nfr,
-}
 
 class CashPage extends StatefulWidget {
   const CashPage({Key? key}) : super(key: key);
@@ -37,12 +31,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
   List<String>? userRole;
   String? userName;
   bool _isInitialized = false;
-
-  final Map<AccountType, double> _accountBalances = {
-    AccountType.svTv: 0.0,
-    AccountType.refill: 0.0,
-    AccountType.nfr: 0.0,
-  };
 
   final currencyFormat = NumberFormat.currency(
     symbol: '₹',
@@ -66,9 +54,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       // Then initialize API service
       _apiService = await ServiceProvider.getApiService();
 
-      // Finally, update account balances
-      await _updateAccountBalances();
-
       setState(() {
         _isLoading = false;
         _isInitialized = true;
@@ -84,36 +69,8 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Only refresh if already initialized
     if (_isInitialized && ModalRoute.of(context)?.isCurrent == true) {
       context.read<CashManagementBloc>().add(RefreshCashData());
-      _updateAccountBalances();
-    }
-  }
-
-  Future<void> _updateAccountBalances() async {
-    try {
-      final response = await _apiService.getCashSummary();
-      List<dynamic> customerOverview = response['customerOverview'] ?? [];
-
-      _accountBalances.clear();
-      if (customerOverview.isNotEmpty) {
-        for (var item in customerOverview) {
-          final accountName = item['account'] ?? '';
-          final availableBalance = item['available_balance']?.toDouble() ?? 0.0;
-
-          // if (accountName.contains('TV Account')) {
-          //   _accountBalances[AccountType.svTv] = availableBalance;
-          // } else if (accountName.contains('Debtors')) {
-          //   _accountBalances[AccountType.refill] = availableBalance;
-          // } else if (accountName.contains('NFR Account')) {
-          //   _accountBalances[AccountType.nfr] = availableBalance;
-          // }
-        }
-        if (mounted) setState(() {});
-      }
-    } catch (e) {
-      print('Error updating account balances: $e');
     }
   }
 
@@ -124,7 +81,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
     setState(() {
       userRole = roles.map((role) => role.role).toList();
       userName = username;
-      // Initialize TabController with proper length after getting user roles
       _tabController?.dispose(); // Dispose old controller if exists
       _tabController = TabController(length: _getTabs().length, vsync: this);
     });
@@ -168,6 +124,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+
     // Show loading screen until everything is initialized
     if (_isLoading || !_isInitialized || _tabController == null) {
       return const Scaffold(
@@ -195,7 +152,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
         final apiService = snapshot.data!;
 
         return BlocProvider(
-          create: (context) => CashManagementBloc(apiService: apiService)..add(LoadCashData()),
+          create: (context) => CashManagementBloc(apiService: apiService)..add(RefreshCashData()),
           child: Scaffold(
             drawer: GlobalDrawer.getDrawer(context),
             appBar: AppBar(
@@ -204,9 +161,10 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
               centerTitle: true,
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.help_outline),
-                  onPressed: () {
-                    // Show help dialog
+                  icon: const Icon(Icons.refresh, color: Colors.white,),
+                  onPressed: () async {
+                    context.read<CashManagementBloc>().add(RefreshCashData());
+                    return await Future.delayed(const Duration(milliseconds: 200));
                   },
                 ),
               ],
@@ -273,7 +231,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                         ),
                         SizedBox(height: 8.h),
                         ElevatedButton(
-                          onPressed: () => context.read<CashManagementBloc>().add(LoadCashData()),
+                          onPressed: () => context.read<CashManagementBloc>().add(RefreshCashData()),
                           child: const Text('Retry'),
                         ),
                       ],
@@ -285,7 +243,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                   return RefreshIndicator(
                     onRefresh: () async {
                       context.read<CashManagementBloc>().add(RefreshCashData());
-                      _updateAccountBalances();
                       return await Future.delayed(const Duration(milliseconds: 400));
                     },
                     child: CustomScrollView(
@@ -294,7 +251,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                           child: Column(
                             children: [
                               if (userRole?.contains('Cashier') ?? false) _buildCashInHandCard(state),
-                              if (userRole?.contains('Cashier') ?? false) _buildSearchBar(context),
+                              // if (userRole?.contains('Cashier') ?? false) _buildSearchBar(context),
                               if (userRole?.contains('Delivery Boy') ?? false) _accountsTab(),
                               _buildTabs(),
                             ],
@@ -329,45 +286,46 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
 
   Widget _buildCashInHandCard(CashManagementLoaded state) {
     final formattedDate = DateFormat('MMM dd, HH:mm a').format(state.cashData.lastUpdated);
-    final availableBalance = state.cashData.customerOverview.isNotEmpty
-        ? state.cashData.customerOverview[0]['availableBalance']
-        : 0.0;
 
-    return Padding(
-      padding: EdgeInsets.all(8.w),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    if (userRole?.contains('Delivery Boy') ?? false) {
+      // For Delivery Boy - show partner data
+      if (state.cashData.partners.isNotEmpty) {
+        final partner = state.cashData.partners.first;
+        return Padding(
+          padding: EdgeInsets.all(8.w),
+          child: Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Cash in Hand',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      context.read<CashManagementBloc>().add(RefreshCashData());
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF0DD),
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
-                      child: Row(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
+                            partner.partnerName,
+                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            'ID: ${partner.partnerId}',
+                            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                      GestureDetector(
+                        onTap: () => context.read<CashManagementBloc>().add(RefreshCashData()),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF0DD),
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Text(
                             'REFRESH',
                             style: TextStyle(
                               fontSize: 12.sp,
@@ -375,38 +333,125 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                               color: const Color(0xFFF7941D),
                             ),
                           ),
-                        ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16.h),
+
+                  // Show balance data in a compact format
+                  ...partner.balanceData.map((balance) => Container(
+                    margin: EdgeInsets.only(bottom: 8.h),
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          balance.account,
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
+                        ),
+                        Text(
+                          currencyFormat.format(balance.availableBalance),
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: balance.availableBalance > 0
+                                ? const Color(0xFF4CAF50)
+                                : Colors.grey[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+
+                  SizedBox(height: 8.h),
+                  Text(
+                    'Last updated: $formattedDate',
+                    style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    } else if (userRole?.contains('Cashier') ?? false) {
+      // For Cashier - show cashier account data
+      double availableBalance = state.cashData.cashInHand;
+      String accountName = 'Cash Account';
+
+      if (state.cashData.cashierAccounts.isNotEmpty) {
+        accountName = state.cashData.cashierAccounts[0]['account_name'] ?? 'Cash Account';
+      }
+
+      return Padding(
+        padding: EdgeInsets.all(8.w),
+        child: Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      accountName,
+                      style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w500),
+                    ),
+                    GestureDetector(
+                      onTap: () => context.read<CashManagementBloc>().add(RefreshCashData()),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF0DD),
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        child: Text(
+                          'REFRESH',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFFF7941D),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8.h),
-              Row(
-                children: [
-                  Text(
-                    currencyFormat.format(availableBalance),
-                    style: TextStyle(
-                      fontSize: 24.sp,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
+                  ],
+                ),
+                SizedBox(height: 8.h),
+                Row(
+                  children: [
+                    Text(
+                      currencyFormat.format(availableBalance),
+                      style: TextStyle(
+                        fontSize: 24.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 8.w),
-                  Text(
-                    'as of $formattedDate',
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      color: Colors.grey[600],
+                    SizedBox(width: 8.w),
+                    Text(
+                      'as of $formattedDate',
+                      style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
+
+    // Fallback for other roles
+    return const SizedBox.shrink();
   }
 
   Widget _buildSearchBar(BuildContext context) {
@@ -463,6 +508,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
         tabs: tabs.map((tab) => Tab(text: tab)).toList(),
       ),
     );
+
   }
 
   void _showCashOptionsBottomSheet(List<String>? userRole) {
@@ -517,7 +563,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                       ),
                     );
                     if (result == true && mounted) {
-                      _updateAccountBalances();
                       _switchToHandoverTab();
                     }
                   },
@@ -539,7 +584,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                       ),
                     );
                     if (result == true && mounted) {
-                      _updateAccountBalances();
                       _switchToBankTab();
                     }
                   },
@@ -547,24 +591,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
             ],
           ),
         );
-      },
-    );
-  }
-
-  void _handleTransactionError(dynamic error) {
-    String errorMessage = 'An error occurred';
-
-    if (error is CashManagementError) {
-      errorMessage = error.message;
-    } else if (error != null) {
-      errorMessage = error.toString();
-    }
-
-    context.showErrorDialog(
-      title: 'Transaction Error',
-      error: error,
-      onRetry: () {
-        context.read<CashManagementBloc>().add(RefreshCashData());
       },
     );
   }
@@ -627,137 +653,246 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
   }
 
   Widget _accountsTab() {
-    final hasData = _accountBalances.isNotEmpty &&
-        _accountBalances.values.any((balance) => balance > 0);
+    return BlocBuilder<CashManagementBloc, CashManagementState>(
+      builder: (context, state) {
+        if (state is! CashManagementLoaded) {
+          return const SizedBox.shrink();
+        }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-        elevation: 1,
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Account Balances',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
+        final partners = state.cashData.partners;
+
+        if (partners.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 1,
+              child: Padding(
+                padding: EdgeInsets.all(16.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Account Balances',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                    Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.account_balance_wallet_outlined,
+                            size: 48.sp,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 12.h),
+                          Text(
+                            'Data not available',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            'Pull down to refresh',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 16.h),
-              if (!hasData) ...[
-                Center(
-                  child: Column(
+            ),
+          );
+        }
+
+        // Collect all balance data from all partners
+        List<AccountBalance> allAccounts = [];
+        for (var partner in partners) {
+          allAccounts.addAll(partner.balanceData);
+        }
+
+        if (allAccounts.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 1,
+              child: Padding(
+                padding: EdgeInsets.all(16.w),
+                child: Center(
+                  child: Text(
+                    'No account data available',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+          child: _buildAccountsTable(allAccounts),
+        );
+      },
+    );
+  }
+
+  Widget _buildAccountsTable(List<AccountBalance> accounts) {
+    if (accounts.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 10.h),
+        Text(
+          'Account Balances ',
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        SizedBox(height: 10.h),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!, width: 1),
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          child: Column(
+            children: [
+              // Table Headers
+              Container(
+                color: Colors.grey[100],
+                child: Row(
+                  children: [
+                    Expanded(flex: 3, child: _buildTableHeaderCell('Account')),
+                    Expanded(flex: 2, child: _buildTableHeaderCell('Ledger')),
+                    Expanded(flex: 2, child: _buildTableHeaderCell('Open')),
+                    Expanded(flex: 2, child: _buildTableHeaderCell('Available')),
+                  ],
+                ),
+              ),
+
+              // Table Rows
+              ...accounts.asMap().entries.map((entry) {
+                int index = entry.key;
+                AccountBalance account = entry.value;
+                return Container(
+                  color: index % 2 == 0 ? Colors.white : Colors.grey[50],
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.account_balance_wallet_outlined,
-                        size: 48.sp,
-                        color: Colors.grey[400],
-                      ),
-                      SizedBox(height: 12.h),
-                      Text(
-                        'Data not available',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        flex: 3,
+                        child: _buildTableDataCell(
+                         account.account,
+                          alignment: Alignment.centerLeft,
                         ),
                       ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        'Pull down to refresh',
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          color: Colors.grey[500],
+                      Expanded(
+                        flex: 2,
+                        child: _buildTableDataCell(
+                          _formatCurrency(account.ledgerBalance),
+                          color: account.ledgerBalance < 0 ? Colors.red : Colors.grey[800]!,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: _buildTableDataCell(
+                          _formatCurrency(account.openSalesOrders),
+                          color: Colors.grey[800]!,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: _buildTableDataCell(
+                          _formatCurrency(account.availableBalance),
+                          color: account.availableBalance > 0
+                              ? const Color(0xFF4CAF50)
+                              : Colors.grey[800]!,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ] else ...[
-                ..._accountBalances.entries.map((entry) {
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: 12.h),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14.r,
-                          backgroundColor: _getAccountColor(entry.key).withOpacity(0.2),
-                          child: Text(
-                            _getAccountInitial(entry.key),
-                            style: TextStyle(
-                              color: _getAccountColor(entry.key),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12.sp,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Text(
-                          _getAccountLabel(entry.key),
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          currencyFormat.format(entry.value),
-                          style: TextStyle(
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ],
+                );
+              }).toList(),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableHeaderCell(String text) {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 4.w),
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Colors.grey[300]!, width: 1),
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.sp,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[700],
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget _buildTableDataCell(
+      String text, {
+        Color? color,
+        Alignment alignment = Alignment.center,
+      }) {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 4.w),
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Colors.grey[300]!, width: 1),
+          top: BorderSide(color: Colors.grey[300]!, width: 1),
+        ),
+      ),
+      child: Align(
+        alignment: alignment,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w500,
+            color: color ?? Colors.grey[800],
+          ),
+          textAlign: alignment == Alignment.centerLeft
+              ? TextAlign.left
+              : TextAlign.center,
         ),
       ),
     );
   }
 
-  Color _getAccountColor(AccountType type) {
-    switch (type) {
-      case AccountType.svTv:
-        return const Color(0xFF0E5CA8);
-      case AccountType.refill:
-        return const Color(0xFF4CAF50);
-      case AccountType.nfr:
-        return const Color(0xFFF7941D);
+  String _formatCurrency(double amount) {
+    if (amount == 0.0) {
+      return '₹0';
     }
-  }
-
-  String _getAccountInitial(AccountType type) {
-    switch (type) {
-      case AccountType.svTv:
-        return 'S';
-      case AccountType.refill:
-        return 'R';
-      case AccountType.nfr:
-        return 'N';
-    }
-  }
-
-  String _getAccountLabel(AccountType type) {
-    switch (type) {
-      case AccountType.svTv:
-        return 'SV/TV Account';
-      case AccountType.refill:
-        return 'Refill Account';
-      case AccountType.nfr:
-        return 'NFR Account';
-      default:
-        return 'Unknown Account';
-    }
+    return currencyFormat.format(amount);
   }
 }

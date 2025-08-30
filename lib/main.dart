@@ -5,7 +5,7 @@ import 'package:lpg_distribution_app/presentation/blocs/cash/cash_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/inventory/inventory_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/orders/orders_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/vehicle/vehicle_bloc.dart';
-import 'package:lpg_distribution_app/presentation/pages/login_screen.dart';
+import 'package:lpg_distribution_app/presentation/pages/login/login_screen.dart';
 import 'package:lpg_distribution_app/presentation/pages/main_container.dart';
 import 'package:lpg_distribution_app/presentation/pages/orders/forms/create_sale_order_page.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/forms/cash_deposit_page.dart';

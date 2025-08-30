@@ -196,23 +196,24 @@ class TransactionItem extends StatelessWidget {
   }
 
   String _formatTime(DateTime time) {
-    try {
-      final now = DateTime.now();
+    final t = time.toLocal(); // ensure comparisons/formatting use device zone
 
-      // If the transaction was today
-      if (time.day == now.day && time.month == now.month && time.year == now.year) {
-        return DateFormat('h:mm a').format(time);
-      }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(t.year, t.month, t.day);
 
-      // If the transaction was yesterday
-      if (time.day == now.day - 1 && time.month == now.month && time.year == now.year) {
-        return DateFormat('h:mm a').format(time);
-      }
-
-      // For older transactions
-      return DateFormat('MMM d, h:mm a').format(time);
-    } catch (e) {
-      return 'Invalid Date';
+    if (date.isAtSameMomentAs(today)) {
+      // Today
+      return DateFormat('h:mm a').format(t);
     }
+
+    if (date.isAtSameMomentAs(today.subtract(const Duration(days: 1)))) {
+      // Yesterday
+      return DateFormat('h:mm a').format(t); // or "Yesterday, ${...}" if you want the label
+    }
+
+    // Older
+    return DateFormat('MMM d, h:mm a').format(t);
   }
+
 }

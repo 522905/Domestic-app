@@ -7,6 +7,7 @@ import 'package:lpg_distribution_app/presentation/blocs/inventory/inventory_even
 import 'package:lpg_distribution_app/presentation/blocs/inventory/inventory_state.dart';
 import 'package:lpg_distribution_app/utils/status_chip.dart';
 import '../../../../utils/swipeButton.dart';
+import '../../../utils/gatepass_dialog.dart';
 import '../../blocs/inventory/inventory_bloc.dart';
 
 class InventoryDetailScreen extends StatefulWidget {
@@ -184,13 +185,13 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                       _buildCommentSection(),
                       SizedBox(height: 2.h),
                       _buildActionButtons(request),
-                    ] else
+                    ]
+                    else
                       _buildStatusIndicator(request),
                   ],
                 ),
               );
             }
-
             return const Center(child: CircularProgressIndicator());
           },
         ),
@@ -855,13 +856,11 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   }
 
   String _formatDateTime(String dateTimeString) {
-    try {
-      final dateTime = DateTime.parse(dateTimeString);
-      return DateFormat('dd MMM yyyy, hh:mm a').format(dateTime);
-    } catch (e) {
-      return dateTimeString;
-    }
+    final dt = DateTime.tryParse(dateTimeString);
+    if (dt == null) return dateTimeString; // bad input, just show it
+    return DateFormat('dd MMM yyyy, hh:mm a').format(dt.toLocal());
   }
+
 
   void _showApprovalDialog(InventoryRequest request) {
     showDialog(

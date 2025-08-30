@@ -15,6 +15,10 @@ class Order {
   final double perBilled;
   final String inventoryStatus;
   final DateTime inventoryDueDate;
+  final String createdBy;
+  final String connectionType;
+  final String billingStatus;
+  final List<OrderItem> items;
 
   Order({
     required this.id,
@@ -32,9 +36,21 @@ class Order {
     required this.perBilled,
     required this.inventoryStatus,
     required this.inventoryDueDate,
+    required this.createdBy,
+    required this.connectionType,
+    required this.billingStatus,
+    required this.items,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    // Parse items from the JSON
+    List<OrderItem> orderItems = [];
+    if (json['items'] != null && json['items'] is List) {
+      orderItems = (json['items'] as List)
+          .map((item) => OrderItem.fromJson(item))
+          .toList();
+    }
+
     return Order(
       id: json['name'] ?? '',
       orderNumber: json['name'] ?? '',
@@ -51,6 +67,10 @@ class Order {
       perBilled: _parseDouble(json['per_billed']),
       inventoryStatus: json['custom_inventory_status'] ?? '',
       inventoryDueDate: _parseDate(json['custom_inventory_due_date']),
+      createdBy: json['custom_created_by'] ?? json['created_by'] ?? json['owner'] ?? '',
+      connectionType: json['custom_connection_type'] ?? '',
+      billingStatus: json['billing_status'] ?? '',
+      items: orderItems,
     );
   }
 
@@ -97,6 +117,10 @@ class Order {
     double? perBilled,
     String? inventoryStatus,
     DateTime? inventoryDueDate,
+    String? createdBy,
+    String? connectionType,
+    String? billingStatus,
+    List<OrderItem>? items,
   }) {
     return Order(
       id: id ?? this.id,
@@ -114,6 +138,10 @@ class Order {
       perBilled: perBilled ?? this.perBilled,
       inventoryStatus: inventoryStatus ?? this.inventoryStatus,
       inventoryDueDate: inventoryDueDate ?? this.inventoryDueDate,
+      createdBy: createdBy ?? this.createdBy,
+      connectionType: connectionType ?? this.connectionType,
+      billingStatus: billingStatus ?? this.billingStatus,
+      items: items ?? this.items,
     );
   }
 
@@ -125,4 +153,51 @@ class Order {
 
   @override
   int get hashCode => id.hashCode;
+}
+
+class OrderItem {
+  final String id;
+  final String itemCode;
+  final String itemName;
+  final String description;
+  final int quantity;
+  final String unit;
+  final double rate;
+  final double amount;
+  final String warehouse;
+  final String itemGroup;
+  final int actualQty;
+  final int projectedQty;
+
+  OrderItem({
+    required this.id,
+    required this.itemCode,
+    required this.itemName,
+    required this.description,
+    required this.quantity,
+    required this.unit,
+    required this.rate,
+    required this.amount,
+    required this.warehouse,
+    required this.itemGroup,
+    required this.actualQty,
+    required this.projectedQty,
+  });
+
+  factory OrderItem.fromJson(Map<String, dynamic> json) {
+    return OrderItem(
+      id: json['name'] ?? '',
+      itemCode: json['item_code'] ?? '',
+      itemName: json['item_name'] ?? '',
+      description: json['description'] ?? '',
+      quantity: (json['qty'] ?? 0).toInt(),
+      unit: json['uom'] ?? '',
+      rate: (json['rate'] ?? 0.0).toDouble(),
+      amount: (json['amount'] ?? 0.0).toDouble(),
+      warehouse: json['warehouse'] ?? '',
+      itemGroup: json['item_group'] ?? '',
+      actualQty: (json['actual_qty'] ?? 0).toInt(),
+      projectedQty: (json['projected_qty'] ?? 0).toInt(),
+    );
+  }
 }

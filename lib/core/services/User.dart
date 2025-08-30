@@ -22,12 +22,45 @@ class UserRole {
   }
 }
 
+class UserCompany {
+  final int id;
+  final String name;
+  final String shortCode;
+
+  UserCompany({
+    required this.id,
+    required this.name,
+    required this.shortCode,
+  });
+
+  factory UserCompany.fromJson(Map<String, dynamic> json) {
+    return UserCompany(
+      id: json['id'],
+      name: json['name'] ?? '',
+      shortCode: json['short_code'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'short_code': shortCode,
+    };
+  }
+}
+
 class User {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _expiryKey = 'token_expiry';
+
+  // Company storage keys
+  static const String _companyIdKey = 'company_id';
+  static const String _companyNameKey = 'company_name';
+  static const String _companyShortCodeKey = 'company_short_code';
 
   Future<void> saveTokens({
     required String token,
@@ -46,11 +79,22 @@ class User {
     }
   }
 
+  Future<void> saveCompany({
+    required int companyId,
+    required String companyName,
+    required String companyShortCode,
+  }) async {
+    await _storage.write(key: _companyIdKey, value: companyId.toString());
+    await _storage.write(key: _companyNameKey, value: companyName);
+    await _storage.write(key: _companyShortCodeKey, value: companyShortCode);
+  }
+
   Future<void> saveSession({
     required String access,
     required String refresh,
     int expiresIn = 300,
     required Map<String, dynamic> user,
+    Map<String, dynamic>? company, // Add company parameter
   }) async {
     try {
       // Save tokens
@@ -68,8 +112,20 @@ class User {
 
       // Handle roles properly - convert array of objects to JSON string
       if (user['roles'] != null) {
-        final roles = List<Map<String, dynamic>>.from(user['roles']);
-        await _storage.write(key: 'user_roles', value: jsonEncode(roles));
+         final roles = user["roles"].values.toList();
+        await _storage.write(
+            key: 'user_roles',
+            value: jsonEncode(roles)
+        );
+      }
+
+      // Save company information if provided
+      if (company != null) {
+        await saveCompany(
+          companyId: company['id'],
+          companyName: company['name'] ?? '',
+          companyShortCode: company['short_code'] ?? '',
+        );
       }
     } catch (e) {
       print('Error saving session: $e');
@@ -125,6 +181,38 @@ class User {
       }
     }
     return [];
+  }
+
+  // Company related methods
+  Future<UserCompany?> getActiveCompany() async {
+    final companyIdStr = await _storage.read(key: _companyIdKey);
+    final companyName = await _storage.read(key: _companyNameKey);
+    final companyShortCode = await _storage.read(key: _companyShortCodeKey);
+
+    if (companyIdStr != null && companyName != null && companyShortCode != null) {
+      final companyId = int.tryParse(companyIdStr);
+      if (companyId != null) {
+        return UserCompany(
+          id: companyId,
+          name: companyName,
+          shortCode: companyShortCode,
+        );
+      }
+    }
+    return null;
+  }
+
+  Future<int?> getActiveCompanyId() async {
+    final companyIdStr = await _storage.read(key: _companyIdKey);
+    return companyIdStr != null ? int.tryParse(companyIdStr) : null;
+  }
+
+  Future<String?> getActiveCompanyName() async {
+    return _storage.read(key: _companyNameKey);
+  }
+
+  Future<String?> getActiveCompanyShortCode() async {
+    return _storage.read(key: _companyShortCodeKey);
   }
 
   // Helper method to check if user has a specific role

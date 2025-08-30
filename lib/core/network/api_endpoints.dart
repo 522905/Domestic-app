@@ -4,14 +4,9 @@ class ApiEndpoints {
   final String baseUrl;
 
   // final String tempUrl = 'http://192.168.168.152:8001';
-  final String tempUrl = 'http://192.168.171.37:9900';
+  final String tempUrl = 'http://192.168.171.34:9900';
 
   ApiEndpoints(this.baseUrl);
-  // Auth endpoints
-  String get login => '$tempUrl/api/users/login/';
-  String get logout => '$baseUrl/api/logout';
-  String get refresh => '$baseUrl/api/token/refresh/';
-
   // Dashboard endpoints
   String get dashboard => '$baseUrl/api/dashboard';
   String get pendingCounts => '$baseUrl/api/dashboard/pending-counts';
@@ -28,7 +23,6 @@ class ApiEndpoints {
   String get autoRelease => '$tempUrl/api/orders/auto-release-sales-order/';
   String get accountsList => '$tempUrl/api/users/users-list/';
   String get vehicles => '$tempUrl/api/users/api/masters/vehicles/';
-  String get cashSummary => '$tempUrl/api/payments/account-balance/';
 
   String transactionApprove(String transactionId) =>
       '$tempUrl/api/payments/payment-requests/$transactionId/approve/';
@@ -37,7 +31,7 @@ class ApiEndpoints {
       '$tempUrl/api/payments/payment-requests/$transactionId/reject/';
 
   String get cashList => '$tempUrl/api/payments/list/';
-  String get cashierData => '$tempUrl/api/payments/cashier_account-balance/';
+
   String get bankList => '$tempUrl/api/payments/bank-list/';
   String get cashHandover => '$baseUrl/api/cash/handover';
 
@@ -65,27 +59,19 @@ class ApiEndpoints {
   String get toggleFavoriteRequest => '$baseUrl/api/inventory-requests/favorite';
   static const String testToken = '/api/direct-test-token';
 
-  // Documents
-  static const String uploadDocument = '/api/documents/upload';
-
-  static String inventoryRequestDetail(String requestId) => '/api/inventory-requests/$requestId';
-  static String inventoryRequestApprove(String requestId) => '/api/inventory-requests/$requestId/approve';
-  static String inventoryRequestReject(String requestId) => '/api/inventory-requests/$requestId/reject';
-  static String inventoryRequestToggleFavorite(String requestId) => '/api/inventory-requests/$requestId/favorite';
-  static const String collectionRequestApprove = '/api/collection-requests/approve';
-  static const String collectionRequestReject = '/api/collection-requests/reject';
-
   //USER API'S
   String get cashDataAPI => '$tempUrl/api/users/api/masters/accounts';
+  String get partnerListApi => '$tempUrl/api/users/api/masters/partners/';
+  String get warehouseListApi => '$tempUrl/api/users/api/masters/warehouses/';
 
   //CASH API'S
   String get paymentListApi => '$tempUrl/api/payments/payment-requests/';
   String transactionDetail(String transactionId) => '$tempUrl/api/payments/payment-requests/$transactionId/';
-  String get partnerListApi => '$tempUrl/api/users/api/masters/partners/';
-  String get stockListApi => '$tempUrl/api/stocks/stock-requests/';
-  String get warehouseListApi => '$tempUrl/api/users/api/masters/warehouses/';
+  String get partnerAccountBalance => '$tempUrl/api/payments/partner-account-balance/';
+  String get cashierAccountBalance => '$tempUrl/api/payments/cash-account-balance/';
 
-  // Add this to your endpoints class
+  // STOCK API'S
+  String get stockListApi => '$tempUrl/api/stocks/stock-requests/';
   String stockDetailApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/';
   String approveRequestsApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/approve/';
   String rejectRequestsApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/reject/';
@@ -95,5 +81,14 @@ class ApiEndpoints {
   String get getPendingDeliveryItems => '$tempUrl/api/stocks/pending-delivery-items/';
   String get getOrderItems => '$tempUrl/api/orders/items-for-order/';
   String get orders => '$tempUrl/api/orders/sales-order-request/';
-  String get ordersList => '$tempUrl/api/orders/sales-orders/';
+  String get ordersData => '$tempUrl/api/orders/sales-orders/';
+  String orderDetails(String orderId) => '$tempUrl/api/orders/sales-orders/$orderId/';
+
+  //Auth API'S
+  String get login => '$tempUrl/api/users/auth/login/';
+  String get refresh => '$baseUrl/api/users/auth/refresh/';
+  String get companyList => '$tempUrl/api/users/auth/companies/';
+  String get switchCompany => '$tempUrl/api/users/auth/switch-company/';
+  String get logout => '$baseUrl/api/logout';
+
 }

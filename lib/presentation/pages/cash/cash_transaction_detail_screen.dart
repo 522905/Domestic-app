@@ -123,13 +123,6 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: Row(
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red),
-                      SizedBox(width: 8.w),
-                      Text('Error'),
-                    ],
-                  ),
                   content: Text(state.message),
                   actions: [
                     TextButton(
@@ -325,15 +318,15 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                     // Last updated info
                     if (transaction.updatedAt != null) ...[
                       SizedBox(height: 8.h),
-                      Text(
-                        'Last updated: ${DateFormat('MMM dd, yyyy • h:mm a').format(transaction.updatedAt!)}',
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          color: Colors.grey[500],
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
+                        Text(
+                            'Last updated: ${formatUpdatedAtAbsolute(transaction.updatedAt)}',
+                            style: TextStyle(
+                                fontSize: 12.sp,
+                                color: Colors.grey[500],
+                                fontStyle: FontStyle.italic,
+                            ),
+                        )
+                      ],
                   ],
                 ),
               ),
@@ -516,6 +509,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
         ),
       ),
     );
+  }
+
+  String formatUpdatedAtAbsolute(DateTime? dt) {
+    if (dt == null) return 'Unknown';
+    return DateFormat('MMM dd, yyyy • h:mm a').format(dt.toLocal());
   }
 
   Widget _buildStatusInfoCard(CashTransaction transaction) {
