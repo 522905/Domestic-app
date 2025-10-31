@@ -1,6 +1,8 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class UserRole {
   final String role;
   final String? details;
@@ -22,15 +24,45 @@ class UserRole {
   }
 }
 
+class Novu {
+  final String applicationIdentifier;
+  final String subscriberId;
+  final String? subscriberHash;
+
+  Novu({
+    required this.applicationIdentifier,
+    required this.subscriberId,
+    this.subscriberHash,
+  });
+
+  factory Novu.fromJson(Map<String, dynamic> json) {
+    return Novu(
+      applicationIdentifier: json['applicationIdentifier'] ?? '',
+      subscriberId: json['subscriberId'] ?? '',
+      subscriberHash: json['subscriberHash'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'applicationIdentifier': applicationIdentifier,
+      'subscriberId': subscriberId,
+      'subscriberHash': subscriberHash,
+    };
+  }
+}
+
 class UserCompany {
   final int id;
   final String name;
   final String shortCode;
+  final String? sdmsUserCode; // Add this field
 
   UserCompany({
     required this.id,
     required this.name,
     required this.shortCode,
+    this.sdmsUserCode, // Add this parameter
   });
 
   factory UserCompany.fromJson(Map<String, dynamic> json) {
@@ -38,6 +70,7 @@ class UserCompany {
       id: json['id'],
       name: json['name'] ?? '',
       shortCode: json['short_code'] ?? '',
+      sdmsUserCode: json['sdms_user_code'], // Add this line
     );
   }
 
@@ -46,6 +79,7 @@ class UserCompany {
       'id': id,
       'name': name,
       'short_code': shortCode,
+      'sdms_user_code': sdmsUserCode, // Add this line
     };
   }
 }
@@ -57,10 +91,16 @@ class User {
   static const String _refreshTokenKey = 'refresh_token';
   static const String _expiryKey = 'token_expiry';
 
-  // Company storage keys
+  // Company storage keys+
   static const String _companyIdKey = 'company_id';
   static const String _companyNameKey = 'company_name';
   static const String _companyShortCodeKey = 'company_short_code';
+  static const String _companySdmsUserCodeKey = 'company_sdms_user_code';
+
+  // Novu storage keys
+  static const String _novuAppIdKey = 'novu_app_id';
+  static const String _novuSubscriberIdKey = 'novu_subscriber_id';
+  static const String _novuSubscriberHashKey = 'novu_subscriber_hash';
 
   Future<void> saveTokens({
     required String token,
@@ -79,14 +119,65 @@ class User {
     }
   }
 
+  // In User class - make sure it handles null:
   Future<void> saveCompany({
     required int companyId,
     required String companyName,
     required String companyShortCode,
+    String? sdmsUserCode,
   }) async {
+    // Use FlutterSecureStorage, not SharedPreferences!
     await _storage.write(key: _companyIdKey, value: companyId.toString());
     await _storage.write(key: _companyNameKey, value: companyName);
     await _storage.write(key: _companyShortCodeKey, value: companyShortCode);
+
+    if (sdmsUserCode != null) {
+      await _storage.write(key: _companySdmsUserCodeKey, value: sdmsUserCode);
+    } else {
+      await _storage.delete(key: _companySdmsUserCodeKey);
+    }
+  }
+
+  Future<void> saveNovu({
+    required String applicationIdentifier,
+    required String subscriberId,
+    String? subscriberHash,
+  }) async {
+    await _storage.write(key: _novuAppIdKey, value: applicationIdentifier);
+    await _storage.write(key: _novuSubscriberIdKey, value: subscriberId);
+
+    if (subscriberHash != null) {
+      await _storage.write(key: _novuSubscriberHashKey, value: subscriberHash);
+    } else {
+      await _storage.delete(key: _novuSubscriberHashKey);
+    }
+  }
+
+  Future<Novu?> getNovu() async {
+    final appId = await _storage.read(key: _novuAppIdKey);
+    final subscriberId = await _storage.read(key: _novuSubscriberIdKey);
+    final subscriberHash = await _storage.read(key: _novuSubscriberHashKey);
+
+    if (appId != null && subscriberId != null) {
+      return Novu(
+        applicationIdentifier: appId,
+        subscriberId: subscriberId,
+        subscriberHash: subscriberHash,
+      );
+    }
+    return null;
+  }
+
+  Future<String?> getNovuApplicationIdentifier() async {
+    return _storage.read(key: _novuAppIdKey);
+  }
+
+  Future<String?> getNovuSubscriberId() async {
+    return _storage.read(key: _novuSubscriberIdKey);
+  }
+
+  Future<String?> getNovuSubscriberHash() async {
+    return _storage.read(key: _novuSubscriberHashKey);
   }
 
   Future<void> saveSession({
@@ -94,7 +185,8 @@ class User {
     required String refresh,
     int expiresIn = 300,
     required Map<String, dynamic> user,
-    Map<String, dynamic>? company, // Add company parameter
+    Map<String, dynamic>? company,
+    Map<String, dynamic>? novu, // Add this parameter
   }) async {
     try {
       // Save tokens
@@ -112,7 +204,7 @@ class User {
 
       // Handle roles properly - convert array of objects to JSON string
       if (user['roles'] != null) {
-         final roles = user["roles"].values.toList();
+        final roles = user["roles"].values.toList();
         await _storage.write(
             key: 'user_roles',
             value: jsonEncode(roles)
@@ -125,6 +217,16 @@ class User {
           companyId: company['id'],
           companyName: company['name'] ?? '',
           companyShortCode: company['short_code'] ?? '',
+          sdmsUserCode: company['sdms_user_code'],
+        );
+      }
+
+      // Save novu information if provided
+      if (novu != null) {
+        await saveNovu(
+          applicationIdentifier: novu['applicationIdentifier'] ?? '',
+          subscriberId: novu['subscriberId'] ?? '',
+          subscriberHash: novu['subscriberHash'],
         );
       }
     } catch (e) {
@@ -188,6 +290,7 @@ class User {
     final companyIdStr = await _storage.read(key: _companyIdKey);
     final companyName = await _storage.read(key: _companyNameKey);
     final companyShortCode = await _storage.read(key: _companyShortCodeKey);
+    final sdmsUserCode = await _storage.read(key: _companySdmsUserCodeKey);
 
     if (companyIdStr != null && companyName != null && companyShortCode != null) {
       final companyId = int.tryParse(companyIdStr);
@@ -196,6 +299,7 @@ class User {
           id: companyId,
           name: companyName,
           shortCode: companyShortCode,
+          sdmsUserCode: sdmsUserCode,
         );
       }
     }
@@ -213,6 +317,10 @@ class User {
 
   Future<String?> getActiveCompanyShortCode() async {
     return _storage.read(key: _companyShortCodeKey);
+  }
+
+  Future<String?> getActiveCompanySdmsUserCode() async {
+    return _storage.read(key: _companySdmsUserCodeKey);
   }
 
   // Helper method to check if user has a specific role

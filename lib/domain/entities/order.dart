@@ -19,6 +19,7 @@ class Order {
   final String connectionType;
   final String billingStatus;
   final List<OrderItem> items;
+  final DateTime creationDate ;
 
   Order({
     required this.id,
@@ -40,6 +41,7 @@ class Order {
     required this.connectionType,
     required this.billingStatus,
     required this.items,
+    required this.creationDate,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -71,6 +73,7 @@ class Order {
       connectionType: json['custom_connection_type'] ?? '',
       billingStatus: json['billing_status'] ?? '',
       items: orderItems,
+      creationDate: _parseDate( json['creation'] ),
     );
   }
 
@@ -142,6 +145,7 @@ class Order {
       connectionType: connectionType ?? this.connectionType,
       billingStatus: billingStatus ?? this.billingStatus,
       items: items ?? this.items,
+      creationDate: creationDate,
     );
   }
 

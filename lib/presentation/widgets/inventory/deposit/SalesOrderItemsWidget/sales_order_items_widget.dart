@@ -20,38 +20,76 @@ class SalesOrderItemsWidget extends StatefulWidget {
 class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
-        _buildCustomerHeader(),
-        Expanded(
+        // Main scrollable content
+        SingleChildScrollView(
           child: Column(
             children: [
-              // Top Component: Order Items
-              Expanded(
-                flex: 3,
-                child: _buildOrderItemsList(),
-              ),
+              _buildCustomerHeader(),
+              _buildOrderItemsSection(),
 
               // Divider
-              Container(
-                height: 8.h,
-                color: Colors.grey[100],
-                child: Center(
-                  child: Container(
-                    height: 1.h,
-                    color: Colors.grey[300],
+              if (widget.depositData.getSelectedReturns().isNotEmpty)
+                Container(
+                  height: 8.h,
+                  color: Colors.grey[100],
+                  child: Center(
+                    child: Container(
+                      height: 1.h,
+                      color: Colors.grey[300],
+                    ),
+                  ),
+                ),
+
+              // Selected Returns Section
+              if (widget.depositData.getSelectedReturns().isNotEmpty)
+                _buildSelectedReturnsSection(),
+
+              // Bottom padding to prevent content from being hidden behind button
+              SizedBox(height: 80.h),
+            ],
+          ),
+        ),
+
+        // Fixed bottom button
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48.h,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                ),
+                child: Text(
+                  'Back to Sale Order Deposit',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-
-              // Bottom Component: Selected Returns
-              // Bottom Component: Selected Returns (only show if data exists)
-              if (widget.depositData.getSelectedReturns().isNotEmpty)
-                Expanded(
-                  flex: 2,
-                  child: _buildSelectedReturnsList(),
-                ),
-            ],
+            ),
           ),
         ),
       ],
@@ -84,7 +122,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
     );
   }
 
-  Widget _buildOrderItemsList() {
+  Widget _buildOrderItemsSection() {
     return Column(
       children: [
         Container(
@@ -105,9 +143,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
             ],
           ),
         ),
-        Expanded(
-          child: _buildOrderItemsContent(),
-        ),
+        _buildOrderItemsContent(),
       ],
     );
   }
@@ -116,9 +152,9 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
     final orderItems = widget.depositData.getOrderItems();
 
     if (orderItems.isEmpty) {
-      return Center(
+      return Padding(
+        padding: EdgeInsets.all(32.w),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.receipt_long_outlined, size: 48.sp, color: Colors.grey[400]),
             SizedBox(height: 12.h),
@@ -132,6 +168,8 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
       padding: EdgeInsets.all(16.w),
       itemCount: orderItems.length,
       itemBuilder: (context, index) {
@@ -144,6 +182,13 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
   Widget _buildOrderItemCard(OrderItem orderItem) {
     final toReturnQty = widget.depositData.getToReturnQty(orderItem.salesOrderItem);
     final hasSelections = toReturnQty < orderItem.balanceQty;
+
+    final alreadySelectedFilledQty = widget.depositData.getdeliveryQty(orderItem.salesOrderItem);
+    final remainingDeliveredQty = orderItem.deliveredQty - alreadySelectedFilledQty;
+
+    final selectedReturns = widget.depositData.getSelectedReturns()
+        .where((r) => r.againstSalesOrderItem == orderItem.salesOrderItem)
+        .fold(0.0, (sum, r) => sum + r.qty);
 
     return Card(
       margin: EdgeInsets.only(bottom: 12.h),
@@ -202,25 +247,24 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
             SizedBox(height: 12.h),
 
             // Quantity Info
-            Container(
-              padding: EdgeInsets.all(12.w),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8.r),
+              Container(
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildQuantityInfo('Ordered', orderItem.qtyOrdered, Colors.blue),
+                    _buildQuantityInfo('Delivered', remainingDeliveredQty.toDouble(), Colors.purple),
+                    _buildQuantityInfo('Returned', selectedReturns, Colors.green), // Dynamic
+                    _buildQuantityInfo('To Return', toReturnQty,
+                        toReturnQty > 0 ? Colors.orange : Colors.grey),
+                  ],
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildQuantityInfo('Ordered', orderItem.qtyOrdered, Colors.blue),
-                  _buildQuantityInfo('Returned', orderItem.qtyReturned, Colors.green),
-                  _buildQuantityInfo('To Return', toReturnQty,
-                      toReturnQty > 0 ? Colors.orange : Colors.grey),
-                ],
-              ),
-            ),
-
             SizedBox(height: 12.h),
-
             // Action Button
             SizedBox(
               width: double.infinity,
@@ -268,7 +312,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
     );
   }
 
-  Widget _buildSelectedReturnsList() {
+  Widget _buildSelectedReturnsSection() {
     return Column(
       children: [
         Container(
@@ -289,9 +333,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
             ],
           ),
         ),
-        Expanded(
-          child: _buildSelectedReturnsContent(),
-        ),
+        _buildSelectedReturnsContent(),
       ],
     );
   }
@@ -300,9 +342,9 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
     final selectedReturns = widget.depositData.getSelectedReturns();
 
     if (selectedReturns.isEmpty) {
-      return Center(
+      return Padding(
+        padding: EdgeInsets.all(32.w),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.assignment_return_outlined, size: 48.sp, color: Colors.grey[400]),
             SizedBox(height: 12.h),
@@ -331,6 +373,8 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
       padding: EdgeInsets.all(16.w),
       itemCount: groupedReturns.length,
       itemBuilder: (context, index) {
@@ -343,7 +387,6 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
   Widget _buildGroupedReturnCard(List<SelectedReturn> returnGroup) {
     final firstReturn = returnGroup.first;
     final totalQty = returnGroup.fold(0.0, (sum, item) => sum + item.qty);
-    final hasMultipleEntries = returnGroup.length > 1;
 
     return Card(
       margin: EdgeInsets.only(bottom: 8.h),
@@ -364,8 +407,8 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
                     borderRadius: BorderRadius.circular(4.r),
                   ),
                   child: Icon(
-                    firstReturn.isEmpty ? Icons.autorenew : Icons.warning,
-                    color: firstReturn.isEmpty ? Colors.green : Colors.orange,
+                    firstReturn.isEmpty ? Icons.inventory_2_outlined : Icons.inventory,
+                    color: Colors.orange,
                     size: 16.sp,
                   ),
                 ),
@@ -382,7 +425,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
                         ),
                       ),
                       Text(
-                        'Qty: ${totalQty.toInt()}${hasMultipleEntries ? ' (${returnGroup.length} entries)' : ''}',
+                        'Qty: ${totalQty.toInt()} ',
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 12.sp,
@@ -395,13 +438,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.edit, size: 16.sp, color: Colors.blue),
-                      onPressed: () => _editReturnGroup(returnGroup),
-                      padding: EdgeInsets.all(4.w),
-                      constraints: BoxConstraints(),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.delete, size: 16.sp, color: Colors.red),
+                      icon: Icon(Icons.delete, size: 20.sp, color: Colors.red),
                       onPressed: () => _removeReturnGroup(returnGroup),
                       padding: EdgeInsets.all(4.w),
                       constraints: BoxConstraints(),
@@ -428,7 +465,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (firstReturn.isDefective && hasMultipleEntries) ...[
+                  if (firstReturn.isDefective ) ...[
                     SizedBox(height: 4.h),
                     Text(
                       'Multiple defective items with different details',
@@ -491,7 +528,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
                     borderRadius: BorderRadius.circular(4.r),
                   ),
                   child: Icon(
-                    returnItem.isEmpty ? Icons.autorenew : Icons.warning,
+                    returnItem.isEmpty ? Icons.inventory : Icons.inventory_2_outlined,
                     color: returnItem.isEmpty ? Colors.green : Colors.orange,
                     size: 16.sp,
                   ),
@@ -512,7 +549,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
                         'Qty: ${returnItem.qty.toInt()}',
                         style: TextStyle(
                           color: Colors.grey[600],
-                          fontSize: 12.sp,
+                          fontSize: 16.sp,
                         ),
                       ),
                     ],
@@ -578,11 +615,15 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
     final eligibleReturns = widget.depositData.getEligibleReturns(orderItem.itemCode);
     final maxQty = widget.depositData.getToReturnQty(orderItem.salesOrderItem);
 
+    // Calculate remaining delivered qty (subtract already selected filled items)
+    final alreadySelectedFilledQty = widget.depositData.getdeliveryQty(orderItem.salesOrderItem);
+    final remainingDeliveredQty = orderItem.deliveredQty - alreadySelectedFilledQty;
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ReturnItemSelectionPage(
-          orderItem: orderItem,
+          orderItem: orderItem.copyWith(deliveredQty: remainingDeliveredQty),
           eligibleReturns: eligibleReturns,
           maxQuantity: maxQty,
         ),
@@ -604,6 +645,11 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
           (item) => item.salesOrderItem == returnItem.againstSalesOrderItem,
     );
 
+    // Calculate remaining delivered qty (subtract already selected, add back what's being edited)
+    final alreadySelectedFilledQty = widget.depositData.getdeliveryQty(orderItem.salesOrderItem);
+    final remainingDeliveredQty = orderItem.deliveredQty - alreadySelectedFilledQty +
+        (returnItem.returnType == 'filled' || returnItem.returnType == 'defective' ? returnItem.qty.toInt() : 0);
+
     final eligibleReturns = widget.depositData.getEligibleReturns(orderItem.itemCode);
     final maxQty = widget.depositData.getToReturnQty(orderItem.salesOrderItem) + returnItem.qty;
 
@@ -611,7 +657,7 @@ class _SalesOrderItemsWidgetState extends State<SalesOrderItemsWidget> {
       context,
       MaterialPageRoute(
         builder: (context) => ReturnItemSelectionPage(
-          orderItem: orderItem,
+          orderItem: orderItem.copyWith(deliveredQty: remainingDeliveredQty),
           eligibleReturns: eligibleReturns,
           maxQuantity: maxQty,
           editingReturn: returnItem,

@@ -140,7 +140,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
               ...emptyItem,
               'item_name': emptyItem['description'] ?? emptyItem['item_code'],
               'data_type': 'eligible_return',
-              'max_qty': 99, // Default max for eligible returns
+              'max_qty': 999, // Default max for eligible returns
               'against_item': itemCode,
             });
           }
@@ -937,7 +937,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
       case 'sale_order_item':
         return Icons.receipt_long;
       case 'eligible_return':
-        return Icons.autorenew;
+        return Icons.inventory_2_rounded;
       case 'material_request':
         return Icons.assignment;
       case 'unlinked_empty':

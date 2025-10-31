@@ -33,11 +33,10 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
 
   final Map<String, List<String>> _rejectionReasons = {
     'DEPOSIT': [
-      'Insufficient Stock',
       'Incorrect Count',
       'Wrong Items',
       'Deposit Already Processed',
-      'Documentation Issues',
+      'Defective item Missing'
       'Other',
     ],
     'COLLECT': [
@@ -45,7 +44,6 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
       'Orders Not Eligible',
       'Vehicle Not Available',
       'Warehouse Closed',
-      'Documentation Issues',
       'Other',
     ],
     'TRANSFER': [
@@ -53,7 +51,6 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
       'Destination Warehouse Full',
       'Vehicle Not Available',
       'Transfer Route Blocked',
-      'Documentation Issues',
       'Other',
     ],
   };
@@ -182,12 +179,24 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                     if (_shouldShowTransferDetails(request))
                       SizedBox(height: 2.h),
                     if (_shouldShowApprovalButtons(request)) ...[
+                      SizedBox(height: 2.h),
                       _buildCommentSection(),
                       SizedBox(height: 2.h),
+                      if (request.requestType.toUpperCase() == 'COLLECT')
+                        GatepassDialog(request: request),
+                      SizedBox(height: 3.h),
                       _buildActionButtons(request),
+                      SizedBox(height: 3.h),
                     ]
-                    else
+                    else ...[
                       _buildStatusIndicator(request),
+                      SizedBox(height: 2.h),
+                        if ( widget.userRole.contains('Warehouse Manager')) ...[
+                            if (request.requestType.toUpperCase() == 'COLLECT')
+                              GatepassDialog(request: request),
+                            SizedBox(height: 3.h),
+                        ]
+                    ]
                   ],
                 ),
               );
@@ -319,9 +328,9 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   }
 
   Widget _buildRequestDetailsTable(InventoryRequest request) {
-    List<TableRow> rows = [
-      _buildTableHeader('Information'),
-    ];
+    List<TableRow> rows = [];
+
+
 
     Map<String, String> details = {
       'Request ID': request.id,
@@ -330,14 +339,15 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
       'Requested By': request.requestedBy,
       'Created At': _formatDateTime(request.timestamp),
       'Status': request.status,
+      'Vehicle Number': request.vehicle ?? 'N/A',
       if (request.rejectionReason != null && request.rejectionReason!.isNotEmpty)
       'Rejection Reason': request.rejectionReason!,
 
     };
 
-    if (request.vehicle != null && request.vehicle!.isNotEmpty) {
-      details['Partner'] = request.vehicle!;
-    }
+    // if (request.vehicle != null && request.vehicle!.isNotEmpty) {
+    //   details['Partner'] = request.vehicle!;
+    // }
 
     if (request.remarks != null && request.remarks!.isNotEmpty) {
       details['Notes'] = request.remarks!;
@@ -473,176 +483,297 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   }
 
   Widget _buildItemsTable(InventoryRequest request) {
+    final items = request.items ?? [];
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Extract common SO/MR reference from first item
+    final firstItem = items.first;
+    final salesOrderRef = firstItem['sales_order_ref']?.toString() ?? '';
+    final materialRequestRef = firstItem['material_request_ref']?.toString() ?? '';
+
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8.r),
+      ),
       child: Padding(
-        padding: EdgeInsets.all(16.w),
+        padding: EdgeInsets.all(12.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionHeader('Items Details', Icons.inventory_2),
-            SizedBox(height: 16.h),
-            if (request.items != null && request.items!.isNotEmpty)
-              _buildItemsTableView(request.items!)
-            else
-              _buildEmptyItemsState(),
+            // Header
+            Row(
+              children: [
+                Container(
+                  width: 4.w,
+                  height: 20.h,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0E5CA8),
+                    borderRadius: BorderRadius.circular(2.r),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  'Items (${items.length})',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0E5CA8),
+                  ),
+                ),
+              ],
+            ),
+
+            // Common SO/MR reference
+            if (salesOrderRef.isNotEmpty || materialRequestRef.isNotEmpty) ...[
+              SizedBox(height: 12.h),
+              Container(
+                padding: EdgeInsets.all(10.w),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(6.r),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  children: [
+                    if (salesOrderRef.isNotEmpty)
+                      _buildReferenceRow(Icons.receipt_long, 'Sales Order', salesOrderRef),
+                    if (materialRequestRef.isNotEmpty)
+                      _buildReferenceRow(Icons.assignment, 'Material Request', materialRequestRef),
+                  ],
+                ),
+              ),
+            ],
+
+            SizedBox(height: 12.h),
+
+            // Items Table - FIXED: Header wrapped in TableRow
+            Table(
+              border: TableBorder.all(
+                color: Colors.grey.shade300,
+                width: 1,
+              ),
+              columnWidths: const {
+                0: FixedColumnWidth(40),
+                1: FlexColumnWidth(1),
+                2: FixedColumnWidth(50),
+              },
+              children: [
+                // Header Row - FIXED
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0E5CA8),
+                  ),
+                  children: [
+                    _buildTableHeader('#'),
+                    _buildTableHeader('Item Details'),
+                    _buildTableHeader('Qty'),
+                  ],
+                ),
+
+                // Data Rows
+                ...items.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  return _buildItemRow(item, index + 1);
+                }),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildItemsTableView(List<Map<String, dynamic>> items) {
-    return Container(
+  TableRow _buildItemRow(Map<String, dynamic> item, int index) {
+    final itemCode = item['item_code']?.toString() ?? 'N/A';
+    final lineType = item['line_type']?.toString() ?? 'N/A';
+    final inventoryDetails = item['inventory_details']?.toString() ??
+        item['item_name']?.toString() ??
+        'Unknown Item';
+
+    // Parse qty and remove decimals if whole number
+    final qtyValue = double.tryParse(item['qty']?.toString() ?? '0') ?? 0;
+    final qty = qtyValue % 1 == 0 ? qtyValue.toInt().toString() : qtyValue.toString();
+
+    final extra = item['extra'] as Map<String, dynamic>?;
+    final isDefective = extra != null && extra.isNotEmpty;
+
+    return TableRow(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey[300]!),
-        borderRadius: BorderRadius.circular(8.r),
+        color: isDefective ? Colors.orange.shade50 : Colors.white,
       ),
-      child: Column(
-        children: [
-          // Table Header
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(8.r),
-                topRight: Radius.circular(8.r),
-              ),
+      children: [
+        // Index
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
+          child: Text(
+            '$index',
+            style: TextStyle(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[800],
             ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 40.w,
-                    child: Text(
-                      '#',
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
-                      ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+
+        // Item Details
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Item Name (from inventory_details)
+              Text(
+                inventoryDetails,
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
+              ),
+              SizedBox(height: 2.h),
+
+              // Item Code
+                Text(
+                  'Code: $itemCode  -  $lineType',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              // Defective Details (if defective)
+              if (isDefective) ...[
+                SizedBox(height: 6.h),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade700,
+                    borderRadius: BorderRadius.circular(3.r),
+                  ),
+                  child: Text(
+                    'DEFECTIVE  DETAILS ',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.sp,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      'Item Code',
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
-                      ),
-                    ),
+                ),
+                SizedBox(height: 6.h),
+
+                _buildDefectiveDetail('Cylinder number', extra!['cylinder_number']),
+                _buildDefectiveDetail('Tare Wt', extra['tare_weight'] != null ? '${extra['tare_weight']} kg' : null),
+                _buildDefectiveDetail('Gross Wt', extra['gross_weight'] != null ? '${extra['gross_weight']} kg' : null),
+                _buildDefectiveDetail('Net Wt', extra['net_weight'] != null ? '${extra['net_weight']} kg' : null),
+                _buildDefectiveDetail('Fault', extra['fault_type']),
+
+                SizedBox(height: 4.h),
+                Divider(color: Colors.orange.shade200, thickness: 1),
+                SizedBox(height: 4.h),
+
+                Text(
+                  'Consumer Details:',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade800,
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      'Quantity',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
+                SizedBox(height: 4.h),
+                _buildDefectiveDetail('Number', extra['consumer_number']),
+                _buildDefectiveDetail('Name', extra['consumer_name']),
+                _buildDefectiveDetail('Mobile', extra['consumer_mobile_number']),
+              ],
+            ],
+          ),
+        ),
+        // Quantity
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
+          child: Center(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+              // decoration: BoxDecoration(
+              //   color: const Color(0xFF0E5CA8),
+              //   borderRadius: BorderRadius.circular(4.r),
+              // ),
+              child: Text(
+                qty,
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0E5CA8),
+                ),
               ),
             ),
           ),
-          // Table Rows
-          ...items.asMap().entries.map((entry) {
-            int index = entry.key;
-            Map<String, dynamic> item = entry.value;
-            bool isEven = index % 2 == 0;
+        ),
+      ],
+    );
+  }
 
-            return Container(
-              decoration: BoxDecoration(
-                color: isEven ? Colors.white : Colors.grey[50],
+  Widget _buildReferenceRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      child: Row(
+        children: [
+          Icon(icon, size: 16.sp, color: Colors.blue.shade700),
+          SizedBox(width: 8.w),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 13.sp,
+              color: Colors.grey[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.shade800,
               ),
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 40.w,
-                      child: Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF0E5CA8),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        item['item_code'] ?? 'Unknown',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        child: Text(
-                          item['qty']?.toString() ?? '0',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF4CAF50),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyItemsState() {
-    return Container(
-      padding: EdgeInsets.all(32.w),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 48.sp,
-              color: Colors.grey[400],
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              'No items found',
+  Widget _buildDefectiveDetail(String label, dynamic value) {
+    if (value == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 2.h),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 70.w,
+            child: Text(
+              '$label:',
               style: TextStyle(
-                fontSize: 16.sp,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+                fontSize: 10.sp,
+                color: Colors.grey[700],
               ),
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: Text(
+              value.toString(),
+              style: TextStyle(
+                fontSize: 10.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[900],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -765,47 +896,18 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
     );
   }
 
-  TableRow _buildTableHeader(String title) {
-    return TableRow(
-      children: [
-        TableCell(
-          child: Container(
-            padding: EdgeInsets.symmetric(vertical: 12.h),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0E5CA8).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Row(
-              children: [
-                Flexible(
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 16.sp,
-                        color: const Color(0xFF0E5CA8),
-                      ),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF0E5CA8),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+  Widget _buildTableHeader(String text) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13.sp,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
         ),
-        const TableCell(child: SizedBox()),
-      ],
+        textAlign: TextAlign.center,
+      ),
     );
   }
 

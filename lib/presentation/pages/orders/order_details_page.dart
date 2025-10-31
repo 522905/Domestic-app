@@ -2,15 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
+import 'package:lpg_distribution_app/utils/currency_utils.dart';
+import '../../../core/services/User.dart';
 import '../../../domain/entities/order.dart';
 import '../../blocs/orders/orders_bloc.dart';
 import '../../blocs/orders/orders_event.dart';
 import '../../blocs/orders/orders_state.dart';
+import '../cash/forms/cash_deposit_page.dart';
+import 'forms/order_countdown_timmer.dart';
 
 class OrderDetailsPage extends StatefulWidget {
-  final Order order;
+  final Order? order;
+  final String? orderId;
 
-  const OrderDetailsPage({Key? key, required this.order}) : super(key: key);
+  const OrderDetailsPage({
+    Key? key,
+    this.order,
+    this.orderId,
+  }) : assert(order != null || orderId != null, 'Either order or orderId must be provided'),
+        super(key: key);
 
   @override
   _OrderDetailsPageState createState() => _OrderDetailsPageState();
@@ -19,29 +29,42 @@ class OrderDetailsPage extends StatefulWidget {
 class _OrderDetailsPageState extends State<OrderDetailsPage> {
   bool _isRequestingApproval = false;
   Map<String, dynamic>? _approvalResponse;
+  List<String>? userRole;
 
-@override
-void initState() {
-  super.initState();
-
-  // Check if the state already contains the order details
-  final currentState = context.read<OrdersBloc>().state;
-  if (currentState is! OrderDetailsLoaded || currentState.detailedOrder.id != widget.order.id) {
-    // Load detailed order data if not already loaded
+  @override
+  void initState() {
+    super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<OrdersBloc>().add(LoadOrderDetails(widget.order.orderNumber));
+      final currentState = context.read<OrdersBloc>().state;
+      if (widget.order != null) {
+        // Order object provided, check if we need to load full details
+        if (currentState is! OrderDetailsLoaded || currentState.detailedOrder.id != widget.order!.id) {
+          context.read<OrdersBloc>().add(LoadOrderDetails(widget.order!.orderNumber));
+        }
+        _fetchUserRole();
+      } else if (widget.orderId != null) {
+        // Only orderId provided, load from scratch
+        context.read<OrdersBloc>().add(LoadOrderDetails(widget.orderId!));
+      }
     });
   }
-}
 
-  void _requestApproval(BuildContext context, String orderId) async {
+  Future<void> _fetchUserRole() async {
+    final roles = await User().getUserRoles();
+
+    setState(() {
+      userRole = roles.map((role) => role.role).toList();
+    });
+  }
+
+  void _requestOrderAction(BuildContext context, String orderId, OrderActionType actionType) async {
     setState(() {
       _isRequestingApproval = true;
       _approvalResponse = null;
     });
 
     try {
-      context.read<OrdersBloc>().add(RequestOrderApproval(orderId));
+      context.read<OrdersBloc>().add(RequestOrderAction(orderId, actionType));
 
       final responseState = await context.read<OrdersBloc>().stream.firstWhere(
             (state) => state is OrdersLoadedWithResponse || state is OrdersError,
@@ -58,7 +81,7 @@ void initState() {
       }
     } catch (e) {
       setState(() {
-        _approvalResponse = {"error": "Failed to request approval: $e"};
+        _approvalResponse = {"error": "Failed to process request: $e"};
       });
     } finally {
       setState(() {
@@ -67,13 +90,12 @@ void initState() {
     }
   }
 
-
   Widget _buildResponseWidget() {
     if (_approvalResponse == null) {
       return const SizedBox.shrink();
     }
 
-    // --- error at top-level ---
+    // Top-level error
     final rawError = _approvalResponse!['error'];
     if (rawError != null) {
       final errText = rawError is String
@@ -92,171 +114,46 @@ void initState() {
             Icon(Icons.error, color: Colors.red.shade600, size: 20.sp),
             SizedBox(width: 8.w),
             Expanded(
-              child: Text(
-                errText,
-                style: TextStyle(color: Colors.red.shade700, fontSize: 14.sp),
-              ),
+              child: Text(errText, style: TextStyle(color: Colors.red.shade700, fontSize: 14.sp)),
             ),
           ],
         ),
       );
     }
 
-    // --- parse ERP payload safely ---
-    final erp = (_approvalResponse!['erp_response'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+    // Parse ERP payload
+    final erp = (_approvalResponse!['erp_response'] as Map?)?.cast<String, dynamic>();
+
+    // Handle simple success response (e.g., finalize might just return success)
+    if (erp == null) {
+      final simpleMessage = _approvalResponse!['message']?.toString() ?? 'Operation completed successfully';
+      return _buildSuccessCard(simpleMessage);
+    }
+
     final message = erp['message'];
+
+    // If message is not a Map, show as simple success
     if (message is! Map) {
-      // Unknown shape; show whatever we got
-      return Container(
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: Colors.green.shade50,
-          borderRadius: BorderRadius.circular(8.r),
-          border: Border.all(color: Colors.green.shade200),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.info, color: Colors.green.shade600, size: 20.sp),
-            SizedBox(width: 8.w),
-            Expanded(
-              child: Text(
-                message?.toString() ?? 'No message',
-                style: TextStyle(color: Colors.green.shade700, fontSize: 14.sp),
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildSuccessCard(message?.toString() ?? 'Operation completed successfully');
     }
 
     final msg = message.cast<String, dynamic>();
-    final status = (msg['status'] as String?) ?? 'Unknown';
+    final status = (msg['status'] as String?) ?? 'success';
 
-    // --- credit_failed ---
-    if (status == 'credit_failed') {
-      final credit = (msg['credit_result'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-      final creditMessage = credit['message']?.toString() ?? 'No message available';
-      final requiredAmount = _fmtNum(credit['required_amount']);
-
-      return Container(
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          borderRadius: BorderRadius.circular(8.r),
-          border: Border.all(color: Colors.orange.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.warning, color: Colors.orange.shade600, size: 20.sp),
-                SizedBox(width: 8.w),
-                Text(
-                  'Credit Failed',
-                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.orange.shade700),
-                ),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            Text('Message: $creditMessage', style: TextStyle(fontSize: 14.sp, color: Colors.orange.shade700)),
-            SizedBox(height: 4.h),
-            Text('Required Amount: $requiredAmount',
-                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
-          ],
-        ),
-      );
+    switch (status) {
+      case 'credit_failed':
+        return _buildCreditFailedCard(msg);
+      case 'missing_returns':
+        return _buildMissingReturnsCard(msg);
+      case 'success':
+      case 'completed':
+        return _buildSuccessCard(msg['message']?.toString() ?? 'Operation completed successfully');
+      default:
+        return _buildSuccessCard('Status: $status');
     }
+  }
 
-    // --- missing_returns ---
-    if (status == 'missing_returns') {
-      final shortagesList = (msg['shortages'] as List?)
-          ?.whereType<Map>()
-          .map((e) => e.cast<String, dynamic>())
-          .toList() ??
-          const <Map<String, dynamic>>[];
-
-      return Container(
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: Colors.red.shade50,
-          borderRadius: BorderRadius.circular(8.r),
-          border: Border.all(color: Colors.red.shade200),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.error, color: Colors.red.shade600, size: 20.sp),
-                SizedBox(width: 8.w),
-                Text(
-                  'Missing Returns',
-                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.red.shade700),
-                ),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            if (shortagesList.isEmpty)
-              Text('No shortages provided.', style: TextStyle(fontSize: 14.sp, color: Colors.red.shade700))
-            else
-              ...shortagesList.map((m) {
-                final item = _itemLabel(m);
-                final required = _fmtNum(m['required']);
-                final allocated = _fmtNum(m['already_allocated']);
-                final pending = _fmtNum(m['pending']);
-                final available = _fmtNum(m['available']);
-                return Padding(
-                    padding: EdgeInsets.only(bottom: 4.h),
-                    child: RichText(
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 14.sp, color: Colors.red.shade700, height: 1.3),
-                        children: [
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.middle,
-                            child: Icon(Icons.inventory_2, size: 12.sp, color: Colors.red.shade700),
-                          ),
-                          TextSpan(text: '  '),
-                          TextSpan(
-                            text: item,
-                            style: TextStyle(fontWeight: FontWeight.w700, color: Colors.red.shade900),
-                          ),
-                          const TextSpan(text: '  •  '),
-
-                          TextSpan(text: 'Ordered: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                          TextSpan(text: required),
-
-                          const TextSpan(text: '   '),
-                          TextSpan(text: 'Allocated: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                          TextSpan(text: allocated),
-
-                          const TextSpan(text: '   '),
-                          TextSpan(text: 'Pending: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                          TextSpan(text: pending),
-
-                          const TextSpan(text: '   '),
-                          TextSpan(text: 'Available: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                          TextSpan(
-                            text: available,
-                            style: TextStyle(
-                              color: (num.tryParse(available) ?? 0) > 0
-                                  ? Colors.green.shade700
-                                  : Colors.red.shade700,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                );
-              }),
-          ],
-        ),
-      );
-    }
-
-    // --- default/success/other statuses ---
+  Widget _buildSuccessCard(String message) {
     return Container(
       padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
@@ -264,19 +161,118 @@ void initState() {
         borderRadius: BorderRadius.circular(8.r),
         border: Border.all(color: Colors.green.shade200),
       ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle, color: Colors.green.shade600, size: 20.sp),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(message, style: TextStyle(color: Colors.green.shade700, fontSize: 14.sp)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCreditFailedCard(Map<String, dynamic> msg) {
+    final credit = (msg['credit_result'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+    final creditMessage = credit['message']?.toString() ?? 'Credit validation failed';
+    final requiredAmount = _fmtNum(credit['required_amount']);
+
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green.shade600, size: 20.sp),
+              Icon(Icons.warning, color: Colors.orange.shade600, size: 20.sp),
               SizedBox(width: 8.w),
-              Text('Response', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+              Text('Credit Failed', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
             ],
           ),
           SizedBox(height: 8.h),
-          Text('Status: $status',
-              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.green.shade700)),
+          Text(creditMessage, style: TextStyle(fontSize: 14.sp, color: Colors.orange.shade700)),
+          SizedBox(height: 4.h),
+          Text('Required Amount: $requiredAmount', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.orange.shade800)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMissingReturnsCard(Map<String, dynamic> msg) {
+    final shortagesList = (msg['shortages'] as List?)
+        ?.whereType<Map>()
+        .map((e) => e.cast<String, dynamic>())
+        .toList() ?? const <Map<String, dynamic>>[];
+
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.error, color: Colors.red.shade600, size: 20.sp),
+              SizedBox(width: 8.w),
+              Text('Missing Returns', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.red.shade700)),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          if (shortagesList.isEmpty)
+            Text('No shortages provided.', style: TextStyle(fontSize: 14.sp, color: Colors.red.shade700))
+          else
+            ...shortagesList.map((m) {
+              final item = _itemLabel(m);
+              final required = _fmtNum(m['required']);
+              final allocated = _fmtNum(m['already_allocated']);
+              final pending = _fmtNum(m['pending']);
+              final available = _fmtNum(m['available']);
+              return Padding(
+                padding: EdgeInsets.only(bottom: 4.h),
+                child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 14.sp, color: Colors.red.shade700, height: 1.3),
+                    children: [
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Icon(Icons.inventory_2, size: 12.sp, color: Colors.red.shade700),
+                      ),
+                      const TextSpan(text: '  '),
+                      TextSpan(text: item, style: TextStyle(fontWeight: FontWeight.w700, color: Colors.red.shade900)),
+                      const TextSpan(text: '  •  '),
+                      TextSpan(text: 'Ordered: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                      TextSpan(text: required),
+                      const TextSpan(text: '   '),
+                      TextSpan(text: 'Allocated: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                      TextSpan(text: allocated),
+                      const TextSpan(text: '   '),
+                      TextSpan(text: 'Pending: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                      TextSpan(text: pending),
+                      const TextSpan(text: '   '),
+                      TextSpan(text: 'Available: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                      TextSpan(
+                        text: available,
+                        style: TextStyle(
+                          color: (num.tryParse(available) ?? 0) > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -325,9 +321,14 @@ void initState() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Order Items (${detailedOrder.items.length})',
-              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0E5CA8)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Order Items (${detailedOrder.items.length})',
+                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0E5CA8)),
+                ),
+              ],
             ),
             SizedBox(height: 16.h),
             ListView.separated(
@@ -343,14 +344,14 @@ void initState() {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        SizedBox(width: 8.w),
                         Expanded(
-                          flex: 3,
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Text(
                                 item.itemName,
-                                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -371,7 +372,6 @@ void initState() {
                             ],
                           ),
                         ),
-                        SizedBox(width: 12.w),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -391,7 +391,6 @@ void initState() {
                             ],
                           ),
                         ),
-                        SizedBox(width: 12.w),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -401,11 +400,10 @@ void initState() {
                                 '₹${item.rate.toStringAsFixed(2)}',
                                 style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500),
                               ),
-                              SizedBox(height: 4.h),
-                              Text('Amount', style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                              SizedBox(height: 10.h),
                               Text(
-                                '₹${item.amount.toStringAsFixed(2)}',
-                                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: const Color(0xFF0E5CA8)),
+                                '₹ ${formatIndianNumber(item.amount.toInt().toString())}',
+                                style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w600, color: const Color(0xFF0E5CA8)),
                               ),
                             ],
                           ),
@@ -413,8 +411,15 @@ void initState() {
                       ],
                     ),
                     if (item.warehouse.isNotEmpty || item.itemGroup.isNotEmpty) ...[
-                      SizedBox(height: 8.h),
+                      Text(
+                        amountToWords(item.amount.toInt()),
+                        style: TextStyle(fontSize: 11.sp, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 2.h),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           if (item.itemGroup.isNotEmpty) ...[
                             Container(
@@ -443,24 +448,30 @@ void initState() {
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                    ],
-                    if (item.actualQty > 0 || item.projectedQty > 0) ...[
-                      SizedBox(height: 6.h),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          if (item.actualQty > 0)
-                            Text(
-                              'Available: ${item.actualQty}',
-                              style: TextStyle(fontSize: 11.sp, color: Colors.green.shade600),
+                          if (userRole?.contains('Delivery Boy') ?? false) ...[
+                            ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CashDepositPage(initialAmount: item.amount), // Navigate to cash page with deposit mode
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0E5CA8),
+                              padding: EdgeInsets.symmetric(vertical: 2.h),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
                             ),
-                          if (item.projectedQty > 0)
-                            Text(
-                              'Projected: ${item.projectedQty}',
-                              style: TextStyle(fontSize: 11.sp, color: Colors.orange.shade600),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6.0),
+                              child: Text(
+                                'Cash Deposit',
+                                style: TextStyle(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.bold),
+                              ),
                             ),
+                          ),
+                         ]
                         ],
                       ),
                     ],
@@ -524,8 +535,16 @@ void initState() {
             );
           }
 
-          // Use API data when available, fallback to widget.order
-          final Order displayOrder = state is OrderDetailsLoaded ? state.detailedOrder : widget.order;
+          // final Order displayOrder = state is OrderDetailsLoaded ? state.detailedOrder : widget.order;
+
+          final Order? displayOrder = state is OrderDetailsLoaded ? state.detailedOrder : widget.order;
+
+          if (displayOrder == null) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
           final statusColor = _getStatusColor(displayOrder.status);
 
           return SingleChildScrollView(
@@ -571,16 +590,34 @@ void initState() {
                         ),
                         if (displayOrder.connectionType.isNotEmpty) ...[
                           SizedBox(height: 8.h),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(16.r),
-                            ),
-                            child: Text(
-                              displayOrder.connectionType,
-                              style: TextStyle(fontSize: 12.sp, color: const Color(0xFF0E5CA8), fontWeight: FontWeight.w600),
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(16.r),
+                                ),
+                                child: Text(
+                                  displayOrder.connectionType,
+                                  style: TextStyle(
+                                      fontSize: 12.sp,
+                                      color: const Color(0xFF0E5CA8),
+                                      fontWeight: FontWeight.w600
+                                  ),
+                                ),
+                              ),
+                              // Show countdown only for Refill orders
+                              if (_isRefillOrder(displayOrder)) ...[
+                                SizedBox(width: 8.w),
+                                OrderCountdownTimer(
+                                  createdAt: displayOrder.creationDate,
+                                  //TODO update this get from api simply
+                                  limitMinutes: 90,
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ],
@@ -604,10 +641,11 @@ void initState() {
                           style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0E5CA8)),
                         ),
                         SizedBox(height: 16.h),
+                        _buildDetailRow('Created:', DateFormat('MMM d, yyyy • h:mm a').format(displayOrder.creationDate), Icons.access_time),  // ADD THIS
                         _buildDetailRow('Transaction Date:', DateFormat('MMM d, yyyy').format(displayOrder.transactionDate), Icons.calendar_today),
                         _buildDetailRow('Delivery Date:', DateFormat('MMM d, yyyy').format(displayOrder.deliveryDate), Icons.local_shipping),
-                        _buildDetailRow('Vehicle:', displayOrder.vehicle, Icons.directions_car),
-                        _buildDetailRow('Warehouse:', displayOrder.warehouse.split(' - ').first, Icons.warehouse),
+                        _buildDetailRow('Vehicle:', displayOrder.vehicle.isEmpty ? 'Not Assigned' : displayOrder.vehicle, Icons.directions_car),
+                        _buildDetailRow('Warehouse:', displayOrder.warehouse.isEmpty ? 'Not Assigned' : displayOrder.warehouse.split(' - ').first, Icons.warehouse),
                         _buildDetailRow('Delivery Status:', displayOrder.deliveryStatus, Icons.delivery_dining),
                         if (displayOrder.billingStatus.isNotEmpty)
                           _buildDetailRow('Billing Status:', displayOrder.billingStatus, Icons.receipt),
@@ -618,33 +656,6 @@ void initState() {
 
                 SizedBox(height: 16.h),
 
-                // Order Summary Card
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.w),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Order Summary',
-                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0E5CA8)),
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildSummaryRow('Total Quantity:', '${displayOrder.totalQty}'),
-                        _buildSummaryRow('Delivered:', '${displayOrder.perDelivered.toStringAsFixed(1)}%'),
-                        _buildSummaryRow('Billed:', '${displayOrder.perBilled.toStringAsFixed(1)}%'),
-                        Divider(height: 24.h, thickness: 1),
-                        _buildSummaryRow('Grand Total:', '₹${displayOrder.grandTotal.toStringAsFixed(2)}', isTotal: true),
-                      ],
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: 16.h),
-
-                // Order Items Card
                 _buildItemsCard(displayOrder),
 
                 SizedBox(height: 16.h),
@@ -678,7 +689,9 @@ void initState() {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isRequestingApproval ? null : () => _requestApproval(context, displayOrder.id),
+                      onPressed: _isRequestingApproval
+                          ? null
+                          : () => _requestOrderAction(context, displayOrder.id, OrderActionType.requestApproval),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0E5CA8),
                         padding: EdgeInsets.symmetric(vertical: 16.h),
@@ -699,6 +712,36 @@ void initState() {
                   SizedBox(height: 16.h),
                   _buildResponseWidget(),
                 ],
+
+                if ( displayOrder.status != "On Hold" &&
+                    displayOrder.status != "To Bill" &&
+                    displayOrder.perDelivered > 1) ...[
+                  SizedBox(height: 24.h),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isRequestingApproval
+                          ? null
+                          : () => _requestOrderAction(context, displayOrder.id, OrderActionType.finalize),                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5CA8),
+                        padding: EdgeInsets.symmetric(vertical: 16.h),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                      ),
+                      child: _isRequestingApproval
+                        ? SizedBox(
+                            height: 20.h,
+                            width: 20.w,
+                            child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : Text(
+                        'Finalize Order',
+                        style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  _buildResponseWidget(),
+                ],
               ],
             ),
           );
@@ -710,6 +753,11 @@ void initState() {
   bool _canRequestApproval(String status) {
     final statusLower = status.toLowerCase();
     return statusLower == 'on hold';
+  }
+
+  bool _isRefillOrder(Order order) {
+  final orderType = order.connectionType.toLowerCase();
+    return orderType.contains('refill') || orderType.contains('refil');
   }
 
   Widget _buildDetailRow(String label, String value, IconData icon) {

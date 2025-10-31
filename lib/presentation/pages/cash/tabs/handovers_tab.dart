@@ -93,7 +93,6 @@ class HandoversTab extends StatelessWidget {
               itemBuilder: (context, index) {
                 final date = groupedTransactions.keys.elementAt(index);
                 final dateTransactions = groupedTransactions[date]!;
-
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -113,9 +112,9 @@ class HandoversTab extends StatelessWidget {
                         .map((handover) => TransactionItem(
                       transaction: handover,
                       onTap: () => _navigateToTransactionDetail(context, handover),
-                      isFromDepositsTab: true,
+                      isFromTab: false
                     ))
-                        .toList(),
+                    .toList(),
                   ],
                 );
               },

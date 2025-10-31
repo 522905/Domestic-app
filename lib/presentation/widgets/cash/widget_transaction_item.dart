@@ -6,13 +6,13 @@ import '../../../domain/entities/cash/cash_transaction.dart';
 class TransactionItem extends StatelessWidget {
   final CashTransaction transaction;
   final VoidCallback onTap;
-  final bool isFromDepositsTab;
+  final bool isFromTab;
 
   const TransactionItem({
     Key? key,
     required this.transaction,
     required this.onTap,
-    this.isFromDepositsTab = false,
+    this.isFromTab = false,
   }) : super(key: key);
 
   @override
@@ -49,13 +49,13 @@ class TransactionItem extends StatelessWidget {
                           ),
                         ),
                         SizedBox(height: 4.h),
-                        Text(
-                          transaction.selectedAccount ?? transaction.paidTo ?? 'Unknown Account',
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            color: Colors.grey[700],
-                          ),
-                        ),
+                        // Text(
+                        //   transaction.selectedAccount ?? transaction.paidTo ?? 'Unknown Account',
+                        //   style: TextStyle(
+                        //     fontSize: 13.sp,
+                        //     color: Colors.grey[700],
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),
@@ -69,7 +69,7 @@ class TransactionItem extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        isFromDepositsTab ? '  From:  ' : '  To:  ',
+                        isFromTab ? '  From:  ' : '  To:  ',
                         style: TextStyle(
                           fontSize: 12.sp,
                           color: Colors.grey[600],
@@ -85,7 +85,7 @@ class TransactionItem extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    _formatTime(transaction.createdAt),
+                    formatUpdatedAtAbsoluteDT(transaction.createdAt),
                     style: TextStyle(
                       fontSize: 12.sp,
                       color: Colors.grey[600],
@@ -107,7 +107,7 @@ class TransactionItem extends StatelessWidget {
 
   // Add this method to safely get display name
   String _getDisplayName() {
-    if (isFromDepositsTab) {
+    if (isFromTab) {
       return transaction.initiator ?? 'Unknown User';
     } else {
       return transaction.paidTo ?? transaction.selectedAccount ?? 'Unknown Recipient';
@@ -195,25 +195,10 @@ class TransactionItem extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime time) {
-    final t = time.toLocal(); // ensure comparisons/formatting use device zone
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(t.year, t.month, t.day);
-
-    if (date.isAtSameMomentAs(today)) {
-      // Today
-      return DateFormat('h:mm a').format(t);
-    }
-
-    if (date.isAtSameMomentAs(today.subtract(const Duration(days: 1)))) {
-      // Yesterday
-      return DateFormat('h:mm a').format(t); // or "Yesterday, ${...}" if you want the label
-    }
-
-    // Older
-    return DateFormat('MMM d, h:mm a').format(t);
+  String formatUpdatedAtAbsoluteDT(DateTime? dt, {String locale = 'en_US'}) {
+    if (dt == null) return 'Unknown';
+    final local = dt.toLocal();
+    return DateFormat('MMM dd, yyyy • h:mm a', locale).format(local);
   }
 
 }

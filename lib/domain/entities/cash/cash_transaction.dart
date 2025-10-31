@@ -41,6 +41,7 @@ class CashTransaction extends Equatable {
   final String? approvedAsRole;
   final int? fromAccountId;
   final int? toAccountId;
+  final Map<String, dynamic>? bankDepositDetails;
 
   const CashTransaction({
     required this.id,
@@ -80,6 +81,7 @@ class CashTransaction extends Equatable {
     this.approvedAsRole,
     this.fromAccountId,
     this.toAccountId,
+    this.bankDepositDetails,
   });
 
   @override
@@ -172,6 +174,7 @@ class CashTransaction extends Equatable {
         approvedAsRole: _toNonEmptyStringOrNull(json['approved_as_role']),
         fromAccountId: _toIntOrNull(json['from_account']),
         toAccountId: _toIntOrNull(json['to_account']),
+        bankDepositDetails: json['bank_deposit_details'] as Map<String, dynamic>?,
       );
     } catch (e) {
       print('Error parsing CashTransaction from JSON: $e');

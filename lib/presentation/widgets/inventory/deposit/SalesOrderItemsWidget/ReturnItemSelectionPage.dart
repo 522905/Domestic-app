@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../../core/models/deposit/sales_order_deposit_data.dart';
@@ -22,13 +23,16 @@ class ReturnItemSelectionPage extends StatefulWidget {
 }
 
 class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
+
   static const List<String> faultTypes = [
-    'Valve Damaged',
-    'Body Dented',
-    'Handle Broken',
-    'Thread Damaged',
-    'Leak Detected',
-    'Corrosion',
+    'Body Leakage',
+    'Pin Broken',
+    'Water Filled',
+    'Valve Leak',
+    'Due To ReTesting',
+    'Sperious Cylinder',
+    'Bung Leak',
+    'OMC',
     'Other'
   ];
 
@@ -40,6 +44,11 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
   final _cylinderNumberController = TextEditingController();
   final _tareWeightController = TextEditingController();
   final _grossWeightController = TextEditingController();
+
+  // Consumer details controllers
+  final _consumerIdController = TextEditingController();
+  final _consumerNameController = TextEditingController();
+  final _consumerMobileController = TextEditingController();
 
   String? _selectedFaultType;
   double _netWeight = 0.0;
@@ -66,6 +75,11 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
         _grossWeightController.text = editingReturn.grossWeight?.toString() ?? '';
         _selectedFaultType = editingReturn.faultType;
         _netWeight = editingReturn.netWeight ?? 0.0;
+
+        // Load consumer details
+        _consumerIdController.text = editingReturn.consumerNumber ?? '';
+        _consumerNameController.text = editingReturn.consumerName ?? '';
+        _consumerMobileController.text = editingReturn.consumerMobileNumber ?? '';
       }
     } else {
       // Set default return item if only one option available
@@ -78,17 +92,17 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
     _cylinderNumberController.addListener(_onFormChanged);
     _tareWeightController.addListener(_onFormChanged);
     _grossWeightController.addListener(_onFormChanged);
-
+    _consumerIdController.addListener(_onFormChanged);
+    _consumerNameController.addListener(_onFormChanged);
+    _consumerMobileController.addListener(_onFormChanged);
     _tareWeightController.addListener(_calculateNetWeight);
     _grossWeightController.addListener(_calculateNetWeight);
   }
 
   void _onFormChanged() {
-    if (!_hasUnsavedChanges) {
-      setState(() {
-        _hasUnsavedChanges = true;
-      });
-    }
+    setState(() {
+      _hasUnsavedChanges = true;
+    });
   }
 
   void _calculateNetWeight() {
@@ -137,6 +151,8 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
                     SizedBox(height: 16.h),
                     _buildQuantitySection(),
                     if (_selectedReturnType == 'defective') ...[
+                      SizedBox(height: 16.h),
+                      _buildConsumerDetailsSection(),
                       SizedBox(height: 16.h),
                       _buildDefectiveDetailsSection(),
                     ],
@@ -187,13 +203,28 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
             ),
           ),
           SizedBox(height: 8.h),
-          Text(
-            'Maximum returnable: ${widget.maxQuantity.toInt()}',
-            style: TextStyle(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.orange[700],
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Maximum returnable: ${widget.maxQuantity.toInt()}',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange[700],
+                  ),
+                ),
+              ),
+              SizedBox(width: 16.w),
+              Text(
+                'Delivered: ${widget.orderItem.deliveredQty}',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green[700],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -202,9 +233,11 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
 
   Widget _buildReturnTypeSelection() {
     final hasEmptyReturns = (widget.eligibleReturns['empty'] ?? []).isNotEmpty;
+    final hasFilledReturns = (widget.eligibleReturns['filled'] ?? []).isNotEmpty;
     final hasDefectiveReturns = (widget.eligibleReturns['defective'] ?? []).isNotEmpty;
 
-    if (!hasEmptyReturns && !hasDefectiveReturns) {
+
+    if (!hasEmptyReturns && !hasDefectiveReturns && !hasFilledReturns) {
       return Card(
         child: Padding(
           padding: EdgeInsets.all(16.w),
@@ -236,31 +269,70 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
                 subtitle: Text('${widget.eligibleReturns['empty']!.length} options available'),
                 value: 'empty',
                 groupValue: _selectedReturnType,
-                onChanged: hasEmptyReturns ? (value) {
+                onChanged: (value) {
                   setState(() {
                     _selectedReturnType = value!;
                     _setDefaultReturnItem();
-                    if (_selectedReturnType == 'empty') {
-                      _quantityController.text = '1';
-                    }
                     _onFormChanged();
                   });
-                } : null,
+                },
+              ),
+            if (hasFilledReturns)
+              RadioListTile<String>(
+                title: Text(
+                  'Filled Return',
+                  style: TextStyle(
+                    color: widget.orderItem.deliveredQty == 0 ? Colors.grey : null,
+                  ),
+                ),
+                subtitle: Text(
+                  widget.orderItem.deliveredQty == 0
+                      ? 'Not available (no delivered items)'
+                      : '${widget.eligibleReturns['filled']!.length} options available',
+                  style: TextStyle(
+                    color: widget.orderItem.deliveredQty == 0 ? Colors.grey : null,
+                  ),
+                ),
+                value: 'filled',
+                groupValue: _selectedReturnType,
+                onChanged: widget.orderItem.deliveredQty == 0
+                    ? null
+                    : (value) {
+                  setState(() {
+                    _selectedReturnType = value!;
+                    _setDefaultReturnItem();
+                    _onFormChanged();
+                  });
+                },
               ),
             if (hasDefectiveReturns)
               RadioListTile<String>(
-                title: Text('Defective Return'),
-                subtitle: Text('${widget.eligibleReturns['defective']!.length} options available'),
+                title: Text(
+                  'Defective Return',
+                  style: TextStyle(
+                    color: widget.orderItem.deliveredQty == 0 ? Colors.grey : null,
+                  ),
+                ),
+                subtitle: Text(
+                  widget.orderItem.deliveredQty == 0
+                      ? 'Not available (no delivered items)'
+                      : '${widget.eligibleReturns['defective']!.length} options available',
+                  style: TextStyle(
+                    color: widget.orderItem.deliveredQty == 0 ? Colors.grey : null,
+                  ),
+                ),
                 value: 'defective',
                 groupValue: _selectedReturnType,
-                onChanged: hasDefectiveReturns ? (value) {
+                onChanged: widget.orderItem.deliveredQty == 0
+                    ? null
+                    : (value) {
                   setState(() {
                     _selectedReturnType = value!;
                     _setDefaultReturnItem();
-                    _quantityController.text = '1'; // Always 1 for defective
+                    _quantityController.text = '1'; // Defective always quantity 1
                     _onFormChanged();
                   });
-                } : null,
+                },
               ),
           ],
         ),
@@ -276,8 +348,8 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
         child: Padding(
           padding: EdgeInsets.all(16.w),
           child: Text(
-            'No ${_selectedReturnType} return items available',
-            style: TextStyle(color: Colors.grey[600]),
+            'No return items available for $_selectedReturnType returns',
+            style: TextStyle(color: Colors.orange, fontSize: 14.sp),
           ),
         ),
       );
@@ -285,36 +357,46 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
 
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16.w),
+        padding: EdgeInsets.all(5.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Select ${_selectedReturnType.toUpperCase()} Return Item',
+              'Select Return Item',
               style: TextStyle(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.bold,
               ),
             ),
             SizedBox(height: 12.h),
-            ...availableReturns.map((returnItem) {
-              final itemCode = returnItem['item_code'] ?? '';
-              final description = returnItem['description'] ?? itemCode;
-
-              return RadioListTile<String>(
-                title: Text(description),
-                subtitle: Text('Code: $itemCode'),
-                value: itemCode,
-                groupValue: _selectedReturnItemCode,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedReturnItemCode = value;
-                    _selectedReturnDescription = description;
-                    _onFormChanged();
-                  });
-                },
-              );
-            }).toList(),
+            DropdownButtonFormField<String>(
+              value: _selectedReturnItemCode,
+              decoration: InputDecoration(
+                labelText: 'Return Item',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                prefixIcon: const Icon(Icons.inventory_2),
+              ),
+              items: availableReturns.map((item) {
+                final itemCode = item['item_code'] as String;
+                final description = item['description'] as String;
+                return DropdownMenuItem<String>(
+                  value: itemCode,
+                  child: Text(' $description '),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedReturnItemCode = value;
+                  final selectedItem = availableReturns.firstWhere(
+                        (item) => item['item_code'] == value,
+                  );
+                  _selectedReturnDescription = selectedItem['description'];
+                  _onFormChanged();
+                });
+              },
+            ),
           ],
         ),
       ),
@@ -322,6 +404,8 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
   }
 
   Widget _buildQuantitySection() {
+    final isDefective = _selectedReturnType == 'defective';
+
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16.w),
@@ -336,57 +420,150 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
               ),
             ),
             SizedBox(height: 12.h),
-            if (_selectedReturnType == 'defective') ...[
-              Container(
-                padding: EdgeInsets.all(12.w),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8.r),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: _canDecreaseQuantity() ? _decreaseQuantity : null,
+                  icon: const Icon(Icons.remove_circle_outline),
+                  color: Colors.blue,
+                  iconSize: 32.sp,
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.orange, size: 16.sp),
-                    SizedBox(width: 8.w),
-                    Text(
-                      'Defective returns are always 1 quantity per cylinder',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.orange[700],
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: TextField(
+                    controller: _quantityController,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    enabled: !isDefective,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16.w,
+                        vertical: 12.h,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: _canDecreaseQuantity() ? _decreaseQuantity : null,
-                  ),
-                  SizedBox(
-                    width: 100.w,
-                    child: TextField(
-                      controller: _quantityController,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 8.h),
-                      ),
-                      onChanged: _onQuantityChanged,
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
                     ),
+                    onChanged: _onQuantityChanged,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: _canIncreaseQuantity() ? _increaseQuantity : null,
-                  ),
-                ],
+                ),
+                SizedBox(width: 8.w),
+                IconButton(
+                  onPressed: _canIncreaseQuantity() ? _increaseQuantity : null,
+                  icon: const Icon(Icons.add_circle_outline),
+                  color: Colors.blue,
+                  iconSize: 32.sp,
+                ),
+              ],
+            ),
+            if (isDefective) ...[
+              SizedBox(height: 8.h),
+              Text(
+                'Note: Defective returns are limited to quantity 1',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.orange[700],
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConsumerDetailsSection() {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.person, color: Colors.blue[700], size: 20.sp),
+                SizedBox(width: 8.w),
+                Text(
+                  'Consumer Details',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16.h),
+
+            // Consumer Number
+            TextField(
+              controller: _consumerIdController,
+              keyboardType: TextInputType.number,
+              maxLength: 16,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(16),
+              ],
+              decoration: InputDecoration(
+                labelText: 'Consumer ID *',
+                hintText: 'Enter 16-digit consumer number',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                prefixIcon: const Icon(Icons.badge),
+                counterText: '',
+              ),
+            ),
+            SizedBox(height: 12.h),
+
+            // Consumer Name
+            TextField(
+              controller: _consumerNameController,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Consumer Name *',
+                hintText: 'Enter consumer name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                prefixIcon: const Icon(Icons.person_outline),
+              ),
+            ),
+            SizedBox(height: 12.h),
+
+            // Consumer Mobile Number
+            TextField(
+              controller: _consumerMobileController,
+              keyboardType: TextInputType.phone,
+              maxLength: 10,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+              decoration: InputDecoration(
+                labelText: 'Consumer Mobile Number *',
+                hintText: 'Enter 10-digit mobile number',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                prefixIcon: const Icon(Icons.phone),
+                counterText: '',
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              '* All fields are mandatory for defective returns',
+              style: TextStyle(
+                fontSize: 11.sp,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ],
         ),
       ),
@@ -400,12 +577,19 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Defective Item Details',
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Icon(Icons.warning, color: Colors.orange[700], size: 20.sp),
+                SizedBox(width: 8.w),
+                Text(
+                  'Defective Item Details',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[700],
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 16.h),
 
@@ -420,9 +604,9 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
                 prefixIcon: const Icon(Icons.qr_code),
               ),
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 12.h),
 
-            // Weights Section
+            // Weight Fields
             Row(
               children: [
                 Expanded(
@@ -504,46 +688,118 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
   }
 
   Widget _buildActionButtons() {
+    final canSave = _canSave();
+    final missingFields = _getMissingFields();
+
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey[300]!)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _onBackPressed,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.grey[700],
-                side: BorderSide(color: Colors.grey[400]!),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                padding: EdgeInsets.symmetric(vertical: 14.h),
+          // Show missing fields hint
+          if (!canSave && missingFields.isNotEmpty) ...[
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(6.r),
+                border: Border.all(color: Colors.orange.shade300),
               ),
-              child: const Text('Cancel'),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _canSave() ? _onSave : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                padding: EdgeInsets.symmetric(vertical: 14.h),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16.sp, color: Colors.orange.shade700),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      'Please fill: ${missingFields.join(", ")}',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Text(widget.editingReturn != null ? 'Update' : 'Save'),
             ),
+            SizedBox(height: 12.h),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _onBackPressed,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.grey[700],
+                    side: BorderSide(color: Colors.grey[400]!),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: canSave ? _onSave : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                  ),
+                  child: Text(widget.editingReturn != null ? 'Update' : 'Save'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+// Add this helper method
+  List<String> _getMissingFields() {
+    List<String> missing = [];
+
+    if (_selectedReturnItemCode == null) missing.add('Return Item');
+
+    final qty = int.tryParse(_quantityController.text) ?? 0;
+    if (qty <= 0 || qty > widget.maxQuantity) missing.add('Valid Quantity');
+
+    // Check filled quantity against delivered quantity
+    if (_selectedReturnType == 'filled' && qty > widget.orderItem.deliveredQty) {
+      missing.add('Filled qty cannot exceed delivered (${widget.orderItem.deliveredQty})');
+    }
+
+    if (_selectedReturnType == 'defective') {
+      // Check defective quantity against delivered quantity
+      if (qty > widget.orderItem.deliveredQty) {
+        missing.add('Defective qty cannot exceed delivered (${widget.orderItem.deliveredQty})');
+      }
+
+      if (_cylinderNumberController.text.trim().isEmpty) missing.add('Cylinder Number');
+      if (_selectedFaultType == null) missing.add('Fault Type');
+      final tare = double.tryParse(_tareWeightController.text);
+      final gross = double.tryParse(_grossWeightController.text);
+      if (tare == null) missing.add('Tare Weight');
+      if (gross == null) missing.add('Gross Weight');
+
+      final consumerId = _consumerIdController.text.trim();
+      if (consumerId.isEmpty || consumerId.length != 16) missing.add('Consumer ID (16 digits)');
+      if (_consumerNameController.text.trim().isEmpty) missing.add('Consumer Name');
+      final mobile = _consumerMobileController.text.trim();
+      if (mobile.isEmpty || mobile.length != 10) missing.add('Mobile Number (10 digits)');
+    }
+
+    return missing;
   }
 
   bool _canSave() {
@@ -552,12 +808,30 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
     final qty = int.tryParse(_quantityController.text) ?? 0;
     if (qty <= 0 || qty > widget.maxQuantity) return false;
 
+    // Validate filled returns against delivered quantity
+    if (_selectedReturnType == 'filled' && qty > widget.orderItem.deliveredQty) {
+      return false;
+    }
+
     if (_selectedReturnType == 'defective') {
+      // Defective also counts against delivered quantity
+      if (qty > widget.orderItem.deliveredQty) {
+        return false;
+      }
+
+      // Validate defective-specific fields
       if (_cylinderNumberController.text.trim().isEmpty) return false;
       if (_selectedFaultType == null) return false;
       final tare = double.tryParse(_tareWeightController.text);
       final gross = double.tryParse(_grossWeightController.text);
       if (tare == null || gross == null) return false;
+
+      // Validate consumer details (mandatory for defective)
+      final consumerId = _consumerIdController.text.trim();
+      if (consumerId.isEmpty || consumerId.length != 16) return false;
+      if (_consumerNameController.text.trim().isEmpty) return false;
+      final mobile = _consumerMobileController.text.trim();
+      if (mobile.isEmpty || mobile.length != 10) return false;
     }
 
     return true;
@@ -566,6 +840,12 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
   bool _canIncreaseQuantity() {
     if (_selectedReturnType == 'defective') return false;
     final currentQty = int.tryParse(_quantityController.text) ?? 0;
+
+    // For filled returns, cap at deliveredQty
+    if (_selectedReturnType == 'filled') {
+      return currentQty < widget.orderItem.deliveredQty && currentQty < widget.maxQuantity;
+    }
+
     return currentQty < widget.maxQuantity;
   }
 
@@ -577,7 +857,16 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
 
   void _increaseQuantity() {
     final currentQty = int.tryParse(_quantityController.text) ?? 0;
-    if (currentQty < widget.maxQuantity) {
+
+    // For filled returns, cap at deliveredQty
+    int maxLimit = widget.maxQuantity.toInt();
+    if (_selectedReturnType == 'filled') {
+      maxLimit = widget.orderItem.deliveredQty < maxLimit
+          ? widget.orderItem.deliveredQty
+          : maxLimit;
+    }
+
+    if (currentQty < maxLimit) {
       _quantityController.text = (currentQty + 1).toString();
     }
   }
@@ -591,12 +880,23 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
 
   void _onQuantityChanged(String value) {
     final qty = int.tryParse(value);
-    if (qty != null && (qty < 1 || qty > widget.maxQuantity)) {
-      // Show error or reset to valid range
-      if (qty < 1) {
-        _quantityController.text = '1';
-      } else if (qty > widget.maxQuantity) {
-        _quantityController.text = widget.maxQuantity.toInt().toString();
+    if (qty != null) {
+      int maxLimit = widget.maxQuantity.toInt();
+
+      // For filled returns, cap at deliveredQty
+      if (_selectedReturnType == 'filled') {
+        maxLimit = widget.orderItem.deliveredQty < maxLimit
+            ? widget.orderItem.deliveredQty
+            : maxLimit;
+      }
+
+      if (qty < 1 || qty > maxLimit) {
+        // Show error or reset to valid range
+        if (qty < 1) {
+          _quantityController.text = '1';
+        } else if (qty > maxLimit) {
+          _quantityController.text = maxLimit.toString();
+        }
       }
     }
   }
@@ -648,6 +948,9 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
       grossWeight: _selectedReturnType == 'defective' ? double.tryParse(_grossWeightController.text) : null,
       netWeight: _selectedReturnType == 'defective' ? _netWeight : null,
       faultType: _selectedReturnType == 'defective' ? _selectedFaultType : null,
+      consumerNumber: _selectedReturnType == 'defective' ? _consumerIdController.text.trim() : null,
+      consumerName: _selectedReturnType == 'defective' ? _consumerNameController.text.trim() : null,
+      consumerMobileNumber: _selectedReturnType == 'defective' ? _consumerMobileController.text.trim() : null,
     );
 
     Navigator.of(context).pop(selectedReturn);
@@ -659,6 +962,9 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
     _cylinderNumberController.dispose();
     _tareWeightController.dispose();
     _grossWeightController.dispose();
+    _consumerIdController.dispose();
+    _consumerNameController.dispose();
+    _consumerMobileController.dispose();
     super.dispose();
   }
 }

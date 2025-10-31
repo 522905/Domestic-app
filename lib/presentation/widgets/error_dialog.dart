@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
+// import 'package:share_plus/share_plus.dart';
 
 class ErrorDialog extends StatelessWidget {
   final String title;
@@ -174,10 +174,10 @@ class ErrorDialog extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            Share.share(
-                              _formattedErrorDetails,
-                              subject: 'LPG App Error Report',
-                            );
+                            // Share.share(
+                            //   _formattedErrorDetails,
+                            //   subject: 'LPG App Error Report',
+                            // );
                           },
                           icon: const Icon(Icons.share, size: 16),
                           label: const Text('Share'),

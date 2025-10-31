@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
+import '../../../utils/currency_utils.dart';
 import '../../blocs/orders/orders_bloc.dart';
 import '../../blocs/orders/orders_event.dart';
 import '../../blocs/orders/orders_state.dart';
@@ -22,18 +23,33 @@ class _OrdersPageState extends State<OrdersPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   List<String> _userRole = [];
-
   // Filter selections
   String? _selectedVehicle;
   String? _selectedWarehouse;
   String? _selectedStatus;
+  String? _selectedDeliveryStatus = 'Not Delivered';
+  bool _isInitialLoad = true;
+  // Static delivery status options
+  final List<String> _deliveryStatusOptions = [
+    'Not Delivered',
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _scrollController.addListener(_onScroll);
-    context.read<OrdersBloc>().add(const LoadOrders());
+
+    // Apply default filter only on initial load
+    if (_isInitialLoad) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _applyFilters();
+        _isInitialLoad = false; // Mark as not initial load anymore
+      });
+      context.read<OrdersBloc>().add(const LoadOrders());
+    } else {
+      context.read<OrdersBloc>().add(const LoadOrders());
+    }
   }
 
   @override
@@ -78,6 +94,9 @@ class _OrdersPageState extends State<OrdersPage> {
     if (_selectedStatus != null && _selectedStatus!.isNotEmpty) {
       filters['status'] = _selectedStatus!;
     }
+    if (_selectedDeliveryStatus != null && _selectedDeliveryStatus!.isNotEmpty) {
+      filters['delivery_status'] = _selectedDeliveryStatus!;
+    }
 
     context.read<OrdersBloc>().add(ApplyFilters(filters));
   }
@@ -87,6 +106,7 @@ class _OrdersPageState extends State<OrdersPage> {
       _selectedVehicle = null;
       _selectedWarehouse = null;
       _selectedStatus = null;
+      _selectedDeliveryStatus = null;
       _searchController.clear();
     });
     context.read<OrdersBloc>().add(const ClearFilters());
@@ -111,6 +131,9 @@ class _OrdersPageState extends State<OrdersPage> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: () {
+              setState(() {
+                _selectedDeliveryStatus = null; // Clear delivery status on refresh
+              });
               context.read<OrdersBloc>().add(const RefreshOrders());
             },
           ),
@@ -128,13 +151,22 @@ class _OrdersPageState extends State<OrdersPage> {
                   return _buildOrdersList(state);
                 } else if (state is OrdersLoadedWithResponse) {
                   // Handle the response state but show the orders list
-                  // This ensures the list doesn't disappear after approval
                   final ordersState = OrdersLoaded(
                     orders: state.orders,
-                    hasMore: false, // Assuming no pagination info in response state
+                    hasMore: false,
                     currentOffset: 0,
                     availableFilters: const {},
                     appliedFilters: const {},
+                  );
+                  return _buildOrdersList(ordersState);
+                } else if (state is OrderDetailsLoaded) {  // ADD THIS BLOCK
+                  final ordersState = OrdersLoaded(
+                    orders: state.orders,
+                    hasMore: state.hasMore,
+                    currentOffset: state.currentOffset,
+                    availableFilters: state.availableFilters,
+                    appliedFilters: state.appliedFilters,
+                    searchQuery: state.searchQuery,
                   );
                   return _buildOrdersList(ordersState);
                 } else if (state is OrdersError) {
@@ -169,6 +201,21 @@ class _OrdersPageState extends State<OrdersPage> {
   Widget _buildSearchAndFilterSection() {
     return BlocBuilder<OrdersBloc, OrdersState>(
       builder: (context, state) {
+        // Convert OrderDetailsLoaded to OrdersLoaded for UI consistency
+        OrdersLoaded? ordersState;
+        if (state is OrdersLoaded) {
+          ordersState = state;
+        } else if (state is OrderDetailsLoaded) {  // ADD THIS BLOCK
+          ordersState = OrdersLoaded(
+            orders: state.orders,
+            hasMore: state.hasMore,
+            currentOffset: state.currentOffset,
+            availableFilters: state.availableFilters,
+            appliedFilters: state.appliedFilters,
+            searchQuery: state.searchQuery,
+          );
+        }
+
         return Container(
           color: Colors.white,
           child: Column(
@@ -195,14 +242,13 @@ class _OrdersPageState extends State<OrdersPage> {
                   },
                 ),
               ),
+              // Filter Section - UPDATE THE CONDITION
+              if (ordersState != null && ordersState.availableFilters.isNotEmpty)
+                _buildFilters(ordersState),
 
-              // Filter Section
-              if (state is OrdersLoaded && state.availableFilters.isNotEmpty)
-                _buildFilters(state),
-
-              // Applied Filters Display
-              if (state is OrdersLoaded && state.hasFiltersApplied)
-                _buildAppliedFilters(state),
+              // Applied Filters Display - UPDATE THE CONDITION
+              if (ordersState != null && ordersState.hasFiltersApplied)
+                _buildAppliedFilters(ordersState),
             ],
           ),
         );
@@ -217,6 +263,21 @@ class _OrdersPageState extends State<OrdersPage> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
+
+            _buildStaticFilterChip(
+              label: 'Delivery Status',
+              value: _selectedDeliveryStatus,
+              options: _deliveryStatusOptions,
+              onSelected: (value) {
+                setState(() {
+                  _selectedDeliveryStatus = value;
+                });
+                _applyFilters();
+              },
+            ),
+
+            SizedBox(width: 8.w),
+
             // Vehicle Filter - Show for GM or if vehicle options exist
             if ((_isGeneralManager() || state.availableFilters.containsKey('vehicle')) &&
                 state.availableFilters['vehicle']?.isNotEmpty == true)
@@ -265,16 +326,33 @@ class _OrdersPageState extends State<OrdersPage> {
                   _applyFilters();
                 },
               ),
+
+            SizedBox(width: 8.w),
+
+            if (state.availableFilters.containsKey('delivery_status') &&
+                state.availableFilters['delivery_status']?.isNotEmpty == true)
+              _buildFilterChip(
+                label: 'Delivery Status',
+                value: _selectedDeliveryStatus,
+                options: state.availableFilters['delivery_status'] ?? [],
+                onSelected: (value) {
+                  setState(() {
+                    _selectedDeliveryStatus = value;
+                  });
+                  _applyFilters();
+                },
+              ),
+
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip({
+  Widget _buildStaticFilterChip({
     required String label,
     required String? value,
-    required List<FilterOption> options,
+    required List<String> options,
     required Function(String?) onSelected,
   }) {
     return FilterChip(
@@ -299,7 +377,100 @@ class _OrdersPageState extends State<OrdersPage> {
       selected: value != null,
       selectedColor: const Color(0xFF0E5CA8),
       backgroundColor: Colors.grey[200],
-      onSelected: (_) => _showFilterDialog(label, options, onSelected),
+      onSelected: (_) {
+        _showStaticFilterDialog(label, options, onSelected);
+      },
+    );
+  }
+
+  void _showStaticFilterDialog(String filterType, List<String> options, Function(String?) onSelected) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Select $filterType'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(  // ADD THIS
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('All'),
+                  leading: Radio<String?>(
+                    value: null,
+                    groupValue: _selectedDeliveryStatus,
+                    onChanged: (value) {
+                      Navigator.pop(context);
+                      onSelected(value);
+                    },
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onSelected(null);
+                  },
+                ),
+                ...options.map((option) => ListTile(
+                  title: Text(option),
+                  leading: Radio<String>(
+                    value: option,
+                    groupValue: _selectedDeliveryStatus,
+                    onChanged: (value) {
+                      Navigator.pop(context);
+                      onSelected(value);
+                    },
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onSelected(option);
+                  },
+                )),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required String? value,
+    required List<FilterOption> options,
+    required Function(String?) onSelected,
+  }) {
+    return FilterChip(
+      label: SingleChildScrollView(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value ?? label,
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: value != null ? Colors.white : Colors.grey[800],
+              ),
+            ),
+            SizedBox(width: 4.w),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 16.sp,
+              color: value != null ? Colors.white : Colors.grey[800],
+            ),
+          ],
+        ),
+      ),
+      selected: value != null,
+      selectedColor: const Color(0xFF0E5CA8),
+      backgroundColor: Colors.grey[200],
+      onSelected: (_) {
+        _showFilterDialog(label, options, onSelected);
+      },
     );
   }
 
@@ -316,7 +487,11 @@ class _OrdersPageState extends State<OrdersPage> {
                 if (state.searchQuery?.isNotEmpty == true)
                   _buildAppliedFilterChip('Search: ${state.searchQuery}'),
                 ...state.appliedFilters.entries.map(
-                      (entry) => _buildAppliedFilterChip('${entry.key}: ${entry.value}'),
+                      (entry) {
+                    // Format the key nicely
+                    final formattedKey = _formatFilterKey(entry.key);
+                    return _buildAppliedFilterChip('$formattedKey: ${entry.value}');
+                  },
                 ),
               ],
             ),
@@ -335,6 +510,15 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
+// Add this helper method
+  String _formatFilterKey(String key) {
+    // Convert snake_case to Title Case
+    return key
+        .split('_')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
   Widget _buildAppliedFilterChip(String label) {
     return Chip(
       label: Text(
@@ -351,11 +535,9 @@ class _OrdersPageState extends State<OrdersPage> {
 
   void _removeSingleFilter(String label) {
     if (label.startsWith('Search: ')) {
-      // Clear search
       _searchController.clear();
       context.read<OrdersBloc>().add(const SearchOrders(''));
     } else if (label.contains(': ')) {
-      // Parse filter type and value
       final parts = label.split(': ');
       final filterType = parts[0].toLowerCase();
 
@@ -370,10 +552,12 @@ class _OrdersPageState extends State<OrdersPage> {
           case 'status':
             _selectedStatus = null;
             break;
+          case 'delivery status':  // Now matches the formatted key
+            _selectedDeliveryStatus = null;
+            break;
         }
       });
 
-      // Apply filters without the removed one
       _applyFilters();
     }
   }
@@ -385,42 +569,44 @@ class _OrdersPageState extends State<OrdersPage> {
         title: Text('Select $filterType'),
         content: SizedBox(
           width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('All'),
-                leading: Radio<String?>(
-                  value: null,
-                  groupValue: filterType == 'Vehicle' ? _selectedVehicle :
-                  filterType == 'Warehouse' ? _selectedWarehouse : _selectedStatus,
-                  onChanged: (value) {
+          child: SingleChildScrollView(  // ADD THIS
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('All'),
+                  leading: Radio<String?>(
+                    value: null,
+                    groupValue: filterType == 'Vehicle' ? _selectedVehicle :
+                    filterType == 'Warehouse' ? _selectedWarehouse : _selectedStatus,
+                    onChanged: (value) {
+                      Navigator.pop(context);
+                      onSelected(value);
+                    },
+                  ),
+                  onTap: () {
                     Navigator.pop(context);
-                    onSelected(value);
+                    onSelected(null);
                   },
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  onSelected(null);
-                },
-              ),
-              ...options.map((option) => ListTile(
-                title: Text('${option.value} (${option.count})'),
-                leading: Radio<String>(
-                  value: option.value,
-                  groupValue: filterType == 'Vehicle' ? _selectedVehicle :
-                  filterType == 'Warehouse' ? _selectedWarehouse : _selectedStatus,
-                  onChanged: (value) {
+                ...options.map((option) => ListTile(
+                  title: Text('${option.value} (${option.count})'),
+                  leading: Radio<String>(
+                    value: option.value,
+                    groupValue: filterType == 'Vehicle' ? _selectedVehicle :
+                    filterType == 'Warehouse' ? _selectedWarehouse : _selectedStatus,
+                    onChanged: (value) {
+                      Navigator.pop(context);
+                      onSelected(value);
+                    },
+                  ),
+                  onTap: () {
                     Navigator.pop(context);
-                    onSelected(value);
+                    onSelected(option.value);
                   },
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  onSelected(option.value);
-                },
-              )),
-            ],
+                )),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -437,22 +623,53 @@ class _OrdersPageState extends State<OrdersPage> {
     final orders = state.filteredOrders;
 
     if (orders.isEmpty && !state.hasFiltersApplied) {
-      return _buildEmptyState();
+      return RefreshIndicator(
+        onRefresh: () async {
+          setState(() {
+            _selectedDeliveryStatus = null;
+          });
+          context.read<OrdersBloc>().add(const RefreshOrders());
+          await Future.delayed(const Duration(milliseconds: 500));
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height - 200.h,
+            child: _buildEmptyState(),
+          ),
+        ),
+      );
     } else if (orders.isEmpty && state.hasFiltersApplied) {
-      return _buildNoResultsState();
+      return RefreshIndicator(
+        onRefresh: () async {
+            setState(() {
+              _selectedDeliveryStatus = null; // Clear delivery status on pull refresh
+            });
+          context.read<OrdersBloc>().add(const RefreshOrders());
+          await Future.delayed(const Duration(milliseconds: 200));
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height - 200.h,
+            child: _buildNoResultsState(),
+          ),
+        ),
+      );
     }
 
     return RefreshIndicator(
       onRefresh: () async {
         context.read<OrdersBloc>().add(const RefreshOrders());
+        await Future.delayed(const Duration(milliseconds: 500));
       },
       child: ListView.builder(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(), // ADD THIS LINE
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         itemCount: orders.length + (state.hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == orders.length) {
-            // Loading indicator at the bottom
             return Container(
               padding: EdgeInsets.all(16.h),
               child: Center(
@@ -474,7 +691,6 @@ class _OrdersPageState extends State<OrdersPage> {
   }
 
   Widget _buildOrderCard(Order order) {
-
     Color statusColor = _getStatusColor(order.status);
 
     return GestureDetector(
@@ -496,7 +712,7 @@ class _OrdersPageState extends State<OrdersPage> {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Padding(
-          padding: EdgeInsets.all(16.sp),
+          padding: EdgeInsets.all(10.sp),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -505,7 +721,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      order.orderNumber,
+                      'Req By: ${order.customerName}',
                       style: TextStyle(
                         fontSize: 15.sp,
                         fontWeight: FontWeight.bold,
@@ -532,7 +748,7 @@ class _OrdersPageState extends State<OrdersPage> {
               ),
               SizedBox(height: 2.h),
               Text(
-                'Created - By : ${order.createdBy}',
+                order.orderNumber,
                 style: TextStyle(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w500,
@@ -541,35 +757,38 @@ class _OrdersPageState extends State<OrdersPage> {
               ),
               SizedBox(height: 4.h),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.local_shipping, size: 14.sp, color: Colors.grey[600]),
-                  SizedBox(width: 4.w),
-                  Expanded(
-                    child: Text(
-                      order.vehicle,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: Colors.grey[600],
+                  Row(
+                    children: [
+                      Icon(Icons.local_shipping, size: 14.sp, color: Colors.grey[600]),
+                      SizedBox(width: 4.w),
+                      Text(
+                        order.vehicle.isEmpty ? 'No Vehicle' : order.vehicle,  // Handle empty vehicle
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.grey[600],
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                   ),
-                  SizedBox(width: 8.w),
-                  Icon(Icons.warehouse, size: 14.sp, color: Colors.grey[600]),
-                  SizedBox(width: 4.w),
-                  Flexible(
-                    child: Text(
-                      order.warehouse,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: Colors.grey[600],
+                  Row(
+                    children: [
+                      Icon(Icons.warehouse, size: 14.sp, color: Colors.grey[600]),
+                      SizedBox(width: 4.w),
+                      Text(
+                        order.warehouse.isEmpty ? 'No Warehouse' : order.warehouse.split(' - ').first,  // Handle empty warehouse
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.grey[600],
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                   ),
                 ],
               ),
-              SizedBox(height: 2.h),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -580,12 +799,12 @@ class _OrdersPageState extends State<OrdersPage> {
                         'Qty: ${order.totalQty}',
                         style: TextStyle(
                           fontSize: 14.sp,
-                          color: Colors.grey[600],
+                          color: Colors.grey[900],
                         ),
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        'Date: ${formatUpdatedAtAbsolute(order.transactionDate)}',
+                        'Created: ${formatUpdatedAtAbsolute(order.creationDate)}',  // CHANGED: Show creation date
                         style: TextStyle(
                           fontSize: 12.sp,
                           color: Colors.grey[600],
@@ -600,7 +819,8 @@ class _OrdersPageState extends State<OrdersPage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '₹${order.grandTotal.toStringAsFixed(0)}',
+                      '₹ ${formatIndianNumber(order.grandTotal.toInt().toString())}',
+                      // '₹ ${order.grandTotal.toStringAsFixed(0)}',
                       style: TextStyle(
                         color: Colors.grey[800],
                         fontSize: 16.sp,

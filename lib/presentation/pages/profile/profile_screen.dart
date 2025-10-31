@@ -2,9 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:lpg_distribution_app/presentation/pages/profile/pan_verification_screen.dart';
+import 'package:lpg_distribution_app/presentation/pages/profile/password_change_screen.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/User.dart';
+import '../../../core/services/version_manager.dart';
 import '../../../core/utils/global_drawer.dart';
 import 'dart:io';
 
@@ -17,6 +20,10 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
+  final _versionManager = VersionManager();
+  UpdateStatus? _updateStatus;
+  bool _isCheckingUpdate = false;
+  bool _isDownloading = false;
 
   // User data variables
   int? userId;
@@ -33,6 +40,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _checkForUpdates();
+  }
+
+  Future<void> _checkForUpdates() async {
+    setState(() => _isCheckingUpdate = true);
+    try {
+      final status = await _versionManager.checkVersionViaAPI();
+      if (mounted) {
+        setState(() {
+          _updateStatus = status;
+          _isCheckingUpdate = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isCheckingUpdate = false);
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -55,10 +78,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       int? _userId;
 
       try {
-        // Add these methods to your User service if they exist
-        // _userWarehouse = await User().getUserWarehouse();
-        // _userVehicleNumber = await User().getUserVehicleNumber();
-        // _userId = await User().getUserId();
       } catch (e) {
         debugPrint('Optional user data not available: $e');
       }
@@ -139,10 +158,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+
+  Future<void> _handleUpdate() async {
+    setState(() => _isDownloading = true);
+    try {
+      await _versionManager.downloadAndInstallAPKWithProgress(context, _updateStatus);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Update failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isDownloading = false);
+    }
+  }
+
   Future<void> _restartApp() async {
     // Navigate to splash/login and clear all state
     Navigator.of(context).pushNamedAndRemoveUntil(
-      '/dashboard',
+      'dashboard',
           (route) => false,
     );
   }
@@ -322,26 +360,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
-          // if (userRoles?.isNotEmpty == true) ...[
-          //   SizedBox(height: 8.h),
-          //   Container(
-          //     padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-          //     decoration: BoxDecoration(
-          //       color: Colors.white.withOpacity(0.2),
-          //       borderRadius: BorderRadius.circular(20.r),
-          //       border: Border.all(color: Colors.white.withOpacity(0.3)),
-          //     ),
-          //     child: Text(
-          //       userRoles!.first, // Primary role
-          //       style: TextStyle(
-          //         fontSize: 14.sp,
-          //         color: Colors.white,
-          //         fontWeight: FontWeight.w600,
-          //       ),
-          //     ),
-          //   ),
-          // ],
         ],
       ),
     );
@@ -445,7 +463,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SizedBox(height: 24.h),
         ],
 
-        // Additional Information Section
         _buildSectionHeader('App Information'),
         Card(
           elevation: 2,
@@ -456,19 +473,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 _buildInfoRow(
                   Icons.info,
-                  'App Version',
-                  '1.0.0', // You can get this from package_info_plus
+                  'Current Version',
+                  _versionManager.currentVersion ?? '1.0.0',
                 ),
-                SizedBox(height: 16.h),
-                _buildInfoRow(
-                  Icons.access_time,
-                  'Last Login',
-                  'Today', // You can store and retrieve actual login time
-                ),
+
+                if (_isCheckingUpdate)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    child: const CircularProgressIndicator(),
+                  )
+                else if (_updateStatus != null && _updateStatus!.type != UpdateType.none) ...[
+                  SizedBox(height: 16.h),
+                  InkWell(
+                    onTap: _isDownloading ? null : _handleUpdate,
+                    borderRadius: BorderRadius.circular(8.r),
+                    child: Container(
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: _getUpdateColor().withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(color: _getUpdateColor().withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.system_update, color: _getUpdateColor()),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Version ${_updateStatus!.latestVersion}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: _getUpdateColor(),
+                                  ),
+                                ),
+                                Text(
+                                  _getUpdateText(),
+                                  style: TextStyle(fontSize: 12.sp, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _isDownloading
+                              ? SizedBox(
+                            width: 20.w,
+                            height: 20.h,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                              : Icon(Icons.download, color: _getUpdateColor()),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
         ),
+
       ],
     );
   }
@@ -627,33 +691,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Replace the _buildActionButtons method in your ProfileScreen
+
   Widget _buildActionButtons() {
     return Column(
       children: [
-        // Edit Profile Button
-        Container(
-          width: double.infinity,
-          margin: EdgeInsets.only(bottom: 12.h),
-          child: ElevatedButton.icon(
-            onPressed: _editProfile,
-            icon: const Icon(Icons.edit),
-            label: Text(
-              'EDIT PROFILE',
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.bold,
+        // Split buttons row
+        Row(
+          children: [
+            // Become Partner Button
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: 6.w, bottom: 12.h),
+                child: ElevatedButton.icon(
+                  onPressed: _navigateToPartnerRegistration,
+                  icon: const Icon(Icons.card_membership),
+                  label: Text(
+                    'BECOME PARTNER',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0E5CA8),
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: 16.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
+
+            // Edit Profile Button
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.only(left: 6.w, bottom: 12.h),
+                child: ElevatedButton.icon(
+                  onPressed: _navigateToChangePassword,
+                  icon: const Icon(Icons.edit),
+                  label: Text(
+                    'EDIT PASSWORD',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0E5CA8),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
               ),
-              elevation: 2,
             ),
-          ),
+          ],
         ),
 
         // Logout Button
@@ -694,6 +793,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _navigateToPartnerRegistration() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PanVerificationScreen(),
+      ),
+    );
+  }
+
+  void _navigateToChangePassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PasswordChangeScreen(),
+      ),
+    );
+  }
+
   void _copyToClipboard(String value, String label) {
     Clipboard.setData(ClipboardData(text: value));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -705,14 +822,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _editProfile() {
+  void _editPassword() {
     // Navigate to edit profile screen or show edit dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Edit profile feature coming soon'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+
   }
 
   void _showActionMenu() {
@@ -750,7 +862,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Colors.blue,
                     () {
                   Navigator.pop(context);
-                  _editProfile();
+                  _editPassword();
                 },
               ),
               _buildActionMenuItem(
@@ -883,13 +995,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final apiService = Provider.of<ApiServiceInterface>(context, listen: false);
       await apiService.logout();
 
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/login',
+       if (mounted) {
+          try {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              'login',
               (route) => false,
-        );
-      }
+            );
+          } catch (e) {
+            debugPrint('Navigation error: $e');
+          }
+        }
     } catch (e) {
       debugPrint('Error during logout: $e');
       if (mounted) {
@@ -916,6 +1031,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
     }
     return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  }
+
+  Color _getUpdateColor() {
+    switch (_updateStatus?.type) {
+      case UpdateType.block:
+        return Colors.red;
+      case UpdateType.nudge:
+        return Colors.orange;
+      case UpdateType.inform:
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getUpdateText() {
+    switch (_updateStatus?.type) {
+      case UpdateType.block:
+        return 'Required update - Tap to install';
+      case UpdateType.nudge:
+        return 'Recommended update available';
+      case UpdateType.inform:
+        return 'New version available';
+      default:
+        return '';
+    }
   }
 }
 

@@ -3,11 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:lpg_distribution_app/presentation/pages/login/sign_up_screen.dart';
+import 'package:lpg_distribution_app/presentation/widgets/version/version_update_widgets.dart';
+import 'package:lpg_distribution_app/core/services/version_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../main_container.dart';
+import '../profile/pan_verification_screen.dart';
+import 'forgot_password_screen.dart';
+import 'otp_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -22,13 +28,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _usernameFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
+  final _versionManager = VersionManager();
 
   bool _isLoading = false;
   String? _errorMessage;
   bool _obscurePassword = true;
   bool _showSuggestions = false;
   List<String> _savedUsernames = [];
-  String? _validationState; // 'valid', 'invalid', null
+  String? _validationState;
 
   static const String _usernameListKey = 'saved_usernames';
   static const int _maxStoredUsernames = 5;
@@ -66,6 +73,13 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadSavedUsernames();
     _setupFocusListeners();
     _setupUsernameValidation();
+    _setupVersionManager();
+  }
+
+  void _setupVersionManager() {
+    _versionManager.onDownloadProgress = (progress) {
+      // Handle download progress if needed
+    };
   }
 
   @override
@@ -123,9 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final digits = input.split('').map(int.parse).toList();
     final checkDigit = digits.removeLast();
 
-    // Generate checksum for first 11 digits
     final calculatedChecksum = _verhoeffGenerate(digits);
-
     return calculatedChecksum == checkDigit;
   }
 
@@ -173,21 +185,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (username.trim().isEmpty) return;
 
     final trimmedUsername = username.trim();
-
-    // Remove if already exists (ignore duplicates)
     _savedUsernames.remove(trimmedUsername);
-
-    // Add to beginning of list
     _savedUsernames.insert(0, trimmedUsername);
 
-    // Keep only last 5
     if (_savedUsernames.length > _maxStoredUsernames) {
       _savedUsernames = _savedUsernames.take(_maxStoredUsernames).toList();
     }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_usernameListKey, _savedUsernames);
-
     setState(() {});
   }
 
@@ -228,69 +234,151 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
 
-      // Save username on successful login
       await _saveUsername(_usernameController.text.trim());
-
-      // Store a flag or token in secure storage
       await _secureStorage.write(key: 'isLoggedIn', value: 'true');
 
-      if (mounted) {
+      // Check app version after successful login
+      final versionStatus = await _versionManager.checkVersionViaAPI();
+
+      if (!mounted) return;
+
+      // Handle version update status
+      if (versionStatus.type == UpdateType.block) {
+        // Navigate to blocked update screen
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainContainer()),
+          MaterialPageRoute(
+            builder: (_) => BlockedUpdateScreen(
+              status: versionStatus,
+              onDownload: () async {
+                _startDownload(versionStatus);
+              },
+            ),
+          ),
         );
+        return;
       }
+
+      // For nudge status, show modal before navigating
+      if (versionStatus.type == UpdateType.nudge) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => NudgeModal(
+            status: versionStatus,
+            onUpdate: () async {
+              Navigator.pop(context);
+              _startDownload(versionStatus);
+            },
+            onLater: () async {
+              await _versionManager.dismissNudge();
+              Navigator.pop(context);
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const MainContainer()),
+              );
+            },
+          ),
+        );
+        return;
+      }
+
+      // For inform status or no update, navigate to main container
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainContainer()),
+      );
+
     } catch (e) {
       String errorMessage = 'Login failed. Please try again.';
 
-      // Handle Dio exceptions properly
       if (e is DioException) {
-        if (e.response?.data != null) {
+        // CRITICAL FIX: Handle 426 status code specifically
+        if (e.response?.statusCode == 426) {
           try {
             final responseData = e.response!.data;
+            final updateStatus = UpdateStatus(
+              type: UpdateType.block,
+              message: responseData['message'] ?? 'Your app version is no longer supported. Please update to continue.',
+              apkUrl: responseData['download_url'],
+              latestVersion: responseData['latest_version'],
+              isBeta: responseData['update_channel'] == 'beta',
+            );
 
-            // Handle JSON response
-            if (responseData is Map<String, dynamic>) {
-              if (responseData['message'] != null) {
-                errorMessage = responseData['message'];
-              } else if (responseData['error'] != null) {
-                errorMessage = responseData['error'];
-              }
-            }
-            // Handle string response that might be JSON
-            else if (responseData is String) {
-              try {
-                final jsonData = jsonDecode(responseData);
-                if (jsonData['message'] != null) {
-                  errorMessage = jsonData['message'];
-                } else if (jsonData['error'] != null) {
-                  errorMessage = jsonData['error'];
-                }
-              } catch (_) {
-                // If not JSON, use the string as error message
-                errorMessage = responseData;
-              }
-            }
+            _versionManager.setCurrentStatus(updateStatus);
+
+            if (!mounted) return;
+
+            // Navigate to blocked update screen with safe download callback
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => BlockedUpdateScreen(
+                  status: updateStatus,
+                  onDownload: () async {
+                    // Use the new safe download method
+                    await _versionManager.downloadAndInstallAPKWithProgress(context, updateStatus);
+                  },
+                ),
+              ),
+            );
+            return;
           } catch (parseError) {
-            debugPrint('Error parsing API response: $parseError');
+            print('Error parsing 426 response: $parseError');
+            errorMessage = 'App update required. Please download the latest version.';
           }
         } else {
-          // Handle network or other Dio errors
-          switch (e.type) {
-            case DioExceptionType.connectionTimeout:
-            case DioExceptionType.receiveTimeout:
-            case DioExceptionType.sendTimeout:
-              errorMessage = 'Connection timeout. Please try again.';
-              break;
-            case DioExceptionType.connectionError:
-              errorMessage = 'No internet connection. Please check your network.';
-              break;
-            default:
-              errorMessage = 'Login failed. Please try again.';
+          // Handle other DioExceptions as before
+          if (e.response?.data != null) {
+            try {
+              final responseData = e.response!.data;
+
+              if (responseData is Map<String, dynamic>) {
+                if (responseData['message'] != null) {
+                  errorMessage = responseData['message'];
+                } else if (responseData['error'] != null) {
+                  errorMessage = responseData['error'];
+                }
+              } else if (responseData is String) {
+                try {
+                  final jsonData = jsonDecode(responseData);
+                  if (jsonData['message'] != null) {
+                    errorMessage = jsonData['message'];
+                  } else if (jsonData['error'] != null) {
+                    errorMessage = jsonData['error'];
+                  }
+                } catch (_) {
+                  errorMessage = responseData;
+                }
+              }
+            } catch (parseError) {
+              debugPrint('Error parsing API response: $parseError');
+            }
+          } else {
+            switch (e.type) {
+              case DioExceptionType.connectionTimeout:
+              case DioExceptionType.receiveTimeout:
+              case DioExceptionType.sendTimeout:
+                errorMessage = 'Connection timeout. Please try again.';
+                break;
+              case DioExceptionType.connectionError:
+                errorMessage = 'No internet connection. Please check your network.';
+                break;
+              default:
+                errorMessage = 'Login failed. Please try again.';
+            }
           }
         }
       } else {
-        // Handle other types of exceptions
         debugPrint('Non-Dio exception: $e');
+
+        // Check if it's the "No user roles" exception
+        if (e.toString().contains('No user roles assigned')) {
+          if (!mounted) return;
+
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const NoRoleAssignedDialog(),
+          );
+          return; // Don't set error message or show it in UI
+        }
       }
 
       setState(() {
@@ -304,6 +392,49 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  void _startDownload(UpdateStatus status) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          double downloadProgress = 0.0;
+
+          _versionManager.onDownloadProgress = (progress) {
+            setState(() {
+              downloadProgress = progress;
+            });
+          };
+
+          return DownloadProgressDialog(progress: downloadProgress);
+        },
+      ),
+    );
+
+    try {
+      await _versionManager.downloadAndInstallAPK(status);
+    } catch (e) {
+      Navigator.pop(context);
+      _showDownloadError();
+    }
+  }
+
+  void _showDownloadError() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Download Failed'),
+        content: const Text('Failed to download update. Please try again or download from website.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildUsernameSuggestions() {
@@ -484,13 +615,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _login(),
                 ),
-                SizedBox(height: 8.h),
 
-                // Sign Up button
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => ForgotPasswordScreen()),
+                      );
+                    },
+                    child: Text(
+                      'Forgot Password?',
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                  ),
+                ),
+
                 Align(
                   alignment: Alignment.center,
                   child: TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => SignupScreen()),
+                      );
+                    },
                     child: Text(
                       'Sign Up for New Account',
                       style: TextStyle(
@@ -500,7 +651,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                SizedBox(height: 24.h),
+
+                SizedBox(height: 6.h),
 
                 // Error message
                 if (_errorMessage != null)
@@ -538,7 +690,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? SizedBox(
                       height: 24.h,
                       width: 24.w,
-                      child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                      child: const CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
                     )
                         : Text(
                       'LOGIN',
@@ -551,18 +706,129 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 SizedBox(height: 24.h),
 
-                // App version
-                Text(
-                  'v1.0.0',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey[600],
-                  ),
+                // App version with beta badge if applicable
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'v${_versionManager.currentVersion ?? '1.0.0'}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    if (_versionManager.isBetaUser) ...[
+                      SizedBox(width: 8.w),
+                      const BetaBadge(),
+                    ],
+                  ],
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+}
+
+class NoRoleAssignedDialog extends StatefulWidget {
+  const NoRoleAssignedDialog({Key? key}) : super(key: key);
+
+  @override
+  State<NoRoleAssignedDialog> createState() => _NoRoleAssignedDialogState();
+}
+
+class _NoRoleAssignedDialogState extends State<NoRoleAssignedDialog> {
+  bool _becomePartnerChecked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(24.sp),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.warning_rounded,
+              size: 64.sp,
+              color: Colors.orange,
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              'No User Role Assigned',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              'Please contact administrator.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.grey[600],
+              ),
+            ),
+            SizedBox(height: 24.h),
+            CheckboxListTile(
+              value: _becomePartnerChecked,
+              onChanged: (value) {
+                setState(() {
+                  _becomePartnerChecked = value ?? false;
+                });
+              },
+              title: Text(
+                'Become a Partner',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.grey[800],
+                ),
+              ),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            SizedBox(height: 16.h),
+            if (_becomePartnerChecked)
+              SizedBox(
+                width: double.infinity,
+                height: 48.h,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close dialog
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PanVerificationScreen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                  child: Text(
+                    'Continue to Partner Registration',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

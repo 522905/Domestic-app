@@ -150,13 +150,13 @@ class AppTheme {
         fontSize: 12,
       ),
     ),
-    cardTheme: CardTheme(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-    ),
+    // cardTheme: CardTheme(
+    //   color: Colors.white,
+    //   elevation: 2,
+    //   shape: RoundedRectangleBorder(
+    //     borderRadius: BorderRadius.circular(8),
+    //   ),
+    // ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: Colors.white,
       selectedItemColor: AppColors.brandBlue,
@@ -203,40 +203,40 @@ class AppTheme {
         return Colors.grey.shade300;
       }),
     ),
-    tabBarTheme: TabBarTheme(
-      indicator: UnderlineTabIndicator(
-        borderSide: BorderSide(width: 2, color: AppColors.brandBlue),
-      ),
-      labelColor: AppColors.brandBlue,
-      unselectedLabelColor: Colors.grey.shade600,
-      labelStyle: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w500,
-        fontFamily: 'Roboto',
-      ),
-      unselectedLabelStyle: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.normal,
-        fontFamily: 'Roboto',
-      ),
-    ),
-    dialogTheme: DialogTheme(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      titleTextStyle: TextStyle(
-        color: AppColors.darkGray,
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        fontFamily: 'Roboto',
-      ),
-      contentTextStyle: TextStyle(
-        color: AppColors.darkGray,
-        fontSize: 16,
-        fontFamily: 'Roboto',
-      ),
-    ),
+    // tabBarTheme: TabBarTheme(
+    //   indicator: UnderlineTabIndicator(
+    //     borderSide: BorderSide(width: 2, color: AppColors.brandBlue),
+    //   ),
+    //   labelColor: AppColors.brandBlue,
+    //   unselectedLabelColor: Colors.grey.shade600,
+    //   labelStyle: const TextStyle(
+    //     fontSize: 16,
+    //     fontWeight: FontWeight.w500,
+    //     fontFamily: 'Roboto',
+    //   ),
+    //   unselectedLabelStyle: const TextStyle(
+    //     fontSize: 16,
+    //     fontWeight: FontWeight.normal,
+    //     fontFamily: 'Roboto',
+    //   ),
+    // ),
+    // dialogTheme: DialogTheme(
+    //   backgroundColor: Colors.white,
+    //   shape: RoundedRectangleBorder(
+    //     borderRadius: BorderRadius.circular(12),
+    //   ),
+    //   titleTextStyle: TextStyle(
+    //     color: AppColors.darkGray,
+    //     fontSize: 18,
+    //     fontWeight: FontWeight.bold,
+    //     fontFamily: 'Roboto',
+    //   ),
+    //   contentTextStyle: TextStyle(
+    //     color: AppColors.darkGray,
+    //     fontSize: 16,
+    //     fontFamily: 'Roboto',
+    //   ),
+    // ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(

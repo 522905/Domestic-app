@@ -5,11 +5,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/services/api_service_interface.dart';
 import '../../../../domain/entities/cash/cash_transaction.dart';
+import '../../../../utils/currency_utils.dart';
 import '../../../../utils/dialog_utils.dart';
 import '../../../blocs/cash/cash_bloc.dart';
 
 class CashDepositPage extends StatefulWidget {
-  const CashDepositPage({Key? key}) : super(key: key);
+  final double? initialAmount;
+
+  const CashDepositPage({Key? key, this.initialAmount}) : super(key: key);
 
   @override
   State<CashDepositPage> createState() => _CashDepositPageState();
@@ -37,6 +40,17 @@ class _CashDepositPageState extends State<CashDepositPage> {
   void initState() {
     super.initState();
     apiService = context.read<ApiServiceInterface>();
+
+    // Pre-fill amount if provided with formatting
+    if (widget.initialAmount != null && widget.initialAmount! > 0) {
+      final digitsOnly = widget.initialAmount!.toInt().toString();
+      _amountController.text = formatIndianNumber(digitsOnly); // Format it
+    }
+    // Listen to amount changes
+    _amountController.addListener(() {
+      setState(() {});
+    });
+
     _fetchCashData();
   }
 
@@ -50,14 +64,14 @@ class _CashDepositPageState extends State<CashDepositPage> {
       final accountTypeResponse = await apiService.getAccountType();
       _accountTypeObjects = List<Map<String, dynamic>>.from(accountTypeResponse);
       final accountTypeList = _accountTypeObjects
-          .map<String>((item) => item['account_name'] as String)
+          .map<String>((item) => item['account_label'] as String)
           .toList();
 
       // Fetch paid-to account list - store full objects
       final paidToAccountResponse = await apiService.getCashAccount();
       _paidToAccountObjects = List<Map<String, dynamic>>.from(paidToAccountResponse);
       final paidToAccountList = _paidToAccountObjects
-          .map<String>((item) => item['account_name'] as String)
+          .map<String>((item) => item['account_label'] as String)
           .toList();
 
       // Update state with the fetched data
@@ -80,7 +94,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
   int? _getAccountTypeId(String accountName) {
     try {
       final account = _accountTypeObjects.firstWhere(
-            (item) => item['account_name'] == accountName,
+            (item) => item['account_label'] == accountName,
       );
       return account['id'] as int;
     } catch (e) {
@@ -92,7 +106,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
   int? _getPaidToAccountId(String accountName) {
     try {
       final account = _paidToAccountObjects.firstWhere(
-            (item) => item['account_name'] == accountName,
+            (item) => item['account_label'] == accountName,
       );
       return account['id'] as int;
     } catch (e) {
@@ -147,6 +161,30 @@ class _CashDepositPageState extends State<CashDepositPage> {
                       ),
                       // Account Radio Buttons
                       _buildDynamicAccountRadios(),
+                      // Amount in words and formatted number
+                      if (_amountController.text.isNotEmpty) ...[
+                        SizedBox(height: 8.h),
+                        Center(
+                          child: Container(
+                            padding: EdgeInsets.all(10.w),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(
+                                color: Colors.yellow!,
+                              ),
+                            ),
+                            child: Text(
+                              amountToWords(int.tryParse(_amountController.text.replaceAll(',', '')) ?? 0), // Remove underscore
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                color: Colors.yellow,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       SizedBox(height: 8.h),
                       // Amount
                       Text(
@@ -160,13 +198,21 @@ class _CashDepositPageState extends State<CashDepositPage> {
                       TextFormField(
                         controller: _amountController,
                         keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          IndianCurrencyInputFormatter(),
+                        ],
+                        style: TextStyle(
+                          fontSize: 25.sp,
+                          color: Colors.black,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Enter amount',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8.r),
                           ),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 0),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                          prefixText: '₹ ',
                           suffixText: 'INR',
                         ),
                         validator: (value) {
@@ -222,7 +268,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _submitDeposit,
+                          onPressed: _showDepositConfirmation,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0E5CA8),
                             padding: EdgeInsets.symmetric(vertical: 14.h),
@@ -252,76 +298,275 @@ class _CashDepositPageState extends State<CashDepositPage> {
     );
   }
 
-  void _submitDeposit() async {
-    if (_formKey.currentState!.validate()) {
-      final amount = double.tryParse(_amountController.text);
-      if (amount == null || amount <= 0) {
-        _showInvalidAmountDialog();
-        return;
-      }
+  void _showDepositConfirmation() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      if (_selectedAccount == null || _selectedAccount!.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select Account Paid To')),
+    final amountText = _amountController.text.replaceAll(',', '');
+    final amount = double.tryParse(amountText) ?? 0;
+
+    if (amount <= 0) {
+      _showInvalidAmountDialog();
+      return;
+    }
+
+    if (_selectedAccountType == null || _selectedAccount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select account type and paid-to account')),
+      );
+      return;
+    }
+
+    // Show confirmation dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(24.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      width: 48.w,
+                      height: 48.w,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check_circle_outline,
+                        color: const Color(0xFF0E5CA8),
+                        size: 24.sp,
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Text(
+                        'Confirm Deposit',
+                        style: TextStyle(
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20.h),
+
+                // Deposit details
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildConfirmationRow('Amount', '₹${_amountController.text}', isAmount: true),
+                      SizedBox(height: 12.h),
+                      _buildConfirmationRow('Account', _selectedAccountType!),
+                      SizedBox(height: 12.h),
+                      _buildConfirmationRow('Paid To', _selectedAccount!),
+                      if (_remarksController.text.isNotEmpty) ...[
+                        SizedBox(height: 12.h),
+                        _buildConfirmationRow('Remarks', _remarksController.text),
+                      ],
+                    ],
+                  ),
+                ),
+                SizedBox(height: 24.h),
+
+                // Action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey[400]!),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 12.h),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.of(dialogContext).pop(); // Close confirmation dialog
+
+                          // Submit deposit FIRST
+                          await _submitDeposit();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0E5CA8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 12.h),
+                        ),
+                        child: Text(
+                          'Confirm',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
-        return;
+      },
+    );
+  }
+
+  Widget _buildConfirmationRow(String label, String value, {bool isAmount = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80.w,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13.sp,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: isAmount ? 16.sp : 13.sp,
+              fontWeight: isAmount ? FontWeight.bold : FontWeight.w600,
+              color: isAmount ? const Color(0xFF0E5CA8) : Colors.grey[800],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  _submitDeposit() async {
+    final amount = double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+
+    // Get IDs instead of names
+    final accountTypeId = _selectedAccountType != null
+        ? _getAccountTypeId(_selectedAccountType!)
+        : null;
+    final paidToAccountId = _selectedAccount != null
+        ? _getPaidToAccountId(_selectedAccount!)
+        : null;
+
+    // Validate IDs were found
+    if (accountTypeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid account type selected')),
+      );
+      return;
+    }
+
+    if (paidToAccountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid paid-to account selected')),
+      );
+      return;
+    }
+
+    // Show loading dialog
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+    }
+
+    final transaction = CashTransaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: TransactionType.deposit,
+      status: TransactionStatus.pending,
+      amount: amount,
+      createdAt: DateTime.now(),
+      initiator: 'D',
+      fromAccount: accountTypeId.toString(),
+      selectedAccount: paidToAccountId.toString(),
+      paidTo: paidToAccountId.toString(),
+      createdBy: 'Current User',
+      notes: _remarksController.text.isNotEmpty ? _remarksController.text : null,
+    );
+
+    final completer = Completer<void>();
+
+    context.read<CashManagementBloc>().add(
+        AddTransaction(transaction, completer: completer)
+    );
+
+    try {
+      await completer.future;
+
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
       }
 
-      // Get IDs instead of names
-      final accountTypeId = _selectedAccountType != null
-          ? _getAccountTypeId(_selectedAccountType!)
-          : null;
-      final paidToAccountId = _selectedAccount != null
-          ? _getPaidToAccountId(_selectedAccount!)
-          : null;
-
-      // Validate IDs were found
-      if (accountTypeId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid account type selected')),
-        );
-        return;
-      }
-
-      if (paidToAccountId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid paid-to account selected')),
-        );
-        return;
-      }
-
-      final transaction = CashTransaction(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: TransactionType.deposit,
-        status: TransactionStatus.pending,
-        amount: amount,
-        createdAt: DateTime.now(),
-        initiator: 'D',
-        fromAccount: accountTypeId.toString(), // Send ID as string
-        selectedAccount: paidToAccountId.toString(), // Send ID as string
-        paidTo: paidToAccountId.toString(), // Send ID as string
-        createdBy: 'Current User',
-        notes: _remarksController.text.isNotEmpty ? _remarksController.text : null,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Deposit submitted successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
 
-      final completer = Completer<void>();
-      context.read<CashManagementBloc>().add(
-          AddTransaction(transaction, completer: completer)
-      );
-      context.read<CashManagementBloc>().add(RefreshCashData());
-
-      try {
-        await completer.future;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Deposit submitted successfully')),
-        );
-        // Return success indicator instead of the transaction object
-        Navigator.of(context).pop(true); // Return true to indicate success
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error submitting deposit: $e')),
-        );
+      if (mounted) {
+        // Return to cash page with success flag
+        // Cash page will handle the refresh
+        Navigator.of(context).pop(true);
       }
+
+    } catch (e) {
+      // Close loading dialog on error
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error submitting deposit: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

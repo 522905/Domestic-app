@@ -1,4 +1,3 @@
-// lib/presentation/blocs/orders/orders_bloc.dart
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../domain/entities/order.dart';
@@ -17,8 +16,8 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     on<ClearFilters>(_onClearFilters);
     on<RefreshOrders>(_onRefreshOrders);
     on<SearchOrders>(_onSearchOrders);
-    on<RequestOrderApproval>(_onRequestOrderApproval);
-    on<LoadOrderDetails>(_onLoadOrderDetails); // NEW HANDLER
+    on<RequestOrderAction>(_onRequestOrderAction);
+    on<LoadOrderDetails>(_onLoadOrderDetails);
   }
 
   Future<void> _onLoadOrders(LoadOrders event, Emitter<OrdersState> emit) async {
@@ -40,7 +39,6 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final availableFilters = _parseFiltersFromResponse(response);
       final hasMore = response['has_more'] ?? false;
 
-      // Update internal cache
       _allOrders = orders;
 
       emit(OrdersLoaded(
@@ -53,8 +51,8 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       ));
     } catch (e) {
       emit(OrdersError(
-        message: _getErrorMessage(e),
-        canRetry: true,
+        message: _extractErrorMessage(e),
+        canRetry: _canRetryError(e),
       ));
     }
   }
@@ -77,10 +75,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final newOrders = _parseOrdersFromResponse(response);
       final hasMore = response['has_more'] ?? false;
 
-      // Combine existing orders with new orders
       final allOrders = List<Order>.from(currentState.orders)..addAll(newOrders);
-
-      // Update internal cache
       _allOrders = allOrders;
 
       emit(currentState.copyWith(
@@ -90,10 +85,15 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
         isLoadingMore: false,
       ));
     } catch (e) {
+      // For pagination errors, don't show full error state, just stop loading
       emit(currentState.copyWith(
         isLoadingMore: false,
+        // Optional: Add an error message field to OrdersLoaded for inline errors
       ));
-      // Could emit error state or show snackbar - for now just stop loading
+
+      // You could also emit a temporary error message here
+      // that the UI can show as a snackbar
+      print('Load more failed: ${_extractErrorMessage(e)}');
     }
   }
 
@@ -111,7 +111,6 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final availableFilters = _parseFiltersFromResponse(response);
       final hasMore = response['has_more'] ?? false;
 
-      // Update internal cache
       _allOrders = orders;
 
       emit(OrdersLoaded(
@@ -124,8 +123,8 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       ));
     } catch (e) {
       emit(OrdersError(
-        message: _getErrorMessage(e),
-        canRetry: true,
+        message: _extractErrorMessage(e),
+        canRetry: _canRetryError(e),
       ));
     }
   }
@@ -153,68 +152,146 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     }
   }
 
-  Future<void> _onRequestOrderApproval(RequestOrderApproval event, Emitter<OrdersState> emit) async {
+  Future<void> _onRequestOrderAction(RequestOrderAction event, Emitter<OrdersState> emit) async {
     try {
-      // Store the current state before making API call
       OrdersLoaded? currentOrdersState;
       if (state is OrdersLoaded) {
         currentOrdersState = state as OrdersLoaded;
       }
 
-      // Call the approval API
-      final response = await apiService.requestOrderApproval(event.orderId);
+      // Switch on action type to call correct API
+      final response = switch (event.actionType) {
+        OrderActionType.requestApproval => await apiService.requestOrderApproval(event.orderId),
+        OrderActionType.finalize => await apiService.requestFinalizeOrder(event.orderId),
+      };
 
-      // Emit the response state with the API response and current orders
       emit(OrdersLoadedWithResponse(
         response: response,
         orders: currentOrdersState?.orders ?? _allOrders,
       ));
 
-      // Update the order status locally if needed
-      _updateOrderStatusLocally(event.orderId, 'Processing');
-
-      // After a brief delay, return to the normal OrdersLoaded state
       await Future.delayed(const Duration(milliseconds: 100));
 
       if (currentOrdersState != null) {
-        // Get the updated orders after status change
-        final updatedOrders = _getUpdatedOrdersList(currentOrdersState.orders, event.orderId, 'Processing');
+        final updatedOrders = _getUpdatedOrdersList(
+            currentOrdersState.orders,
+            event.orderId,
+            'Processing'
+        );
 
-        emit(currentOrdersState.copyWith(
-          orders: updatedOrders,
+        emit(currentOrdersState.copyWith(orders: updatedOrders));
+      }
+    } catch (e) {
+      if (state is OrdersLoaded) {
+        final currentState = state as OrdersLoaded;
+        emit(OrdersErrorWithRecovery(
+          message: _extractErrorMessage(e),
+          canRetry: true,
+          previousState: currentState,
+        ));
+      } else {
+        emit(OrdersError(
+          message: _extractErrorMessage(e),
+          canRetry: true,
         ));
       }
-
-    } catch (e) {
-      emit(OrdersError(
-        message: 'Failed to request approval: $e',
-        canRetry: true,
-      ));
     }
   }
 
-  // NEW METHOD FOR LOADING ORDER DETAILS
   Future<void> _onLoadOrderDetails(LoadOrderDetails event, Emitter<OrdersState> emit) async {
     try {
+      List<Order> currentOrders = [];
+      bool hasMore = false;
+      int currentOffset = 0;
+      Map<String, List<FilterOption>> availableFilters = {};
+      Map<String, String> appliedFilters = {};
+      String? searchQuery;
+
+      if (state is OrdersLoaded) {
+        final currentState = state as OrdersLoaded;
+        currentOrders = currentState.orders;
+        hasMore = currentState.hasMore;
+        currentOffset = currentState.currentOffset;
+        availableFilters = currentState.availableFilters;
+        appliedFilters = currentState.appliedFilters;
+        searchQuery = currentState.searchQuery;
+      } else {
+        currentOrders = _allOrders;
+      }
+
       emit(OrderDetailsLoading(event.id));
 
       final response = await apiService.getOrderDetails(event.id);
 
-      // Parse the sales_order_data into Order entity
       final salesOrderData = response['sales_order_data'] as Map<String, dynamic>;
       final detailedOrder = Order.fromJson(salesOrderData);
 
       emit(OrderDetailsLoaded(
         detailedOrder: detailedOrder,
         orderName: event.id,
+        orders: currentOrders,
+        hasMore: hasMore,
+        currentOffset: currentOffset,
+        availableFilters: availableFilters,
+        appliedFilters: appliedFilters,
+        searchQuery: searchQuery,
       ));
     } catch (e) {
       emit(OrderDetailsError(
-        message: _getErrorMessage(e),
+        message: _extractErrorMessage(e),
         orderName: event.id,
-        canRetry: true,
+        canRetry: _canRetryError(e),
       ));
     }
+  }
+
+  // IMPROVED: Extract error message from Exception thrown by API service
+  String _extractErrorMessage(dynamic error) {
+    // The API service now throws properly formatted exceptions
+    // using ErrorHandler.handleError(), so we just extract the message
+
+    final errorString = error.toString();
+
+    // Remove "Exception: " prefix if present
+    if (errorString.startsWith('Exception: ')) {
+      return errorString.substring(11);
+    }
+
+    // If it's a raw error string, return as-is
+    return errorString;
+  }
+
+  // NEW: Determine if error is retryable based on type
+  bool _canRetryError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    // Network/timeout errors are retryable
+    if (errorString.contains('timeout') ||
+        errorString.contains('connection') ||
+        errorString.contains('network')) {
+      return true;
+    }
+
+    // Server errors (5xx) are potentially retryable
+    if (errorString.contains('server error')) {
+      return true;
+    }
+
+    // Client errors (4xx) are generally not retryable
+    // except for 401 (user can retry after re-auth)
+    if (errorString.contains('401') || errorString.contains('authentication')) {
+      return true;
+    }
+
+    // Validation errors (400) are not retryable without changes
+    if (errorString.contains('validation') ||
+        errorString.contains('invalid') ||
+        errorString.contains('required')) {
+      return false;
+    }
+
+    // Default to retryable for unknown errors
+    return true;
   }
 
   List<Order> _getUpdatedOrdersList(List<Order> currentOrders, String orderId, String newStatus) {
@@ -224,27 +301,6 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       }
       return order;
     }).toList();
-  }
-
-  void _updateOrderStatusLocally(String orderId, String newStatus) {
-    // Update in internal cache
-    final orderIndex = _allOrders.indexWhere((order) => order.id == orderId);
-    if (orderIndex != -1) {
-      _allOrders[orderIndex] = _allOrders[orderIndex].copyWith(status: newStatus);
-    }
-
-    // Update current state if it's OrdersLoaded
-    if (state is OrdersLoaded) {
-      final currentState = state as OrdersLoaded;
-      final displayOrderIndex = currentState.orders.indexWhere((order) => order.id == orderId);
-
-      if (displayOrderIndex != -1) {
-        final updatedOrders = List<Order>.from(currentState.orders);
-        updatedOrders[displayOrderIndex] = updatedOrders[displayOrderIndex].copyWith(status: newStatus);
-
-        emit(currentState.copyWith(orders: updatedOrders));
-      }
-    }
   }
 
   List<Order> _parseOrdersFromResponse(Map<String, dynamic> response) {
@@ -268,47 +324,22 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     return filters;
   }
 
-  String _getErrorMessage(dynamic error) {
-    if (error.toString().contains('No internet')) {
-      return 'No internet connection. Please check your network.';
-    } else if (error.toString().contains('timeout')) {
-      return 'Request timeout. Please try again.';
-    } else if (error.toString().contains('404')) {
-      return 'Order not found.';
-    } else if (error.toString().contains('500')) {
-      return 'Server error. Please try again later.';
-    } else if (error.toString().contains('401') || error.toString().contains('403')) {
-      return 'Authentication failed. Please login again.';
-    } else {
-      return 'Failed to load data. Please try again.';
-    }
-  }
-
-  // Method to add new order (for create order functionality)
   void addNewOrder(Order order) {
     if (state is OrdersLoaded) {
       final currentState = state as OrdersLoaded;
-
-      // Add to internal cache
       _allOrders.insert(0, order);
-
-      // Add to displayed orders if it matches current filters
       final updatedOrders = List<Order>.from(currentState.orders);
       updatedOrders.insert(0, order);
-
       emit(currentState.copyWith(orders: updatedOrders));
     }
   }
 
-  // Method to update existing order
   void updateOrder(Order updatedOrder) {
-    // Update in internal cache
     final cacheIndex = _allOrders.indexWhere((order) => order.id == updatedOrder.id);
     if (cacheIndex != -1) {
       _allOrders[cacheIndex] = updatedOrder;
     }
 
-    // Update in current state
     if (state is OrdersLoaded) {
       final currentState = state as OrdersLoaded;
       final displayIndex = currentState.orders.indexWhere((order) => order.id == updatedOrder.id);
@@ -316,22 +347,17 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       if (displayIndex != -1) {
         final updatedOrders = List<Order>.from(currentState.orders);
         updatedOrders[displayIndex] = updatedOrder;
-
         emit(currentState.copyWith(orders: updatedOrders));
       }
     }
   }
 
-  // Method to remove order
   void removeOrder(String orderId) {
-    // Remove from internal cache
     _allOrders.removeWhere((order) => order.id == orderId);
 
-    // Remove from current state
     if (state is OrdersLoaded) {
       final currentState = state as OrdersLoaded;
       final updatedOrders = currentState.orders.where((order) => order.id != orderId).toList();
-
       emit(currentState.copyWith(orders: updatedOrders));
     }
   }
@@ -341,4 +367,20 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     _allOrders.clear();
     return super.close();
   }
+}
+
+// Optional: Add this state class to orders_state.dart for better error recovery
+class OrdersErrorWithRecovery extends OrdersState {
+  final String message;
+  final bool canRetry;
+  final OrdersLoaded previousState;
+
+  const OrdersErrorWithRecovery({
+    required this.message,
+    required this.canRetry,
+    required this.previousState,
+  });
+
+  @override
+  List<Object?> get props => [message, canRetry, previousState];
 }

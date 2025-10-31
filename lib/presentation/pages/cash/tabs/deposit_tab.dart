@@ -19,7 +19,8 @@ class DepositsTab extends StatelessWidget {
         // Listen for transaction updates and automatically refresh
         if (state is TransactionActionSuccess) {
           // Transaction was approved/rejected, data will be refreshed automatically
-          // No need to do anything here, just let the UI rebuild
+          // N
+          // o need to do anything here, just let the UI rebuild
         }
       },
       child: BlocBuilder<CashManagementBloc, CashManagementState>(
@@ -116,7 +117,7 @@ class DepositsTab extends StatelessWidget {
                           .map((deposit) => TransactionItem(
                         transaction: deposit,
                         onTap: () => _navigateToTransactionDetail(context, deposit),
-                        isFromDepositsTab: true,
+                        isFromTab: true,
                       ))
                           .toList(),
                     ],

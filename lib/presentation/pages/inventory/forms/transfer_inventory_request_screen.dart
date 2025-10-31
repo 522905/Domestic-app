@@ -49,9 +49,9 @@ class _InventoryTransferScreenState extends State<InventoryTransferScreen> {
   bool _isVehicleSelected = false;
   List<Map<String, dynamic>> _selectedItems = [];
 
-  String _fromWarehouse = '';
-  String _toWarehouse = '';
-  String? _userName = '';
+  String _fromWarehouse = '' ;
+  String _toWarehouse = '' ;
+  String? _userName = '' ;
   List<Map<String, dynamic>> _deliveryPartners = [];
   bool _isLoading = true;
 
@@ -698,12 +698,12 @@ class _InventoryTransferScreenState extends State<InventoryTransferScreen> {
                         'authorizedBy': _userName ?? 'Unknown User',
                       };
 
-                      showDialog(
-                        context: context,
-                        builder: (context) => SimpleGatepassDialog(
-                          gatepassData: gatepassData,
-                        ),
-                      );
+                      // showDialog(
+                      //   context: context,
+                      //   builder: (context) => SimpleGatepassDialog(
+                      //     gatepassData: gatepassData,
+                      //   ),
+                      // );
                     } else if (_driverPhotoFile == null && isPhotoRequired) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -803,4 +803,5 @@ class _InventoryTransferScreenState extends State<InventoryTransferScreen> {
       ),
     );
   }
+
 }

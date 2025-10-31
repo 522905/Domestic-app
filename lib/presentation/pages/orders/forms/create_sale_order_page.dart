@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/User.dart';
+import '../../../../core/models/api_validation_exception.dart';
+import '../../../../core/services/validation_error_dialog.dart';
 import '../../../blocs/orders/orders_event.dart';
 import '../../../widgets/orders/order_items_widget.dart';
 import '../../../../core/services/api_service_interface.dart';
@@ -195,9 +197,9 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
 
     if (selectedWarehouse != null) {
       setState(() {
-        _selectedWarehouseName = selectedWarehouse['name'] ?? 'Unknown';
+        _selectedWarehouseName = selectedWarehouse['warehouse_label'] ?? 'Unknown';
         _selectedWarehouseId = selectedWarehouse['id']?.toString() ?? 'Unknown';
-        _selectedWarehouse = selectedWarehouse['name'] ?? 'Unknown';
+        _selectedWarehouse = selectedWarehouse['warehouse_label'] ?? 'Unknown';
         _selectedCustomer = selectedWarehouse['warehouse_type'] ?? '';
         // Clear selected items when warehouse changes
         _selectedItems.clear();
@@ -510,6 +512,18 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
           );
         },
       );
+    } on ApiValidationException catch (e) {
+      setState(() {
+        _isSubmitting = false;
+      });
+
+      if (mounted) {
+        ValidationErrorDialog.show(
+          context,
+          e,
+          onRetry: _submitOrder,  // Pass retry callback
+        );
+      }
     } catch (e) {
       setState(() {
         _isSubmitting = false;

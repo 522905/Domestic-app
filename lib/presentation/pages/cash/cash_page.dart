@@ -11,10 +11,25 @@ import '../../../core/services/User.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/service_provider.dart';
 import '../../../core/utils/global_drawer.dart';
+import '../../../domain/entities/cash/cash_transaction.dart';
 import '../../../domain/entities/cash/partner_balance.dart';
 import '../../blocs/cash/cash_bloc.dart';
 import 'forms/bank_deposit_page.dart';
 import 'forms/handover_screen.dart';
+import 'general_ledger_detail_page.dart';
+
+class _AppLifecycleObserver extends WidgetsBindingObserver {
+  final VoidCallback onResume;
+
+  _AppLifecycleObserver({required this.onResume});
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      onResume();
+    }
+  }
+}
 
 class CashPage extends StatefulWidget {
   const CashPage({Key? key}) : super(key: key);
@@ -31,6 +46,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
   List<String>? userRole;
   String? userName;
   bool _isInitialized = false;
+  bool _isSearching = false;
 
   final currencyFormat = NumberFormat.currency(
     symbol: '₹',
@@ -43,7 +59,39 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
     super.initState();
     _searchController = TextEditingController();
     _initializeApp();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        print('🔵 cash_page: Loading initial cash data');
+        context.read<CashManagementBloc>().add(RefreshCashData());
+      }
+    });
+
+    WidgetsBinding.instance.addObserver(_AppLifecycleObserver(
+      onResume: () {
+        if (mounted && _isInitialized) {
+          print('🔵 cash_page: App resumed, refreshing data');
+          context.read<CashManagementBloc>().add(RefreshCashData());
+        }
+      },
+    ));
   }
+
+  // @override
+  // void didChangeDependencies() {
+  //   super.didChangeDependencies();
+  //
+  //   // More reliable way to detect when page becomes active
+  //   WidgetsBinding.instance.addPostFrameCallback((_) {
+  //     if (mounted && _isInitialized) {
+  //       final route = ModalRoute.of(context);
+  //       if (route?.isCurrent == true && !route!.isFirst) {
+  //         // We're returning from another screen - refresh data
+  //         context.read<CashManagementBloc>().add(RefreshCashData());
+  //       }
+  //     }
+  //   });
+  // }
 
   // Initialize everything in proper order
   Future<void> _initializeApp() async {
@@ -66,14 +114,6 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
     }
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_isInitialized && ModalRoute.of(context)?.isCurrent == true) {
-      context.read<CashManagementBloc>().add(RefreshCashData());
-    }
-  }
-
   Future<void> _fetchUserRole() async {
     final roles = await User().getUserRoles();
     final username = await User().getUserName();
@@ -81,18 +121,99 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
     setState(() {
       userRole = roles.map((role) => role.role).toList();
       userName = username;
-      _tabController?.dispose(); // Dispose old controller if exists
-      _tabController = TabController(length: _getTabs().length, vsync: this);
+      _tabController?.dispose();
+
+      int tabCount;
+      if (userRole?.contains('Delivery Boy') ?? false) {
+        tabCount = 1; // Only 'All Transactions'
+      } else {
+        tabCount = 3; // 'Deposits', 'Handovers', 'Bank'
+      }
+      _tabController = TabController(length: tabCount, vsync: this);
+      _tabController!.addListener(_onTabChanged);
     });
   }
 
-  List<String> _getTabs() {
+  List<String> _getTabs(List<CashTransaction> allTransactions, List<CashTransaction> filteredTransactions, bool isSearching) {
     if (userRole?.contains('Delivery Boy') ?? false) {
-      return ['All Transactions'];
+      final allCount = allTransactions.length;
+      final filteredCount = filteredTransactions.length;
+
+      if (isSearching && filteredCount != allCount) {
+        return ['All Transactions ($filteredCount/$allCount)'];
+      }
+      return ['All Transactions ($allCount)'];
     } else if (userRole?.contains('Cashier') ?? false) {
-      return ['Deposits', 'Handovers', 'Bank'];
+      // Count in ALL transactions (total)
+      final depositCountTotal = allTransactions
+          .where((tx) => tx.type == TransactionType.deposit)
+          .length;
+      final handoverCountTotal = allTransactions
+          .where((tx) => tx.type == TransactionType.handover)
+          .length;
+      final bankCountTotal = allTransactions
+          .where((tx) => tx.type == TransactionType.bank)
+          .length;
+
+      // Count in FILTERED transactions (search results)
+      final depositCountFiltered = filteredTransactions
+          .where((tx) => tx.type == TransactionType.deposit)
+          .length;
+      final handoverCountFiltered = filteredTransactions
+          .where((tx) => tx.type == TransactionType.handover)
+          .length;
+      final bankCountFiltered = filteredTransactions
+          .where((tx) => tx.type == TransactionType.bank)
+          .length;
+
+      if (isSearching && filteredTransactions.length != allTransactions.length) {
+        return [
+          'Deposits ($depositCountFiltered/$depositCountTotal)',
+          'Handovers ($handoverCountFiltered/$handoverCountTotal)',
+          'Bank ($bankCountFiltered/$bankCountTotal)'
+        ];
+      }
+
+      return [
+        'Deposits ($depositCountTotal)',
+        'Handovers ($handoverCountTotal)',
+        'Bank ($bankCountTotal)'
+      ];
     } else {
-      return [ 'Deposits', 'Handovers', 'Bank'];
+      // Same logic for managers
+      final depositCountTotal = allTransactions
+          .where((tx) => tx.type == TransactionType.deposit)
+          .length;
+      final handoverCountTotal = allTransactions
+          .where((tx) => tx.type == TransactionType.handover)
+          .length;
+      final bankCountTotal = allTransactions
+          .where((tx) => tx.type == TransactionType.bank)
+          .length;
+
+      final depositCountFiltered = filteredTransactions
+          .where((tx) => tx.type == TransactionType.deposit)
+          .length;
+      final handoverCountFiltered = filteredTransactions
+          .where((tx) => tx.type == TransactionType.handover)
+          .length;
+      final bankCountFiltered = filteredTransactions
+          .where((tx) => tx.type == TransactionType.bank)
+          .length;
+
+      if (isSearching && filteredTransactions.length != allTransactions.length) {
+        return [
+          'Deposits ($depositCountFiltered/$depositCountTotal)',
+          'Handovers ($handoverCountFiltered/$handoverCountTotal)',
+          'Bank ($bankCountFiltered/$bankCountTotal)'
+        ];
+      }
+
+      return [
+        'Deposits ($depositCountTotal)',
+        'Handovers ($handoverCountTotal)',
+        'Bank ($bankCountTotal)'
+      ];
     }
   }
 
@@ -115,16 +236,107 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
     }
   }
 
+  // NEW: Handle tab changes - reset search
+  void _onTabChanged() {
+    if (_tabController!.indexIsChanging) {
+      _resetSearch();
+    }
+  }
+
+// NEW: Reset search state
+  void _resetSearch() {
+    if (_isSearching || _searchController.text.isNotEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchController.clear();
+      });
+      context.read<CashManagementBloc>().add(SearchCashRequest(query: ''));
+    }
+  }
+
+// NEW: Toggle search mode
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchController.clear();
+        context.read<CashManagementBloc>().add(SearchCashRequest(query: ''));
+      }
+    });
+  }
+
+// NEW: Perform search
+  void _performSearch(String query) {
+    context.read<CashManagementBloc>().add(SearchCashRequest(query: query));
+  }
+
   @override
   void dispose() {
+    _tabController?.removeListener(_onTabChanged);
     _tabController?.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF0E5CA8),
+      title: _isSearching
+          ? TextField(
+        controller: _searchController,
+        autofocus: true,
+        style: const TextStyle(color: Colors.white),
+        decoration: const InputDecoration(
+          hintText: 'Search by ID, name, reference...',
+          hintStyle: TextStyle(color: Colors.white70),
+          border: InputBorder.none,
+        ),
+        onChanged: _performSearch,
+      )
+          : const Text('Cash'),
+      centerTitle: !_isSearching,
+      actions: [
+        if (_isSearching)
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: _toggleSearch,
+          )
+        else ...[
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.white),
+            onPressed: _toggleSearch,
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () async {
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  },
+                );
+
+                context.read<CashManagementBloc>().add(RefreshCashData());
+
+                await Future.delayed(const Duration(milliseconds: 500));
+
+                if (mounted) {
+                  Navigator.of(context, rootNavigator: true).pop();
+                }
+              }
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-
     // Show loading screen until everything is initialized
     if (_isLoading || !_isInitialized || _tabController == null) {
       return const Scaffold(
@@ -132,523 +344,170 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       );
     }
 
-    return FutureBuilder<ApiServiceInterface>(
-      future: ServiceProvider.getApiService(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Scaffold(
-            body: Center(
-              child: Text("Error initializing service: ${snapshot.error}"),
-            ),
-          );
-        }
-
-        final apiService = snapshot.data!;
-
-        return BlocProvider(
-          create: (context) => CashManagementBloc(apiService: apiService)..add(RefreshCashData()),
-          child: Scaffold(
-            drawer: GlobalDrawer.getDrawer(context),
-            appBar: AppBar(
-              backgroundColor: const Color(0xFF0E5CA8),
-              title: const Text('Cash Data'),
-              centerTitle: true,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white,),
-                  onPressed: () async {
-                    context.read<CashManagementBloc>().add(RefreshCashData());
-                    return await Future.delayed(const Duration(milliseconds: 200));
-                  },
+    // ✅ NO FutureBuilder, NO BlocProvider
+    // Just use the existing bloc from app level (main.dart)
+    return Scaffold(
+      drawer: GlobalDrawer.getDrawer(context),
+      // appBar: AppBar(
+      //   backgroundColor: const Color(0xFF0E5CA8),
+      //   title: const Text('Cash'),
+      //   centerTitle: true,
+      //   actions: [
+      //     IconButton(
+      //       icon: const Icon(
+      //           Icons.refresh,
+      //           color: Colors.white
+      //       ),
+      //       onPressed: () async {
+      //         if (mounted) {
+      //           showDialog(
+      //             context: context,
+      //             barrierDismissible: false,
+      //             builder: (BuildContext context) {
+      //               return const Center(
+      //                 child: CircularProgressIndicator(),
+      //               );
+      //             },
+      //           );
+      //           Future.delayed(const Duration(milliseconds: 500), () {
+      //             Navigator.of(context).pop(); // Close the dialog
+      //             context.read<CashManagementBloc>().add(RefreshCashData());
+      //           });
+      //         }
+      //       },
+      //     ),
+      //   ],
+      // ),
+      appBar: _buildAppBar(),
+      body: BlocConsumer<CashManagementBloc, CashManagementState>(
+        listener: (context, state) {
+          // Handle success states - just show a simple snackbar
+          if (state is TransactionAddedSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+          // Handle error states with simple dialog
+          if (state is CashManagementError) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red),
+                    SizedBox(width: 8.w),
+                    Text('Error'),
+                  ],
                 ),
-              ],
-            ),
-            body: BlocConsumer<CashManagementBloc, CashManagementState>(
-              listener: (context, state) {
-                // Handle success states - just show a simple snackbar
-                if (state is TransactionAddedSuccess) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.message),
-                      backgroundColor: Colors.green,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                }
-
-                // Handle error states with simple dialog
-                if (state is CashManagementError) {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Row(
-                        children: [
-                          Icon(Icons.error_outline, color: Colors.red),
-                          SizedBox(width: 8.w),
-                          Text('Error'),
-                        ],
-                      ),
-                      content: Text(state.message),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            context.read<CashManagementBloc>().add(RefreshCashData());
-                          },
-                          child: Text('Retry'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text('Close'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-              },
-              builder: (context, state) {
-                // Keep all your existing builder code exactly the same
-                if (state is CashManagementLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (state is CashManagementError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, size: 48.sp, color: Colors.red),
-                        SizedBox(height: 16.h),
-                        Text(
-                          'Error loading cash data: ${state.message}',
-                          style: TextStyle(fontSize: 16.sp),
-                        ),
-                        SizedBox(height: 8.h),
-                        ElevatedButton(
-                          onPressed: () => context.read<CashManagementBloc>().add(RefreshCashData()),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                if (state is CashManagementLoaded) {
-                  return RefreshIndicator(
-                    onRefresh: () async {
+                content: Text(state.message),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
                       context.read<CashManagementBloc>().add(RefreshCashData());
-                      return await Future.delayed(const Duration(milliseconds: 400));
                     },
-                    child: CustomScrollView(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Column(
-                            children: [
-                              if (userRole?.contains('Cashier') ?? false) _buildCashInHandCard(state),
-                              // if (userRole?.contains('Cashier') ?? false) _buildSearchBar(context),
-                              if (userRole?.contains('Delivery Boy') ?? false) _accountsTab(),
-                              _buildTabs(),
-                            ],
-                          ),
-                        ),
-                        SliverFillRemaining(
-                          child: TabBarView(
-                            controller: _tabController!,
-                            children: _getTabViews(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return const Center(child: Text('No data available'));
-              },
-            ),
-            floatingActionButton: FloatingActionButton(
-              heroTag: 'cash_fab',
-              onPressed: () async {
-                _showCashOptionsBottomSheet(userRole);
-              },
-              backgroundColor: const Color(0xFF0E5CA8),
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCashInHandCard(CashManagementLoaded state) {
-    final formattedDate = DateFormat('MMM dd, HH:mm a').format(state.cashData.lastUpdated);
-
-    if (userRole?.contains('Delivery Boy') ?? false) {
-      // For Delivery Boy - show partner data
-      if (state.cashData.partners.isNotEmpty) {
-        final partner = state.cashData.partners.first;
-        return Padding(
-          padding: EdgeInsets.all(8.w),
-          child: Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-            child: Padding(
-              padding: EdgeInsets.all(16.w),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            partner.partnerName,
-                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600),
-                          ),
-                          Text(
-                            'ID: ${partner.partnerId}',
-                            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () => context.read<CashManagementBloc>().add(RefreshCashData()),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF0DD),
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
-                          child: Text(
-                            'REFRESH',
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFFF7941D),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    child: Text('Retry'),
                   ),
-                  SizedBox(height: 16.h),
-
-                  // Show balance data in a compact format
-                  ...partner.balanceData.map((balance) => Container(
-                    margin: EdgeInsets.only(bottom: 8.h),
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          balance.account,
-                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          currencyFormat.format(balance.availableBalance),
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w600,
-                            color: balance.availableBalance > 0
-                                ? const Color(0xFF4CAF50)
-                                : Colors.grey[800],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )).toList(),
-
-                  SizedBox(height: 8.h),
-                  Text(
-                    'Last updated: $formattedDate',
-                    style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('Close'),
                   ),
                 ],
               ),
-            ),
-          ),
-        );
-      }
-    } else if (userRole?.contains('Cashier') ?? false) {
-      // For Cashier - show cashier account data
-      double availableBalance = state.cashData.cashInHand;
-      String accountName = 'Cash Account';
+            );
+          }
+        },
+        builder: (context, state) {
+          // ✅ NEW: Auto-refresh if we detect TransactionDetailsLoaded state
+          // This happens when returning from transaction detail screen
+          if (state is TransactionDetailsLoaded) {
+            print('🔄 cash_page: Detected TransactionDetailsLoaded, auto-refreshing...');
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                context.read<CashManagementBloc>().add(RefreshCashData());
+              }
+            });
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      if (state.cashData.cashierAccounts.isNotEmpty) {
-        accountName = state.cashData.cashierAccounts[0]['account_name'] ?? 'Cash Account';
-      }
+          // Keep all your existing builder code exactly the same
+          if (state is CashManagementLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      return Padding(
-        padding: EdgeInsets.all(8.w),
-        child: Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-          child: Padding(
-            padding: EdgeInsets.all(16.w),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      accountName,
-                      style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w500),
-                    ),
-                    GestureDetector(
-                      onTap: () => context.read<CashManagementBloc>().add(RefreshCashData()),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF0DD),
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        child: Text(
-                          'REFRESH',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFFF7941D),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8.h),
-                Row(
-                  children: [
-                    Text(
-                      currencyFormat.format(availableBalance),
-                      style: TextStyle(
-                        fontSize: 24.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    SizedBox(width: 8.w),
-                    Text(
-                      'as of $formattedDate',
-                      style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+          if (state is CashManagementError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 48.sp, color: Colors.red),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'Error loading cash data: ${state.message}',
+                    style: TextStyle(fontSize: 16.sp),
+                  ),
+                  SizedBox(height: 8.h),
+                  ElevatedButton(
+                    onPressed: () => context.read<CashManagementBloc>().add(RefreshCashData()),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
 
-    // Fallback for other roles
-    return const SizedBox.shrink();
-  }
+          if (state is CashManagementLoaded) {
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<CashManagementBloc>().add(RefreshCashData());
+                return await Future.delayed(const Duration(milliseconds: 400));
+              },
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        if (userRole?.contains('Cashier') ?? false)
+                          _buildCashInHandCard(state),
+                        if (userRole?.contains('Delivery Boy') ?? false)
+                          _accountsTab(),
+                        _buildTabs(),
+                      ],
+                    ),
+                  ),
+                  SliverFillRemaining(
+                    child: BlocBuilder<CashManagementBloc, CashManagementState>(
+                      builder: (context, state) {
+                        return TabBarView(
+                          controller: _tabController!,
+                          key: ValueKey('tabview_${state.hashCode}'),
+                          children: _getTabViews(),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
 
-  Widget _buildSearchBar(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(8.w),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search Requests...',
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8.r),
-          ),
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 16.w,
-            vertical: 12.h,
-          ),
-        ),
-        onChanged: (value) {
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (_searchController.text == value) {
-              context.read<CashManagementBloc>().add(SearchCashRequest(query: value));
-            }
-          });
+          return const Center(
+            child: CircularProgressIndicator()
+          );
         },
       ),
-    );
-  }
-
-  Widget _buildTabs() {
-    final tabs = _getTabs();
-
-    return Container(
-      margin: EdgeInsets.only(top: 5.h),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.black12, width: 1),
-        ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'cash_fab',
+        onPressed: () async {
+          _showCashOptionsBottomSheet(userRole);
+        },
+        backgroundColor: const Color(0xFF0E5CA8),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
-      child: TabBar(
-        controller: _tabController!,
-        labelColor: Theme.of(context).primaryColor,
-        unselectedLabelColor: Colors.grey,
-        indicatorColor: Theme.of(context).primaryColor,
-        indicatorWeight: 5,
-        labelStyle: TextStyle(
-          fontSize: 14.sp,
-          fontWeight: FontWeight.w500,
-        ),
-        unselectedLabelStyle: TextStyle(
-          fontSize: 14.sp,
-          fontWeight: FontWeight.w400,
-        ),
-        tabs: tabs.map((tab) => Tab(text: tab)).toList(),
-      ),
-    );
-
-  }
-
-  void _showCashOptionsBottomSheet(List<String>? userRole) {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (userRole?.contains('Delivery Boy') ?? false)
-                _buildBottomSheetOption(
-                  icon: Icons.inventory,
-                  title: 'Cash Deposit',
-                  subtitle: 'Deposit cash to bank or Manager',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider.value(
-                          value: context.read<CashManagementBloc>(),
-                          child: const CashDepositPage(),
-                        ),
-                      ),
-                    );
-                    // Handle result - refresh if transaction was added
-                    if (result == true && mounted) {
-                      // The bloc will automatically update the UI through TransactionAddedSuccess state
-                      // No need to manually refresh here as the bloc handles it
-                    }
-                  },
-                ),
-              if (userRole?.contains('Cashier') ?? false)
-                _buildBottomSheetOption(
-                  icon: Icons.inventory_2_rounded,
-                  title: 'Handover Cash',
-                  subtitle: 'Handover cash to bank or Manager',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider.value(
-                          value: context.read<CashManagementBloc>(),
-                          child: const HandoverScreen(),
-                        ),
-                      ),
-                    );
-                    if (result == true && mounted) {
-                      _switchToHandoverTab();
-                    }
-                  },
-                ),
-              if (!(userRole?.contains('Delivery Boy') ?? false))
-                _buildBottomSheetOption(
-                  icon: Icons.account_balance,
-                  title: 'Bank Deposit',
-                  subtitle: 'Deposit cash directly to bank',
-                  onTap: () async {
-                    Navigator.pop(context);
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BlocProvider.value(
-                          value: context.read<CashManagementBloc>(),
-                          child: const BankDepositPage(),
-                        ),
-                      ),
-                    );
-                    if (result == true && mounted) {
-                      _switchToBankTab();
-                    }
-                  },
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _switchToBankTab() {
-    final tabs = _getTabs();
-    int bankTabIndex = tabs.indexOf('Ban'
-        'k');
-
-    if (bankTabIndex != -1 && bankTabIndex < _tabController!.length) {
-      _tabController!.animateTo(bankTabIndex);
-    }
-  }
-
-  void _switchToHandoverTab() {
-    final tabs = _getTabs();
-    int handoverTabIndex = tabs.indexOf('Handovers');
-
-    if (handoverTabIndex != -1 && handoverTabIndex < _tabController!.length) {
-      _tabController!.animateTo(handoverTabIndex);
-    }
-  }
-
-  Widget _buildBottomSheetOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-      leading: Container(
-        padding: EdgeInsets.all(8.w),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0E5CA8).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: Icon(
-          icon,
-          color: const Color(0xFF0E5CA8),
-          size: 24.sp,
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16.sp,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 14.sp,
-          color: Colors.grey[600],
-        ),
-      ),
-      onTap: onTap,
     );
   }
 
@@ -763,7 +622,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       children: [
         SizedBox(height: 10.h),
         Text(
-          'Account Balances ',
+          'Account Balances',
           style: TextStyle(
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
@@ -789,46 +648,62 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                   ],
                 ),
               ),
-
-              // Table Rows
+              // Table Rows - NOW TAPPABLE
               ...accounts.asMap().entries.map((entry) {
                 int index = entry.key;
                 AccountBalance account = entry.value;
-                return Container(
-                  color: index % 2 == 0 ? Colors.white : Colors.grey[50],
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: _buildTableDataCell(
-                         account.account,
-                          alignment: Alignment.centerLeft,
+                return InkWell(
+                  onTap: () {
+                    List<String> allAccountNames = accounts.map((a) => a.accountName).toList();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GeneralLedgerDetailPage(
+                          accountNames: account.accountName, // Full name like "Load Account - AG"
+                          accountLabel: account.account.replaceAll(' - AG', ''), // Display name
                         ),
                       ),
-                      Expanded(
-                        flex: 2,
-                        child: _buildTableDataCell(
-                          _formatCurrency(account.ledgerBalance),
-                          color: account.ledgerBalance < 0 ? Colors.red : Colors.grey[800]!,
+                    );
+                  },
+                  child: Container(
+                    color: index % 2 == 0 ? Colors.white : Colors.grey[50],
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _buildTableDataCell(
+                            account.account,
+                            alignment: Alignment.centerLeft,
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: _buildTableDataCell(
-                          _formatCurrency(account.openSalesOrders),
-                          color: Colors.grey[800]!,
+                        Expanded(
+                          flex: 2,
+                          child: _buildTableDataCell(
+                            _formatCurrency(account.ledgerBalance),
+                            alignment: Alignment.centerRight,
+                            color: account.ledgerBalance < 0 ? Colors.red : Colors.grey[800]!,
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: _buildTableDataCell(
-                          _formatCurrency(account.availableBalance),
-                          color: account.availableBalance > 0
-                              ? const Color(0xFF4CAF50)
-                              : Colors.grey[800]!,
+                        Expanded(
+                          flex: 2,
+                          child: _buildTableDataCell(
+                            _formatCurrency(account.openSalesOrders),
+                            alignment: Alignment.centerRight,
+                            color: account.openSalesOrders < 0 ? Colors.red : Colors.grey[800]!,
+                          ),
                         ),
-                      ),
-                    ],
+                        Expanded(
+                          flex: 2,
+                          child: _buildTableDataCell(
+                            _formatCurrency(account.availableBalance),
+                            alignment: Alignment.centerRight,
+                            color: account.availableBalance > 0
+                                ? const Color(0xFF4CAF50)
+                                : Colors.grey[800]!,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
@@ -883,9 +758,332 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
           ),
           textAlign: alignment == Alignment.centerLeft
               ? TextAlign.left
+              : alignment == Alignment.centerRight
+              ? TextAlign.right
               : TextAlign.center,
         ),
       ),
+    );
+  }
+
+  Widget _buildCashInHandCard(CashManagementLoaded state) {
+    final formattedDate = DateFormat('MMM dd, HH:mm a').format(state.cashData.lastUpdated);
+
+    if (userRole?.contains('Cashier') ?? false) {
+      double availableBalance = state.cashData.cashInHand;
+      String accountName = 'Cash Account';
+      String? fullAccountName; // For API call
+
+      if (state.cashData.cashierAccounts.isNotEmpty) {
+        accountName = state.cashData.cashierAccounts[0]['account_label'] ?? 'Cash Account';
+        fullAccountName = state.cashData.cashierAccounts[0]['account_name']; // Assuming this exists
+      }
+
+      return Padding(
+        padding: EdgeInsets.all(8.w),
+        child: Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.all(16.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          accountName,
+                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w500),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            if (mounted) {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (BuildContext context) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                },
+                              );
+                              Future.delayed(const Duration(milliseconds: 500), () {
+                                Navigator.of(context).pop();
+                                context.read<CashManagementBloc>().add(RefreshCashData());
+                              });
+                            }
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF0DD),
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: Text(
+                              'REFRESH',
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFFF7941D),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8.h),
+                    Row(
+                      children: [
+                        Text(
+                          currencyFormat.format(availableBalance),
+                          style: TextStyle(
+                            fontSize: 24.sp,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          'as of $formattedDate',
+                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, thickness: 1),
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => GeneralLedgerDetailPage(
+                        accountNames: fullAccountName, // Can be null for all accounts
+                        accountLabel: accountName,
+                      ),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'View Transaction History',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF0E5CA8),
+                        ),
+                      ),
+                      SizedBox(width: 4.w),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 14.sp,
+                        color: Color(0xFF0E5CA8),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Keep existing delivery boy logic unchanged
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildTabs() {
+    return BlocBuilder<CashManagementBloc, CashManagementState>(
+      buildWhen: (previous, current) {
+        return current is CashManagementLoaded ||
+            (previous is CashManagementLoaded && current is CashManagementLoaded);
+      },
+      builder: (context, state) {
+        List<String> tabs;
+
+        if (state is CashManagementLoaded) {
+          tabs = _getTabs(
+              state.allTransactions,
+              state.filteredTransactions,
+              _isSearching  // Pass search state
+          );
+        } else {
+          if (userRole?.contains('Delivery Boy') ?? false) {
+            tabs = ['All Transactions (...)'];
+          } else {
+            tabs = ['Deposits (...)', 'Handovers (...)', 'Bank (...)'];
+          }
+        }
+
+        return Container(
+          key: ValueKey('tabs_${tabs.hashCode}'),
+          margin: EdgeInsets.only(top: 5.h),
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.black12, width: 1),
+            ),
+          ),
+          child: TabBar(
+            controller: _tabController!,
+            labelColor: Theme.of(context).primaryColor,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Theme.of(context).primaryColor,
+            indicatorWeight: 5,
+            labelStyle: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
+            unselectedLabelStyle: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w400),
+            tabs: tabs.map((tab) => Tab(text: tab)).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCashOptionsBottomSheet(List<String>? userRole) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: EdgeInsets.all(16.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (userRole?.contains('Delivery Boy') ?? false)
+                _buildBottomSheetOption(
+                  icon: Icons.inventory,
+                  title: 'Cash Deposit',
+                  subtitle: 'Deposit cash to Manager',
+                  onTap: () async {
+                    Navigator.pop(context); // Close bottom sheet
+
+                    // Capture bloc BEFORE async navigation to avoid context issues
+                    final bloc = context.read<CashManagementBloc>();
+
+                    print('🔵 Navigating to Cash Deposit page');
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BlocProvider.value(
+                          value: bloc,
+                          child: const CashDepositPage(),
+                        ),
+                      ),
+                    );
+                    print('🔵 Returned from Cash Deposit page with result: $result');
+                    // Only refresh if deposit was successful
+                    if (result == true && mounted) {
+                      print('🔄 Refreshing cash data after successful deposit');
+                      bloc.add(RefreshCashData()); // Use captured bloc reference
+                    } else {
+                      print('⚠️ Not refreshing - result: $result, mounted: $mounted');
+                    }
+                  },
+                ),
+              if (userRole?.contains('Cashier') ?? false)
+                _buildBottomSheetOption(
+                  icon: Icons.inventory_2_rounded,
+                  title: 'Handover Cash',
+                  subtitle: 'Handover cash to  Manager',
+                  onTap: () async {
+                    Navigator.pop(context); // Close bottom sheet
+
+                    // Capture bloc BEFORE async navigation
+                    final bloc = context.read<CashManagementBloc>();
+
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BlocProvider.value(
+                          value: bloc,
+                          child: const HandoverScreen(),
+                        ),
+                      ),
+                    );
+                    // Only refresh if handover was successful
+                    if (result == true && mounted) {
+                      bloc.add(RefreshCashData()); // Use captured bloc reference
+                    }
+                  },
+                ),
+              if (!(userRole?.contains('Delivery Boy') ?? false))
+                _buildBottomSheetOption(
+                  icon: Icons.account_balance,
+                  title: 'Bank Deposit',
+                  subtitle: 'Deposit cash directly to bank',
+                  onTap: () async {
+                    Navigator.pop(context); // Close bottom sheet
+
+                    // Capture bloc BEFORE async navigation
+                    final bloc = context.read<CashManagementBloc>();
+
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BlocProvider.value(
+                          value: bloc,
+                          child: const BankDepositScreen(),
+                        ),
+                      ),
+                    );
+                    // Only refresh if bank deposit was successful
+                    if (result == true && mounted) {
+                      bloc.add(RefreshCashData()); // Use captured bloc reference
+                    }
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomSheetOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      leading: Container(
+        padding: EdgeInsets.all(8.w),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E5CA8).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Icon(
+          icon,
+          color: const Color(0xFF0E5CA8),
+          size: 24.sp,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16.sp,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 14.sp,
+          color: Colors.grey[600],
+        ),
+      ),
+      onTap: onTap,
     );
   }
 
@@ -895,4 +1093,5 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
     }
     return currencyFormat.format(amount);
   }
+
 }

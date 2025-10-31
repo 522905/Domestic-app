@@ -123,14 +123,35 @@ class OrderDetailsLoading extends OrdersState {
 class OrderDetailsLoaded extends OrdersState {
   final Order detailedOrder;
   final String orderName;
+  final List<Order> orders;                                    // ADD THIS
+  final bool hasMore;                                          // ADD THIS
+  final int currentOffset;                                     // ADD THIS
+  final Map<String, List<FilterOption>> availableFilters;     // ADD THIS
+  final Map<String, String> appliedFilters;                   // ADD THIS
+  final String? searchQuery;                                   // ADD THIS
 
   const OrderDetailsLoaded({
     required this.detailedOrder,
     required this.orderName,
+    required this.orders,              // ADD THIS
+    required this.hasMore,             // ADD THIS
+    required this.currentOffset,       // ADD THIS
+    required this.availableFilters,    // ADD THIS
+    required this.appliedFilters,      // ADD THIS
+    this.searchQuery,                  // ADD THIS
   });
 
   @override
-  List<Object> get props => [detailedOrder, orderName];
+  List<Object?> get props => [
+    detailedOrder,
+    orderName,
+    orders,              // ADD THIS
+    hasMore,             // ADD THIS
+    currentOffset,       // ADD THIS
+    availableFilters,    // ADD THIS
+    appliedFilters,      // ADD THIS
+    searchQuery,         // ADD THIS
+  ];
 }
 
 class OrderDetailsError extends OrdersState {

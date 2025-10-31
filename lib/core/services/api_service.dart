@@ -2,12 +2,15 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lpg_distribution_app/core/services/User.dart';
-import 'package:path/path.dart';
+import '../../data/models/sdms/sdms_transaction.dart';
+import '../../utils/error_handler.dart';
 import '../models/inventory/inventory_request.dart';
+import '../models/purchase_invoice/api_response.dart';
+import '../models/purchase_invoice/purchase_invoice.dart';
 import '../network/api_client.dart';
 import 'api_service_interface.dart';
+import '../models/api_validation_exception.dart';
 
 class ApiService implements ApiServiceInterface {
   late String baseUrl;
@@ -22,21 +25,66 @@ class ApiService implements ApiServiceInterface {
     await apiClient.init(baseUrl);
   }
 
-  @override
-  Future<void> updateDashboardMockData(Map<String, dynamic> newData) async {
-    try {
-      await apiClient.post(
-        apiClient.endpoints.dashboard,
-        data: newData,
-      );
-    } catch (e) {
-      _handleError(e);
-      rethrow;
+  void _handleError(dynamic error) {
+    if (error is DioException) {
+      if (error.error is SessionExpiredException) {
+        debugPrint('SESSION EXPIRED: ${error.message}');
+      } else if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
+        debugPrint('NETWORK ERROR: ${error.message}');
+      } else if (error.response != null) {
+        final statusCode = error.response?.statusCode;
+        final data = error.response?.data;
+        debugPrint('SERVER ERROR [$statusCode]: $data');
+
+        if (data is Map<String, dynamic> &&
+            data.containsKey('validation_details') &&
+            data['validation_details'] is Map<String, dynamic>) {
+
+          final validationDetails = data['validation_details'] as Map<String, dynamic>;
+
+          if (validationDetails.containsKey('errors') &&
+              validationDetails['errors'] is List) {
+
+            final errorsList = validationDetails['errors'] as List;
+
+            if (errorsList.isNotEmpty) {
+              final validationErrors = errorsList.map((errorItem) {
+                return ValidationError(
+                  message: errorItem['message']?.toString() ?? 'Unknown error',
+                  code: errorItem['code']?.toString() ?? 'UNKNOWN',
+                );
+              }).toList();
+
+              // Extract balance_info if available
+              Map<String, dynamic>? balanceInfo;
+              if (validationDetails.containsKey('balance_info')) {
+                balanceInfo = Map<String, dynamic>.from(validationDetails['balance_info']);
+              }
+
+              throw ApiValidationException(
+                title: data['error']?.toString() ?? 'Validation Failed',
+                errors: validationErrors,
+                balanceInfo: balanceInfo,
+              );
+            }
+          }
+        }
+      } else {
+        debugPrint('UNKNOWN ERROR: ${error.message}');
+      }
+    } else {
+      debugPrint('UNEXPECTED ERROR: $error');
     }
+
+    final formattedError = ErrorHandler.handleError(error);
+    throw Exception(formattedError);
   }
 
   @override
-    Future<Map<String, dynamic>> login(String username, String password) async {
+  Future<Map<String, dynamic>> login(String username, String password) async {
+    try {
       await apiClient.logout();
 
       final resp = await apiClient.post(
@@ -52,22 +100,372 @@ class ApiService implements ApiServiceInterface {
           },
         ),
       );
+
       final access = resp.data['token']['access'];
       final refresh = resp.data['token']['refresh'];
       final company = Map<String, dynamic>.from(resp.data['company']);
-
       final user = Map<String, dynamic>.from(resp.data['user']);
 
       await User().saveSession(
         access: access,
         refresh: refresh,
         user: user,
-        company: company
+        company: company,
+        novu: resp.data['novu'],
       );
+
+      // Check roles immediately after saving session
+      final userRoles = await User().getUserRoles();
+      if (userRoles.isEmpty) {
+        // Clear the session since roles are invalid
+        await User().clearTokens();
+        throw Exception('No user roles assigned. Please contact administrator.');
+      }
 
       await apiClient.setToken(access);
       return resp.data;
+    } catch (e) {
+      _handleError(e);
+      rethrow; // This will never be reached but keeps the signature consistent
     }
+  }
+
+  // FIXED: Changed to throw error instead of returning empty map
+  @override
+  Future<Map<String, dynamic>> getOrdersList({
+    int offset = 0,
+    int limit = 20,
+    Map<String, String>? filters,
+  }) async {
+    try {
+      Map<String, dynamic> queryParams = {
+        'offset': offset,
+        'limit': limit,
+        if (filters != null) ...filters,
+      };
+
+      final response = await apiClient.get(
+        apiClient.endpoints.ordersData,
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to fetch orders: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow; // Important: Let the UI handle the formatted error
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOrderDetails(String orderId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.orderDetails(orderId),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to fetch order details: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow; // Changed from returning empty map
+    }
+  }
+
+  // FIXED: Changed to throw error instead of returning empty list
+  @override
+  Future<List<dynamic>> getInventory({
+    String? warehouseId,
+    String? itemType,
+    Map<String, dynamic>? filters,
+  }) async {
+    try {
+      String endpoint = warehouseId != null
+          ? '${apiClient.endpoints.inventory}/$warehouseId'
+          : apiClient.endpoints.inventory;
+
+      print("Getting inventory from $endpoint");
+
+      final response = await apiClient.get(
+        endpoint,
+        queryParameters: {
+          if (itemType != null) 'item_type': itemType,
+          if (filters != null) ...filters,
+        },
+      );
+
+      print("Inventory response: ${response.data}");
+      return response.data;
+    } catch (e) {
+      print("Error getting inventory: $e");
+      _handleError(e);
+      rethrow; // Changed from returning empty list
+    }
+  }
+
+  // FIXED: Changed to throw error instead of returning empty list
+  @override
+  Future<List<InventoryRequest>> getInventoryRequests() async {
+    try {
+      final response = await apiClient.get(
+          apiClient.endpoints.stockListApi
+      );
+
+      if (response.data is List) {
+        return (response.data as List)
+            .map((json) => InventoryRequest.fromJson(json))
+            .toList();
+      }
+      throw Exception('Invalid response format for inventory requests');
+    } catch (e) {
+      _handleError(e);
+      rethrow; // Changed from returning empty list
+    }
+  }
+
+  // FIXED: Enhanced error handling for create operations
+  @override
+  Future<InventoryRequest> createInventoryRequest(InventoryRequest request) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.inventoryRequests,
+        data: request.toJson(),
+      );
+
+      // Check for HTTP status code
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        if (response.data is Map<String, dynamic>) {
+          return InventoryRequest.fromJson(response.data);
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        // Extract error message from response for 400 errors
+        if (response.statusCode == 400 && response.data != null) {
+          final errorMsg = ErrorHandler.handleError(
+              DioException(
+                requestOptions: response.requestOptions,
+                response: response,
+                type: DioExceptionType.badResponse,
+              )
+          );
+          throw Exception(errorMsg);
+        }
+        throw Exception(
+          'Failed to create inventory request: ${response.statusCode} - ${response.statusMessage}',
+        );
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  // FIXED: Better error handling for transaction creation
+  @override
+  Future<Map<String, dynamic>> createTransaction(
+      Map<String, dynamic> transactionData) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.paymentListApi,
+        data: transactionData,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw Exception('Failed to create transaction: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  // FIXED: Better error handling for submit operations
+  @override
+  Future<ApiResponse> submitDispatchVehicle(Map<String, dynamic> payload) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.submitDispatch,
+        data: payload,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ApiResponse<Map<String, dynamic>>(
+          success: true,
+          message: response.data['message'] ?? 'Vehicle dispatched successfully',
+          data: response.data,
+        );
+      } else {
+        // For 400 errors, extract validation messages
+        if (response.statusCode == 400 && response.data != null) {
+          final errorMsg = ErrorHandler.handleError(
+              DioException(
+                requestOptions: response.requestOptions,
+                response: response,
+                type: DioExceptionType.badResponse,
+              )
+          );
+          return ApiResponse<Map<String, dynamic>>(
+            success: false,
+            message: 'Validation Error',
+            error: errorMsg,
+          );
+        }
+
+        return ApiResponse<Map<String, dynamic>>(
+          success: false,
+          message: response.data['message'] ?? 'Failed to dispatch vehicle',
+          error: response.data['error'] ?? 'Unknown error',
+        );
+      }
+    } on DioException catch (e) {
+      // Use ErrorHandler for DioExceptions
+      final errorMsg = ErrorHandler.handleError(e);
+      return ApiResponse<Map<String, dynamic>>(
+        success: false,
+        message: 'Request Failed',
+        error: errorMsg,
+      );
+    } catch (e) {
+      _handleError(e);
+      return ApiResponse<Map<String, dynamic>>(
+        success: false,
+        message: 'Unexpected error occurred',
+        error: e.toString(),
+      );
+    }
+  }
+
+      @override
+      Future<Map<String, dynamic>> initiateAadhaar(String aadhaarNumber, String phoneNumber) async {
+        final response = await apiClient.post(
+          apiClient.endpoints.initiateAadhaar,
+          data: {
+            'aadhaar_number': aadhaarNumber,
+            'phone_number': phoneNumber,
+          },
+        );
+        return response.data;
+      }
+
+      @override
+      Future<Map<String, dynamic>> submitAadhaarOtp(String aadhaarNumber, String refId, String otp, String phoneNumber) async {
+        final response = await apiClient.post(
+          apiClient.endpoints.submitAadhaarOtp,
+          data: {
+            'aadhaar_number': aadhaarNumber,
+            'ref_id': refId,
+            'otp': otp,
+            'phone_number': phoneNumber,
+          },
+        );
+        return response.data;
+      }
+
+      @override
+      Future<Map<String, dynamic>> initiatePartner(String panNumber) async {
+        final response = await apiClient.post(
+          apiClient.endpoints.initiatePartner, // Add this endpoint
+          data: {
+            'pan_number': panNumber,
+          },
+        );
+        return response.data;
+      }
+
+      @override
+      Future<Map<String, dynamic>> changePassword(String oldPassword, String newPassword) async {
+          final response = await apiClient.post(
+            apiClient.endpoints.changePassword, // Add this endpoint
+            data: {
+              'old_password': oldPassword,
+              'new_password': newPassword,
+            },
+          );
+          return response.data;
+        }
+
+    @override
+    Future<Map<String, dynamic>> sendOTP(Map<String, String> data) async {
+      final response = await apiClient.post(
+        apiClient.endpoints.sendOTP, // Add this endpoint
+        data: {
+          'username': data['aadhar_number'],
+        },
+      );
+      return response.data;
+    }
+
+    @override
+    Future<Map<String, dynamic>> resetPassword(Map<String, String> data) async {
+      final response = await apiClient.post(
+        apiClient.endpoints.resetPassword, // Add this endpoint
+        data: {
+          'username': data['aadhar_number'],
+          'otp': data['otp'],
+          'new_password': data['new_password'],
+        },
+      );
+      return response.data;
+    }
+
+    @override
+     Future<Map<String, dynamic>> checkAppVersion() async {
+    final user = User();
+    final token = await user.getToken();
+
+    final response = await apiClient.get(
+      apiClient.endpoints.appConfig,
+      options: Options(
+        headers: {
+            if (token != null) 'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          // Token will be added automatically by your apiClient if available
+        },
+      ),
+    );
+    return response.data;
+  }
+
+    @override
+    Future<Map<String, dynamic>> getGeneralLedger({
+      required String fromDate,
+      required String toDate,
+      String? accountNames,
+    }) async {
+      final params = <String, String>{
+        'from_date': fromDate,
+        'to_date': toDate,
+      };
+
+      if (accountNames != null && accountNames.isNotEmpty) {
+        params['account_names'] = accountNames;
+      }
+
+      final response = await apiClient.get(
+        apiClient.endpoints.ledgerData,
+        queryParameters: params,
+      );
+
+      return response.data;
+    }
+
+  @override
+  Future<Map<String, dynamic>> getAvailableAccounts() async {
+    final response = await apiClient.get(
+      apiClient.endpoints.availableAccounts,
+    );
+
+    return response.data;
+  }
 
     @override
     Future<List<UserCompany>> companyList() async {
@@ -87,6 +485,19 @@ class ApiService implements ApiServiceInterface {
         rethrow;
       }
     }
+
+  @override
+  Future<Map<String, dynamic>> getWarehouseStock({String? warehouseId}) async {
+
+    final response = await apiClient.get(
+      apiClient.endpoints.warehouseStock,
+      queryParameters: {
+        'warehouse_id': warehouseId,
+      },
+    );
+
+    return response.data;
+  }
 
   @override
   Future<void> switchCompany(int? companyId) async {
@@ -118,7 +529,17 @@ class ApiService implements ApiServiceInterface {
           companyId: data['company']['id'],
           companyName: data['company']['name'],
           companyShortCode: data['company']['short_code'],
+          sdmsUserCode: data['company']['sdms_user_code'],
         );
+
+        // After saving company info, add this if novu exists in response
+        if (data.containsKey('novu') && data['novu'] != null) {
+          await User().saveNovu(
+            applicationIdentifier: data['novu']['applicationIdentifier'] ?? '',
+            subscriberId: data['novu']['subscriberId'] ?? '',
+            subscriberHash: data['novu']['subscriberHash'],
+          );
+        }
 
         // Update API client token for future requests
         await apiClient.setToken(data['access']);
@@ -138,57 +559,6 @@ class ApiService implements ApiServiceInterface {
     } catch (e) {
       _handleError(e);
       rethrow;
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>> getOrdersList(
-      {
-        int offset = 0,
-        int limit = 20,
-        Map<String, String>? filters,
-      }
-      ) async {
-    try {
-      Map<String, dynamic> queryParams = {
-        'offset': offset,
-        'limit': limit,
-        if (filters != null) ...filters,
-      };
-
-      final response = await apiClient.get(
-        apiClient.endpoints.ordersData,
-        queryParameters: queryParams,
-      );
-
-      if (response.statusCode == 200) {
-        return response.data;
-      } else {
-        throw Exception(
-            'Failed to fetch orders: ${response.statusCode}'
-        );
-      }
-    } catch (e) {
-      _handleError(e);
-      return {};
-    }
-  }
-
-  @override
-  Future<Map<String, dynamic>> getOrderDetails(String orderId) async {
-    try {
-      final response = await apiClient.get(
-        apiClient.endpoints.orderDetails(orderId),
-      );
-
-      if (response.statusCode == 200) {
-        return response.data;
-      } else {
-        throw Exception('Failed to fetch order details: ${response.statusCode}');
-      }
-    } catch (e) {
-      _handleError(e);
-      return {};
     }
   }
 
@@ -231,6 +601,21 @@ class ApiService implements ApiServiceInterface {
       rethrow;
     }
   }
+
+  // @override
+  // Future<Map<String, dynamic>> createOrder(
+  //     Map<String, dynamic> orderData) async {
+  //   try {
+  //     final response = await apiClient.post(
+  //       apiClient.endpoints.orders,
+  //       data: orderData,
+  //     );
+  //     return response.data;
+  //   } catch (e) {
+  //     _handleError(e);
+  //     rethrow;
+  //   }
+  // }
 
   @override
   Future<List<dynamic>> getWarehouses({String? depositType}) async {
@@ -287,6 +672,77 @@ class ApiService implements ApiServiceInterface {
       }
     } catch (e) {
       print('Error fetching items: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<int>> getVoucherPDF({
+    required String voucherType,
+    required String voucherNo,
+  }) async {
+    try {
+      print('Fetching PDF: $voucherType - $voucherNo');
+
+      final response = await apiClient.get(
+        apiClient.endpoints.voucherPDF(voucherType, voucherNo),
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) {
+            return status != null && status < 500; // Accept all responses < 500
+          },
+        ),
+      );
+
+      print('Response status: ${response.statusCode}');
+      print('Response type: ${response.data.runtimeType}');
+
+      if (response.statusCode == 200) {
+        // Check if response is actually bytes
+        if (response.data is List<int>) {
+          return response.data as List<int>;
+        } else if (response.data is String) {
+          // Server returned text/HTML instead of PDF
+          throw Exception('Server returned error: ${response.data}');
+        } else {
+          throw Exception('Invalid response format: ${response.data.runtimeType}');
+        }
+      } else if (response.statusCode == 404) {
+        throw Exception('PDF not available for this voucher');
+      } else {
+        // Try to extract error message from response
+        String errorMsg = 'Failed to load PDF: ${response.statusCode}';
+        if (response.data is String) {
+          errorMsg += '\n${response.data}';
+        }
+        throw Exception(errorMsg);
+      }
+    } catch (e) {
+      print('PDF fetch error: $e');
+      if (e is DioException) {
+        if (e.response?.data is String) {
+          throw Exception('Server error: ${e.response?.data}');
+        }
+        throw Exception('Network error: ${e.message}');
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateDeviceToken(String fcmToken, String deviceId) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.updateDeviceToken,
+        data: {
+          'platform': 'fcm',
+          'token': fcmToken,
+          'device_id': deviceId,
+        },
+      );
+       return response.data;
+    } catch (e) {
+      print('Error updating device token: $e');
       rethrow;
     }
   }
@@ -445,35 +901,10 @@ class ApiService implements ApiServiceInterface {
     }
 
   @override
-  Future<Map<String, dynamic>> createTransaction(
-      Map<String, dynamic> transactionData) async {
-        final response = await apiClient.post(
-          apiClient.endpoints.paymentListApi,
-          data: transactionData,
-        );
-        return response.data as Map<String, dynamic>;
-  }
-
-  @override
-  Future<Map<String, dynamic>> refreshCashData() async {
-    try {
-      // Change this from PUT to GET
-      final response = await apiClient.get(
-          apiClient.endpoints.paymentListApi);
-      return response.data;
-    } catch (e) {
-      _handleError(e);
-      rethrow;
-    }
-  }
-
-  @override
   Future<List<dynamic>> getCashTransactions() async {
     final response = await apiClient.get(
         apiClient.endpoints.paymentListApi);
-
     return response.data as List<dynamic>;
-
   }
 
   @override
@@ -509,54 +940,6 @@ class ApiService implements ApiServiceInterface {
       }
     }
 
-    @override
-    Future<List<dynamic>> getInventory({
-      String? warehouseId,
-      String? itemType,
-      Map<String, dynamic>? filters,
-    }) async {
-      try {
-        String endpoint = warehouseId != null
-            ? '${apiClient.endpoints.inventory}/$warehouseId'  // Use inventory-items/{warehouse_id}
-            : apiClient.endpoints.inventory;
-
-        print(" Getting inventory from $endpoint");
-
-        final response = await apiClient.get(
-          endpoint,
-          queryParameters: {
-            if (itemType != null) 'item_type': itemType,
-            if (filters != null) ...filters,
-          },
-        );
-
-        print("Inventory response: ${response.data}");
-        return response.data;
-      } catch (e) {
-        print("Error getting inventory: $e");
-        return [];
-      }
-    }
-
-    @override
-    Future<List<InventoryRequest>> getInventoryRequests() async {
-      try {
-        final response = await apiClient.get(
-            apiClient.endpoints.stockListApi
-        );
-
-        if (response.data is List) {
-          return (response.data as List)
-              .map((json) => InventoryRequest.fromJson(json))
-              .toList();
-        }
-        return [];
-      } catch (e) {
-        _handleError(e);
-        return [];
-      }
-    }
-
   @override
   Future<InventoryRequest> getInventoryRequestDetail(String requestId) async {
     try {
@@ -572,35 +955,6 @@ class ApiService implements ApiServiceInterface {
       rethrow; // Important: rethrow so bloc can handle the error
     }
   }
-
-
-    @override
-    Future<InventoryRequest> createInventoryRequest(InventoryRequest request) async {
-      try {
-        Response response;
-          response = await apiClient.post(
-            apiClient.endpoints.inventoryRequests,
-            data: request.toJson(),
-          );
-
-        // Check for HTTP status code
-        if (response.statusCode == 201) {
-          if (response.data is Map<String, dynamic>) {
-            return InventoryRequest.fromJson(response.data);
-          } else {
-            throw Exception('Invalid response format');
-          }
-        } else {
-          // Throw an exception for non-201 status codes
-          throw Exception(
-            'Failed to create inventory request: ${response.statusCode} - ${response.statusMessage}',
-          );
-        }
-      } catch (e) {
-        _handleError(e);
-        rethrow;
-      }
-    }
 
     @override
     Future<void> approveInventoryRequest({
@@ -835,30 +1189,6 @@ class ApiService implements ApiServiceInterface {
     }
   }
 
-  // Unified error handling
-  void _handleError(dynamic error) {
-    if (error is DioException) {
-      if (error.error is SessionExpiredException) {
-        // Handle session expiry - emit event for global listener to redirect to login
-        debugPrint('SESSION EXPIRED: ${error.message}');
-        // Here you would likely trigger a global event that your app listens for
-      } else if (error.type == DioExceptionType.connectionTimeout ||
-          error.type == DioExceptionType.sendTimeout ||
-          error.type == DioExceptionType.receiveTimeout) {
-        debugPrint('NETWORK ERROR: ${error.message}');
-      } else if (error.response != null) {
-        // Server returned an error response
-        final statusCode = error.response?.statusCode;
-        final data = error.response?.data;
-        debugPrint('SERVER ERROR [$statusCode]: $data');
-      } else {
-        debugPrint('UNKNOWN ERROR: ${error.message}');
-      }
-    } else {
-      debugPrint('UNEXPECTED ERROR: $error');
-    }
-  }
-
   // Inventory request methods
   @override
   Future<InventoryRequest> updateInventoryRequest(String id, InventoryRequest request) async {
@@ -984,6 +1314,25 @@ class ApiService implements ApiServiceInterface {
       }
     }
 
+    @override
+    Future<dynamic> requestFinalizeOrder(String orderId) async {
+      try {
+        final response = await apiClient.post(
+          apiClient.endpoints.finalizeOrder,
+          data: {
+            'sales_order_name': orderId,
+          },
+        );
+        if (response.statusCode != 200) {
+          throw Exception('Failed to request approval');
+        }
+        return response.data; // Ensure the response data is returned
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
   @override
   Future<InventoryRequest> updateInventoryRequestObject(String id, InventoryRequest request) {
     // TODO: implement updateInventoryRequestObject
@@ -1047,5 +1396,282 @@ class ApiService implements ApiServiceInterface {
         throw Exception('Failed to fetch account type');
       }
     }
+
+  // Purchase Invoice Methods
+  @override
+  Future<List<PurchaseInvoice>> getPendingInvoices() async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.pendingInvoices,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => PurchaseInvoice.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to fetch pending invoices: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<PurchaseInvoice>> getReceivedInvoices() async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.receivedInvoices,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => PurchaseInvoice.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to fetch received invoices: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getInvoiceDetails(
+    String gstin,
+    String invoiceDate,
+    String invoiceNumber
+    ) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.purchaseInvoiceDetails(gstin, invoiceDate, invoiceNumber),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to fetch invoice details: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> searchDrivers(String query) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.searchDrivers,
+        queryParameters: {
+          'q': query,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is List) {
+          return List<Map<String, dynamic>>.from(response.data);
+        } else if (response.data['results'] != null) {
+          return List<Map<String, dynamic>>.from(response.data['results']);
+        }
+        return [];
+      }
+     else {
+        throw Exception('Failed to search drivers: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+
+  @override
+  Future<String> uploadDriverPhoto(String filePath) async {
+    try {
+      final fileName = filePath.split('/').last;
+      final formData = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(filePath, filename: fileName),
+      });
+
+      final response = await apiClient.post(
+        apiClient.endpoints.uploadDriverPhoto,
+        data: formData,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data['url'] ?? '';
+      } else {
+        throw Exception('Failed to upload photo: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  // In your API implementation
+  @override
+  Future<dynamic> getVehicleHistory(String vehicleNo) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.vehicleHistory(vehicleNo),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data; // Return raw response
+      } else {
+        throw Exception('Failed to fetch vehicle history: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getDriverDetails(int driverId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.driverDetials(driverId),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        throw Exception('Failed to fetch driver profile: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getAvailableItems() async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.receivedAPI,
+      );
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(response.data);
+      } else {
+        throw Exception('Failed to fetch available items: ${response.statusCode}');
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<ApiResponse> submitReceiveVehicle(Map<String, dynamic> payload) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.receivedAPI,
+        data: payload,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ApiResponse(
+          success: true,
+          message: response.data['message'] ?? 'Vehicle received successfully',
+          data: response.data,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: response.data['message'] ?? 'Failed to receive vehicle',
+          error: response.data['error'] ?? 'Unknown error',
+        );
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final errorData = e.response!.data;
+        return ApiResponse(
+          success: false,
+          message: errorData['message'] ?? 'Failed to receive vehicle',
+          error: errorData['error'] ?? e.message ?? 'Network error',
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          message: 'Network error occurred',
+          error: e.message ?? 'Connection failed',
+        );
+      }
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Unexpected error occurred',
+        error: e.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<List<SDMSTransaction>> getSDMSTransactions({
+    String? status,
+    String? actionType,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    Map<String, dynamic> queryParams = {};
+
+    if (status != null && status.isNotEmpty) {
+      queryParams['process_status'] = status;
+    }
+    if (actionType != null && actionType.isNotEmpty) {
+      queryParams['action_type'] = actionType;
+    }
+    if (fromDate != null && fromDate.isNotEmpty) {
+      queryParams['created_at__date__gte'] = fromDate;
+    }
+    if (toDate != null && toDate.isNotEmpty) {
+      queryParams['created_at__date__lte'] = toDate;
+    }
+
+    final response = await apiClient.get(
+      apiClient.endpoints.sdmsTransactions,
+      queryParameters: queryParams,
+    );
+
+    final List<dynamic> data = response.data;
+    return data.map((json) => SDMSTransaction.fromJson(json)).toList();
+  }
+
+  @override
+  Future<SDMSTransaction> getSDMSTransactionDetail(String transactionId) async {
+    final response = await apiClient.get(
+      apiClient.endpoints.sdmsTransactionDetail(transactionId),
+    );
+    return SDMSTransaction.fromJson(response.data);
+  }
+
+  @override
+  Future<SDMSApiResponse> createInvoiceAssign(String orderId) async {
+    final response = await apiClient.post(
+      apiClient.endpoints.sdmsInvoiceAssign,
+      data: {'order_id': orderId},
+    );
+    return SDMSApiResponse.fromJson(response.data);
+  }
+
+  @override
+  Future<SDMSApiResponse> createCreditPayment(String orderId) async {
+    final response = await apiClient.post(
+      apiClient.endpoints.sdmsCreditPayment,
+      data: {'order_id': orderId},
+    );
+    return SDMSApiResponse.fromJson(response.data);
+  }
+
+  @override
+  Future<void> retryTask(String transactionId) async {
+    await apiClient.post(
+      apiClient.endpoints.sdmsRetryTask(transactionId),
+    );
+  }
 
 }

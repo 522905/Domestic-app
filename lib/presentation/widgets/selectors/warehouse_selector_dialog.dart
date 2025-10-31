@@ -81,7 +81,7 @@ class _WarehouseSelectorContentState extends State<_WarehouseSelectorContent> {
     setState(() {
       searchQuery = query.toLowerCase();
       filteredWarehouses = widget.warehouses.where((warehouse) {
-        final name = (warehouse['name'] ?? '').toString().toLowerCase();
+        final name = (warehouse['warehouse_label'] ?? '').toString().toLowerCase();
         final type = (warehouse['warehouse_type'] ?? '').toString().toLowerCase();
         final location = (warehouse['location'] ?? '').toString().toLowerCase();
         return name.contains(searchQuery) ||
@@ -180,7 +180,7 @@ class _WarehouseSelectorContentState extends State<_WarehouseSelectorContent> {
                     ),
                   ),
                   title: Text(
-                    warehouse['name'] ?? 'Unknown Name',
+                    warehouse['warehouse_label'] ?? 'Unknown Name',
                     style: TextStyle(
                       color: isActive ? Colors.black : Colors.grey,
                       fontWeight: FontWeight.w500,

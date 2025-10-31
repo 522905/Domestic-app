@@ -201,7 +201,7 @@ class BankTab extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    DateFormat('MMM dd, HH:mm').format(transaction.createdAt),
+                    DateFormat('MMM dd').format(transaction.createdAt),
                     style: TextStyle(
                       fontSize: 12.sp,
                       color: Colors.grey[600],

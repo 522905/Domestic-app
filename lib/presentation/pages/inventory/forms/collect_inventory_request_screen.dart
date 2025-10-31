@@ -327,7 +327,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                 ),
               ),
               child: Text(
-                'Back to Collection Screen',
+                'Back to Challan',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16.sp,
@@ -667,7 +667,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
         },
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Collect Inventory'),
+            title: const Text('Challan'),
             backgroundColor: const Color(0xFF0E5CA8),
             foregroundColor: Colors.white,
             elevation: 0,
@@ -703,7 +703,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              Icons.local_shipping,
+                              Icons.insert_page_break,
                               color: Colors.blue,
                               size: 20.sp,
                             ),
@@ -714,7 +714,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Collect Inventory',
+                                  'Challan',
                                   style: TextStyle(
                                     fontSize: 16.sp,
                                     fontWeight: FontWeight.bold,
@@ -722,7 +722,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Select vehicle to view pending deliveries',
+                                  'Select vehicle to create a new collection challan',
                                   style: TextStyle(
                                     fontSize: 12.sp,
                                     color: Colors.grey[600],

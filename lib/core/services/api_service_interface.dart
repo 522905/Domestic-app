@@ -1,5 +1,13 @@
 // lib/core/services/api_service_interface.dart
+import 'dart:ffi';
+
+import '../../data/models/sdms/sdms_transaction.dart';
+import '../../domain/entities/warehouse.dart';
 import '../models/inventory/inventory_request.dart';
+import '../models/purchase_invoice/api_response.dart';
+import '../models/purchase_invoice/driver.dart';
+import '../models/purchase_invoice/purchase_invoice.dart';
+import '../models/purchase_invoice/vehicle_history.dart';
 import 'User.dart';
 
 abstract class ApiServiceInterface {
@@ -15,8 +23,9 @@ abstract class ApiServiceInterface {
   Future<void> logout();
   Future<Map<String, dynamic>> getUserProfile();
   Future<Map<String, dynamic>> getOrderDetail(String orderId);
-  Future<Map<String, dynamic>> refreshCashData();
+  // Future<Map<String, dynamic>> refreshCashData();
   Future<dynamic> requestOrderApproval(String orderId);
+  Future<dynamic> requestFinalizeOrder(String orderId);
 
   Future<List<dynamic>> getInventory({
     String? warehouseId,
@@ -129,16 +138,58 @@ abstract class ApiServiceInterface {
   Future<Map<String, dynamic>> submitHandover(Map<String, dynamic> data);
   Future<Map<String, dynamic>> approveTransaction(String transactionId);
   Future<Map<String, dynamic>> rejectTransaction(String transactionId, Map<String, dynamic> rejectionData);
-
   Future<Map<String, dynamic>>getPendingDeliveryItems(
       String vehicleId,
   );
-
   Future<Map<String, dynamic>> getOrderItems({
     required String orderType,
     String? warehouseId,  // Add this optional parameter
   });
-
   Future<Map<String, dynamic>> getOrderDetails(String orderId);
+  Future<Map<String, dynamic>> initiateAadhaar(String aadhaarNumber, String phoneNumber);
+  Future<Map<String, dynamic>> submitAadhaarOtp(String aadhaarNumber, String refId, String otp, String phoneNumber);
+  Future<Map<String, dynamic>> initiatePartner(String panNumber);
+  Future<Map<String, dynamic>> changePassword(String oldPassword, String newPassword);
+  Future<Map<String, dynamic>> sendOTP(Map<String, String> data);
+  Future<Map<String, dynamic>> resetPassword(Map<String, String> data);
+  // Add these method signatures to your existing ApiServiceInterface
 
+  // Purchase Invoice Methods
+  Future<List<PurchaseInvoice>> getPendingInvoices();
+  Future<List<PurchaseInvoice>> getReceivedInvoices();
+  Future<Map<String, dynamic>> getInvoiceDetails(
+      String gstin,
+      String invoiceDate,
+      String invoiceNumber
+  );
+  Future<List<Map<String, dynamic>>> searchDrivers(String query);
+  Future<String> uploadDriverPhoto(String filePath);
+  Future<dynamic> getVehicleHistory(String vehicleNo);
+  Future<Map<String, dynamic>> getDriverDetails(int driverId);
+  Future<List<Map<String, dynamic>>> getAvailableItems();
+  Future<ApiResponse> submitReceiveVehicle(Map<String, dynamic> payload);
+  Future<ApiResponse> submitDispatchVehicle(Map<String, dynamic> payload);
+  Future<Map<String, dynamic>> updateDeviceToken(String fcmToken, String deviceId);
+  Future<List<SDMSTransaction>> getSDMSTransactions({
+    String? status,
+    String? actionType,
+    String? fromDate,
+    String? toDate,
+  });
+  Future<SDMSTransaction> getSDMSTransactionDetail(String transactionId);
+  Future<SDMSApiResponse> createInvoiceAssign(String orderId);
+  Future<SDMSApiResponse> createCreditPayment(String orderId);
+  Future<void> retryTask(String transactionId);
+  Future<Map<String, dynamic>> checkAppVersion();
+  Future<Map<String, dynamic>> getWarehouseStock({String? warehouseId});
+  Future<Map<String, dynamic>> getGeneralLedger({
+    required String fromDate,
+    required String toDate,
+    String? accountNames,
+  });
+  Future<Map<String, dynamic>> getAvailableAccounts();
+  Future<List<int>> getVoucherPDF({
+    required String voucherType,
+    required String voucherNo,
+  });
 }

@@ -27,18 +27,22 @@ class SalesOrderDepositData extends DepositData {
 
   // Get individual order items for top component
   List<OrderItem> getOrderItems() {
-    return orders.map((order) => OrderItem(
-      salesOrder: order['sales_order'] ?? '',
-      transactionDate: order['transaction_date'] ?? '',
-      status: order['status'] ?? '',
-      salesOrderItem: order['sales_order_item'] ?? '',
-      itemCode: order['item_code'] ?? '',
-      warehouse: order['warehouse'] ?? '',
-      qtyOrdered: (order['qty_ordered'] ?? 0).toDouble(),
-      qtyReturned: (order['qty_returned'] ?? 0).toDouble(),
-      balanceQty: (order['balance_qty'] ?? 0).toDouble(),
-      itemDescription: _getItemDescription(order['item_code'] ?? ''),
-    )).toList();
+    return orders.map((order) {
+      final itemCode = order['item_code'] ?? '';
+      return OrderItem(
+        salesOrder: order['sales_order'] ?? '',
+        transactionDate: order['transaction_date'] ?? '',
+        status: order['status'] ?? '',
+        salesOrderItem: order['sales_order_item'] ?? '',
+        itemCode: itemCode,
+        warehouse: order['warehouse'] ?? '',
+        qtyOrdered: (order['qty_ordered'] ?? 0).toDouble(),
+        qtyReturned: (order['qty_returned'] ?? 0).toDouble(),
+        balanceQty: (order['balance_qty'] ?? 0).toDouble(),
+        itemDescription: _getItemDescription(itemCode),
+        deliveredQty: (order['delivered_qty'] ?? 0).toInt(), // FIXED: Now returns int, not string
+      );
+    }).toList();
   }
 
   // Calculate "To Return" for specific order item
@@ -59,6 +63,15 @@ class SalesOrderDepositData extends DepositData {
     return ordered - returned - selectedForThisItem;
   }
 
+  // NEW: Get already selected filled+defective count for a specific order item
+  int getdeliveryQty(String salesOrderItem) {
+    return selectedReturns
+        .where((selected) =>
+    selected.againstSalesOrderItem == salesOrderItem &&
+        (selected.returnType == 'filled' || selected.returnType == 'defective'))
+        .fold(0, (sum, selected) => sum + selected.qty.toInt());
+  }
+
   // Get eligible returns for specific item code
   Map<String, List<Map<String, dynamic>>> getEligibleReturns(String itemCode) {
     final itemSummary = summaryByItemCode[itemCode];
@@ -67,6 +80,7 @@ class SalesOrderDepositData extends DepositData {
     final eligibleReturns = itemSummary['eligible_returns'] as Map<String, dynamic>? ?? {};
     return {
       'empty': List<Map<String, dynamic>>.from(eligibleReturns['empty'] ?? []),
+      'filled': List<Map<String, dynamic>>.from(eligibleReturns['filled'] ?? []),
       'defective': List<Map<String, dynamic>>.from(eligibleReturns['defective'] ?? []),
     };
   }
@@ -102,9 +116,44 @@ class SalesOrderDepositData extends DepositData {
 
   @override
   int getMaxQuantityLimit() => totalBalanceQty.toInt();
+
+  // Convert SelectedReturn to API item format
+  Map<String, dynamic> selectedReturnToItemMap(SelectedReturn selectedReturn) {
+    final itemMap = {
+      'item_code': selectedReturn.returnItemCode,
+      'item_name': selectedReturn.returnItemDescription,
+      'qty': selectedReturn.qty,
+      'return_type': selectedReturn.returnType,
+      'sales_order_ref': selectedReturn.againstSalesOrder,
+      'sales_order_detail_ref': selectedReturn.againstSalesOrderItem,
+    };
+
+    // Add defective-specific fields including consumer details
+    if (selectedReturn.isDefective) {
+      itemMap.addAll({
+        'cylinder_number': selectedReturn.cylinderNumber!,
+        'tare_weight': selectedReturn.tareWeight!,
+        'gross_weight': selectedReturn.grossWeight!,
+        'net_weight': selectedReturn.netWeight!,
+        'fault_type': selectedReturn.faultType!,
+        'consumer_number': selectedReturn.consumerNumber!,
+        'consumer_name': selectedReturn.consumerName!,
+        'consumer_mobile_number': selectedReturn.consumerMobileNumber!,
+      });
+    }
+
+    return itemMap;
+  }
+
+// Convert all selected returns to API items format
+  List<Map<String, dynamic>> getSelectedReturnsAsItems() {
+    return selectedReturns.map((sr) => selectedReturnToItemMap(sr)).toList();
+  }
+
 }
 
-// Data classes for the new structure
+// Add this copyWith method to your existing OrderItem class
+
 class OrderItem {
   final String salesOrder;
   final String transactionDate;
@@ -116,6 +165,7 @@ class OrderItem {
   final double qtyReturned;
   final double balanceQty;
   final String itemDescription;
+  final int deliveredQty;
 
   OrderItem({
     required this.salesOrder,
@@ -128,14 +178,44 @@ class OrderItem {
     required this.qtyReturned,
     required this.balanceQty,
     required this.itemDescription,
+    required this.deliveredQty,
   });
+
+  // ADD THIS METHOD
+  OrderItem copyWith({
+    String? salesOrder,
+    String? transactionDate,
+    String? status,
+    String? salesOrderItem,
+    String? itemCode,
+    String? warehouse,
+    double? qtyOrdered,
+    double? qtyReturned,
+    double? balanceQty,
+    String? itemDescription,
+    int? deliveredQty,
+  }) {
+    return OrderItem(
+      salesOrder: salesOrder ?? this.salesOrder,
+      transactionDate: transactionDate ?? this.transactionDate,
+      status: status ?? this.status,
+      salesOrderItem: salesOrderItem ?? this.salesOrderItem,
+      itemCode: itemCode ?? this.itemCode,
+      warehouse: warehouse ?? this.warehouse,
+      qtyOrdered: qtyOrdered ?? this.qtyOrdered,
+      qtyReturned: qtyReturned ?? this.qtyReturned,
+      balanceQty: balanceQty ?? this.balanceQty,
+      itemDescription: itemDescription ?? this.itemDescription,
+      deliveredQty: deliveredQty ?? this.deliveredQty,
+    );
+  }
 }
 
 class SelectedReturn {
   final String id;
   final String returnItemCode;
   final String returnItemDescription;
-  final String returnType; // 'empty' or 'defective'
+  final String returnType; // 'empty', 'filled', or 'defective'
   final double qty;
   final String againstSalesOrder;
   final String againstSalesOrderItem;
@@ -148,6 +228,11 @@ class SelectedReturn {
   final double? grossWeight;
   final double? netWeight;
   final String? faultType;
+
+  // Consumer details (mandatory for defective returns)
+  final String? consumerNumber;
+  final String? consumerName;
+  final String? consumerMobileNumber;
 
   SelectedReturn({
     required this.id,
@@ -164,8 +249,12 @@ class SelectedReturn {
     this.grossWeight,
     this.netWeight,
     this.faultType,
+    this.consumerNumber,
+    this.consumerName,
+    this.consumerMobileNumber,
   });
 
   bool get isDefective => returnType == 'defective';
   bool get isEmpty => returnType == 'empty';
+  bool get isFilled => returnType == 'filled';
 }

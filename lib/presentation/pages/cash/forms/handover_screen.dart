@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/api_service_interface.dart';
 import '../../../../domain/entities/cash/cash_transaction.dart';
+import '../../../../utils/currency_utils.dart';
 import '../../../../utils/dialog_utils.dart';
 import '../../../blocs/cash/cash_bloc.dart';
 
@@ -31,6 +32,10 @@ class _HandoverScreenState extends State<HandoverScreen> {
   void initState() {
     super.initState();
     apiService = context.read<ApiServiceInterface>();
+    // Listen to amount changes
+    _amountController.addListener(() {
+      setState(() {});
+    });
     _fetchCashData();
   }
 
@@ -52,7 +57,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
       final paidToAccountResponse = await apiService.getCashAccount();
       _paidToAccountObjects = List<Map<String, dynamic>>.from(paidToAccountResponse);
       final paidToAccountList = _paidToAccountObjects
-          .map<String>((item) => item['account_name'] as String)
+          .map<String>((item) => item['account_label'] as String)
           .toList();
 
       setState(() {
@@ -73,7 +78,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
   int? _getPaidToAccountId(String accountName) {
     try {
       final account = _paidToAccountObjects.firstWhere(
-            (item) => item['account_name'] == accountName,
+            (item) => item['account_label'] == accountName,
       );
       return account['id'] as int;
     } catch (e) {
@@ -90,17 +95,40 @@ class _HandoverScreenState extends State<HandoverScreen> {
         return;
       }
 
-      final amount = double.parse(_amountController.text);
+      // 🔧 Strip grouping commas (and any stray spaces) before parsing
+      final raw = _amountController.text.replaceAll(',', '').trim();
 
-      // Get account ID from selected account name
+      // Extra guard rails
+      if (raw.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid amount')),
+        );
+        return;
+      }
+
+      final amount = double.tryParse(raw);
+      if (amount == null || amount <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Amount must be a positive number')),
+        );
+        return;
+      }
+
       final paidToAccountId = _getPaidToAccountId(_selectedAccount!);
-
       if (paidToAccountId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Invalid account selected')),
         );
         return;
       }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
 
       final transaction = CashTransaction(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -109,26 +137,48 @@ class _HandoverScreenState extends State<HandoverScreen> {
         amount: amount,
         createdAt: DateTime.now(),
         initiator: 'D',
-        selectedAccount: paidToAccountId.toString(), // Send ID as string
-        paidTo: paidToAccountId.toString(), // Send ID as string
+        selectedAccount: paidToAccountId.toString(),
+        paidTo: paidToAccountId.toString(),
         createdBy: 'Current User',
         notes: _remarksController.text.isNotEmpty ? _remarksController.text : null,
-        fromAccount: "", // You can set this based on your business logic
-        modeOfPayment: 'Cash', // Always cash for handovers
+        fromAccount: paidToAccountId.toString(), // Use same account ID
+        modeOfPayment: 'Cash',
       );
 
       final completer = Completer<void>();
-      context.read<CashManagementBloc>().add(AddTransaction(transaction, completer: completer));
+      context.read<CashManagementBloc>().add(
+          AddTransaction(transaction, completer: completer)
+      );
 
       try {
         await completer.future;
+
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Handover submitted successfully')),
+          const SnackBar(
+            content: Text('Handover submitted successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
-        Navigator.pop(context, true); // Return success indicator
+
+        if (mounted) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          Navigator.pop(context, true);
+        }
+
       } catch (e) {
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error submitting handover: $e')),
+          SnackBar(
+            content: Text('Error submitting handover: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -191,7 +241,6 @@ class _HandoverScreenState extends State<HandoverScreen> {
                         },
                       ),
                       SizedBox(height: 16.h),
-
                       // Amount
                       Text(
                         'Amount (₹)',
@@ -201,32 +250,58 @@ class _HandoverScreenState extends State<HandoverScreen> {
                         ),
                       ),
                       SizedBox(height: 8.h),
+                      if (_amountController.text.isNotEmpty) ...[
+                        SizedBox(height: 8.h),
+                        Center(
+                          child: Container(
+                            padding: EdgeInsets.all(10.w),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(
+                                color: Colors.yellow!,
+                              ),
+                            ),
+                            child: Text(
+                              amountToWords(int.tryParse(_amountController.text.replaceAll(',', '')) ?? 0), // Remove underscore
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                color: Colors.yellow,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: 8.h),
                       TextFormField(
                         controller: _amountController,
                         keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          IndianCurrencyInputFormatter(),
+                        ],
+                        style: TextStyle(
+                          fontSize: 25.sp,
+                          color: Colors.black,
+                        ),
                         decoration: InputDecoration(
                           hintText: 'Enter amount',
-                          suffixText: 'INR',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8.r),
                           ),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                          prefixText: '₹ ',
+                          suffixText: 'INR',
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter an amount';
                           }
-                          final amount = double.tryParse(value);
-                          if (amount == null || amount <= 0) {
-                            return 'Please enter a valid amount';
-                          }
                           return null;
                         },
                       ),
                       SizedBox(height: 16.h),
-
-                      // Remarks
                       Text(
                         'Remarks',
                         style: TextStyle(
@@ -247,7 +322,6 @@ class _HandoverScreenState extends State<HandoverScreen> {
                         ),
                       ),
                       SizedBox(height: 24.h),
-
                       // Submit Button
                       SizedBox(
                         width: double.infinity,

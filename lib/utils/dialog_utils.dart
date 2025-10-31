@@ -54,9 +54,9 @@ class DialogUtils {
                     itemBuilder: (context, index) {
                       final account = accounts[index];
                       return ListTile(
-                        title: Text(account['account_name'] ?? 'Unknown Account'),
+                        title: Text(account['account_label'] ?? 'Unknown Account'),
                         onTap: () {
-                          onAccountSelected(account['account_name']);
+                          onAccountSelected(account['account_label']);
                           Navigator.of(context).pop();
                         },
                       );

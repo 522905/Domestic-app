@@ -108,7 +108,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
   Widget _buildHeader() {
     final orderType = widget.orderData.orderType;
     final color = orderType == 'Refill' ? Colors.blue : Colors.orange;
-    final icon = orderType == 'Refill' ? Icons.local_gas_station : Icons.inventory;
+    final icon = orderType == 'Refill' ? Icons.inventory_2_outlined : Icons.inventory;
 
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -424,7 +424,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                       borderRadius: BorderRadius.circular(25.r),
                     ),
                     child: Icon(
-                      orderType == 'Refill' ? Icons.local_gas_station : Icons.inventory,
+                      orderType == 'Refill' ? Icons.inventory_2 : Icons.inventory,
                       color: color,
                       size: 24.sp,
                     ),

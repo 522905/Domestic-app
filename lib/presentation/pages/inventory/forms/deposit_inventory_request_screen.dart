@@ -83,121 +83,6 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
           break;
         case DepositData.salesOrder:
           itemData = await apiService.getPendingSaleOrderList();
-          // itemData ={
-          //   "customer": "AZEPH2516F",
-          //   "orders": [
-          //     {
-          //       "sales_order": "SAL-ORD-2025-00158",
-          //       "transaction_date": "2025-08-28",
-          //       "status": "On Hold",
-          //       "sales_order_item": "pjjkl63bs2",
-          //       "item_code": "M00104",
-          //       "warehouse": "Sherpur Godown - AIG",
-          //       "qty_ordered": 5.0,
-          //       "qty_returned": 0.0,
-          //       "balance_qty": 5.0
-          //     },
-          //     {
-          //       "sales_order": "SAL-ORD-2025-00158",
-          //       "transaction_date": "2025-08-28",
-          //       "status": "On Hold",
-          //       "sales_order_item": "pjjvjn455a",
-          //       "item_code": "M00087",
-          //       "warehouse": "Sherpur Godown - AIG",
-          //       "qty_ordered": 5.0,
-          //       "qty_returned": 0.0,
-          //       "balance_qty": 5.0
-          //     },
-          //     {
-          //       "sales_order": "SAL-ORD-2025-00159",
-          //       "transaction_date": "2025-08-28",
-          //       "status": "On Hold",
-          //       "sales_order_item": "psi2satm1b",
-          //       "item_code": "M00087",
-          //       "warehouse": "Sherpur Godown - AIG",
-          //       "qty_ordered": 4.0,
-          //       "qty_returned": 0.0,
-          //       "balance_qty": 4.0
-          //     },
-          //     {
-          //       "sales_order": "SAL-ORD-2025-00159",
-          //       "transaction_date": "2025-08-28",
-          //       "status": "On Hold",
-          //       "sales_order_item": "psif59f5l4",
-          //       "item_code": "M00104",
-          //       "warehouse": "Sherpur Godown - AIG",
-          //       "qty_ordered": 4.0,
-          //       "qty_returned": 0.0,
-          //       "balance_qty": 4.0
-          //     },
-          //     {
-          //       "sales_order": "SAL-ORD-2025-00157",
-          //       "transaction_date": "2025-08-27",
-          //       "status": "On Hold",
-          //       "sales_order_item": "3mrqnbcgvd",
-          //       "item_code": "M00087",
-          //       "warehouse": "Sherpur Godown - AIG",
-          //       "qty_ordered": 10.0,
-          //       "qty_returned": 0.0,
-          //       "balance_qty": 10.0
-          //     }
-          //   ],
-          //   "summary_by_item_code": {
-          //     "M00104": {
-          //       "balance_qty": 9.0,
-          //       "item_description": "5 Kg LPG Cylinder - Filled",
-          //       "eligible_returns": {
-          //         "empty": [
-          //           {
-          //             "item_code": "M00105",
-          //             "description": "5 Kg LPG Cylinder - Empty"
-          //           },
-          //           {
-          //             "item_code": "M0010101",
-          //             "description": "5 Kg LPG Cylinder - Empty"
-          //           },
-          //           {
-          //             "item_code": "M00101010",
-          //             "description": "5 Kg LPG Cylinder - Empty"
-          //           }
-          //         ],
-          //         "defective": [
-          //           {
-          //             "item_code": "M00101",
-          //             "description": "5 Kg LPG Cylinder - Defective"
-          //           },
-          //           {
-          //             "item_code": "M001010",
-          //             "description": "5 Kg LPG Cylinder - Defective"
-          //           }
-          //         ]
-          //       }
-          //     },
-          //     "M00087": {
-          //       "balance_qty": 19.0,
-          //       "item_description": "14.2 Kg LPG Cylinder - Filled",
-          //       "eligible_returns": {
-          //         "empty": [
-          //           {
-          //             "item_code": "M00088",
-          //             "description": "14.2 Kg LPG Cylinder - Empty"
-          //           }
-          //         ],
-          //         "defective": [
-          //           {
-          //             "item_code": "M00108",
-          //             "description": "14.2 Kg LPG Cylinder - defective"
-          //           },
-          //           {
-          //             "item_code": "M08080",
-          //             "description": "14.2 Kg LPG Cylinder - defective"
-          //           }
-          //         ]
-          //       }
-          //     }
-          //   },
-          //   "total_balance_qty": 28.0
-          // };
           break;
         case DepositData.materialRequest:
           itemData = await apiService.getMaterialRequestList();
@@ -306,7 +191,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
 
     if (selectedWarehouse != null) {
       setState(() {
-        _selectedWarehouseName = selectedWarehouse['name'] ?? 'Unknown';
+        _selectedWarehouseName = selectedWarehouse['warehouse_label'] ?? 'Unknown';
         _selectedWarehouseId = selectedWarehouse['id']?.toString() ?? 'Unknown';
         _selectedWarehouse = selectedWarehouse['location']?.toString().isNotEmpty == true
             ? selectedWarehouse['location'].toString()
@@ -605,21 +490,21 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
             'return_type': "Deposit",
             'sales_order_ref': returnItem.againstSalesOrder,
             'sales_order_detail_ref': returnItem.againstSalesOrderItem,
-            // 'against_sales_order': returnItem.againstSalesOrder,
-            // 'sales_order_detail_ref': returnItem.againstSalesOrderItem,
-            // 'against_item_code': returnItem.againstItemCode,
-            // 'against_item_description': returnItem.againstItemDescription,
+            'line_type': returnItem.returnType[0].toUpperCase() + returnItem.returnType.substring(1)
           };
 
           // Add defective-specific fields if applicable
           if (returnItem.isDefective) {
-            payload.addAll({
+            payload['extra'] = {
               'cylinder_number': returnItem.cylinderNumber,
               'tare_weight': returnItem.tareWeight,
               'gross_weight': returnItem.grossWeight,
               'net_weight': returnItem.netWeight,
               'fault_type': returnItem.faultType,
-            });
+              'consumer_number': returnItem.consumerNumber,
+              'consumer_name': returnItem.consumerName,
+              'consumer_mobile_number': returnItem.consumerMobileNumber,
+            };
           }
 
           return payload;
@@ -1061,8 +946,8 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
-                                        firstReturn.isEmpty ? Icons.autorenew : Icons.warning,
-                                        color: firstReturn.isEmpty ? Colors.green : Colors.orange,
+                                        firstReturn.isEmpty ? Icons.inventory_2_outlined : Icons.inventory,
+                                        color: Colors.orange,
                                         size: 16.sp,
                                       ),
                                     ),

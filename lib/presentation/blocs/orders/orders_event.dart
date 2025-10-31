@@ -51,13 +51,19 @@ class SearchOrders extends OrdersEvent {
   List<Object?> get props => [query];
 }
 
-class RequestOrderApproval extends OrdersEvent {
+class RequestOrderAction extends OrdersEvent {
   final String orderId;
+  final OrderActionType actionType;
 
-  const RequestOrderApproval(this.orderId);
+  const RequestOrderAction(this.orderId, this.actionType);
 
   @override
-  List<Object> get props => [orderId];
+  List<Object> get props => [orderId, actionType];
+}
+
+enum OrderActionType {
+  requestApproval,
+  finalize,
 }
 
 // NEW EVENT FOR ORDER DETAILS

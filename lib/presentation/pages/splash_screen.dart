@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../main.dart';
 import 'login/login_screen.dart';
 import 'main_container.dart';
 
@@ -24,6 +25,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _checkLoginStatus() async {
     final isLoggedIn = await _secureStorage.read(key: 'isLoggedIn');
     if (isLoggedIn == 'true') {
+      await sendPendingFCMToken(context);
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainContainer()),
       );
@@ -41,12 +43,6 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // App Logo
-            // Icon(
-            //   Icons.local_fire_department,
-            //   size: 100.sp,
-            //   color: Theme.of(context).primaryColor,
-            // ),
             Image.asset(
               'assets/images/app_icon.png',
               width: 100.w,

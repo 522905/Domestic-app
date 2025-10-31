@@ -154,7 +154,7 @@ class InventoryRequest extends Equatable {
       requestType: json['request_type']?.toString() ?? '',
       status: json['status']?.toString() ?? 'PENDING',
       timestamp: json['created_at']?.toString() ?? '',
-      vehicle: json['partner_name']?.toString() ?? json['vehicle']?.toString() ?? json['partner']?.toString(),
+      vehicle: json['vehicle_number']?.toString() ,
       isFavorite: json['is_favorite'] ?? false,
       customerName: json['custom_customer']?.toString(),
       stockEntryType: json['stock_entry_type']?.toString(),

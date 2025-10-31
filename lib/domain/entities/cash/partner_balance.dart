@@ -30,12 +30,14 @@ class AccountBalance extends Equatable {
   final double ledgerBalance;
   final double openSalesOrders;
   final double availableBalance;
+  final  String accountName;
 
   const AccountBalance({
     required this.account,
     required this.ledgerBalance,
     required this.openSalesOrders,
     required this.availableBalance,
+    required this.accountName
   });
 
   factory AccountBalance.fromJson(Map<String, dynamic> json) {
@@ -44,9 +46,10 @@ class AccountBalance extends Equatable {
       ledgerBalance: (json['ledger_balance'] as num?)?.toDouble() ?? 0.0,
       openSalesOrders: (json['open_sales_orders'] as num?)?.toDouble() ?? 0.0,
       availableBalance: (json['available_balance'] as num?)?.toDouble() ?? 0.0,
+      accountName: json['account_name'] ?? '',
     );
   }
 
   @override
-  List<Object?> get props => [account, ledgerBalance, openSalesOrders, availableBalance];
+  List<Object?> get props => [account, ledgerBalance, openSalesOrders, availableBalance,accountName];
 }

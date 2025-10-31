@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 class ApiEndpoints {
   final String baseUrl;
 
-  // final String tempUrl = 'http://192.168.168.152:8001';
-  final String tempUrl = 'http://192.168.171.34:9900';
+  // final String tempUrl = 'https://lpg.ops.arungas.com';
+  final String tempUrl = 'http://192.168.171.49:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
@@ -21,14 +21,9 @@ class ApiEndpoints {
   String get orderApproval => '$baseUrl/api/approvals/{order_id}/approve';
   String get orderReject => '$baseUrl/api/approvals/{order_id}/reject';
   String get autoRelease => '$tempUrl/api/orders/auto-release-sales-order/';
+  String get finalizeOrder => '$tempUrl/api/orders/finalize-sales-order/';
   String get accountsList => '$tempUrl/api/users/users-list/';
   String get vehicles => '$tempUrl/api/users/api/masters/vehicles/';
-
-  String transactionApprove(String transactionId) =>
-      '$tempUrl/api/payments/payment-requests/$transactionId/approve/';
-
-  String transactionReject(String transactionId) =>
-      '$tempUrl/api/payments/payment-requests/$transactionId/reject/';
 
   String get cashList => '$tempUrl/api/payments/list/';
 
@@ -67,11 +62,14 @@ class ApiEndpoints {
   //CASH API'S
   String get paymentListApi => '$tempUrl/api/payments/payment-requests/';
   String transactionDetail(String transactionId) => '$tempUrl/api/payments/payment-requests/$transactionId/';
+  String transactionApprove(String transactionId) => '$tempUrl/api/payments/payment-requests/$transactionId/approve/';
+  String transactionReject(String transactionId) => '$tempUrl/api/payments/payment-requests/$transactionId/reject/';
   String get partnerAccountBalance => '$tempUrl/api/payments/partner-account-balance/';
   String get cashierAccountBalance => '$tempUrl/api/payments/cash-account-balance/';
 
   // STOCK API'S
   String get stockListApi => '$tempUrl/api/stocks/stock-requests/';
+  String orderDetails(String orderId) => '$tempUrl/api/orders/sales-orders/$orderId/';
   String stockDetailApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/';
   String approveRequestsApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/approve/';
   String rejectRequestsApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/reject/';
@@ -82,13 +80,46 @@ class ApiEndpoints {
   String get getOrderItems => '$tempUrl/api/orders/items-for-order/';
   String get orders => '$tempUrl/api/orders/sales-order-request/';
   String get ordersData => '$tempUrl/api/orders/sales-orders/';
-  String orderDetails(String orderId) => '$tempUrl/api/orders/sales-orders/$orderId/';
 
   //Auth API'S
   String get login => '$tempUrl/api/users/auth/login/';
   String get refresh => '$baseUrl/api/users/auth/refresh/';
   String get companyList => '$tempUrl/api/users/auth/companies/';
   String get switchCompany => '$tempUrl/api/users/auth/switch-company/';
-  String get logout => '$baseUrl/api/logout';
+  String get logout => '$tempUrl/api/users/auth/logout/';
+  String get initiateAadhaar => '$tempUrl/kyc/api/initiate-aadhaar/';
+  String get submitAadhaarOtp => '$tempUrl/kyc/api/submit-aadhaar-otp/';
+  String get initiatePartner => '$tempUrl/kyc/api/initiate-partner/';
+  String get changePassword => '$tempUrl/api/users/auth/change-password/';
+  String get sendOTP => '$tempUrl/api/users/auth/forgot-password/request-otp/';
+  String get resetPassword => '$tempUrl/api/users/auth/forgot-password/reset-password/';
+  String get purchaseInvoices => '$tempUrl/procurement/purchase-invoices/';
+  String get validateSeedCode => '$tempUrl/purchase-invoices/validate-seed/';
+  String get searchDrivers => '$tempUrl/procurement/drivers/search/';
+  String get createDriver => '$tempUrl/procurement/drivers/';
+  String get uploadDriverPhoto => 'http://arungas.com:1080/files/';
+  String get submitReceive => '$tempUrl/procurement/purchase-invoices/receive/';
+  String get submitDispatch => '$tempUrl/procurement/invoices/dispatch/';
+  String vehicleHistory(String vehicleNo) => '$tempUrl/procurement/vehicles/$vehicleNo/history/';
+  String driverDetials(int driverId) => '$tempUrl/procurement/drivers/$driverId/';
+  String get userWarehouses => '$tempUrl/procurement/user/warehouses/';
+  String get receivedAPI => '$tempUrl/procurement/invoices/receive/';
+  String get pendingInvoices => '$tempUrl/procurement/invoices/pending/';
+  String get receivedInvoices => '$tempUrl/procurement/invoices/received/';
+  String purchaseInvoiceDetails(String gstin, String invoiceDate, String invoiceNumber) => '$tempUrl/procurement/invoices/$gstin/$invoiceDate/$invoiceNumber/';
+  String get versionCheck => '$tempUrl/api/version/check/';
+  String get versionPolicy => '$tempUrl/api/version/policy/';
+  String get appConfig => '$tempUrl/app-config';
+  String get updateDeviceToken => '$tempUrl/api/users/notifications/register-device/';
 
+  String get sdmsTransactions => '$tempUrl/sdms/api/transactions/';
+  String sdmsTransactionDetail(String id) => '$tempUrl/sdms/api/transactions/$id/';
+  String get sdmsInvoiceAssign => '$tempUrl/sdms/api/transactions/invoice-assign/';
+  String get sdmsCreditPayment => '$tempUrl/sdms/api/transactions/credit-payment/';
+  String sdmsRetryTask(String id) => '$tempUrl/sdms/api/transactions/$id/retry-task/';
+  // In your endpoints class
+  String get warehouseStock => '$tempUrl/api/stocks/warehouse-balance/';
+  String get ledgerData => '$tempUrl/reports/api/general-ledger/';
+  String get availableAccounts => '$tempUrl/reports/api/available-accounts/';
+  String voucherPDF(String voucherType, String voucherNo) => '$tempUrl/reports/voucher-pdf/?voucher_type=$voucherType&voucher_no=$voucherNo';
 }

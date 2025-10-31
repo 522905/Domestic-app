@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:provider/provider.dart';
 import 'package:lpg_distribution_app/presentation/pages/orders/forms/create_sale_order_page.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/cash_page.dart';
-import '../../../core/services/dashboard_service.dart';
 import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
+import '../../widgets/notification/inbox.dart';
+import '../../widgets/warehouse_stock_card_screen.dart';
+import '../cash/forms/cash_deposit_page.dart';
+import '../inventory/forms/collect_inventory_request_screen.dart';
+import '../inventory/forms/deposit_inventory_request_screen.dart';
 import '../inventory/inventory_screen.dart';
+import '../purchase_invoice/purchase_invoice_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -21,6 +25,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _userName;
   List<String> _userRoles = [];
   UserCompany? activeCompany;
+  String? novuAppId;
+  String? novuSubscriberId;
 
   // Dashboard Statistics
   final Map<String, dynamic> _dashboardStats = {
@@ -31,7 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   };
 
   // Pending Approval Counts
-  int _pendingInventoryApprovals = 8;
+  int _pendingInventoryApprovals = 0;
   int _pendingCashApprovals = 3;
   int _pendingOrderApprovals = 2;
   int _pendingCSETickets = 15;
@@ -40,6 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _initializeDashboard();
+    loadNovuData();
   }
 
   Future<void> _initializeDashboard() async {
@@ -66,6 +73,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _showErrorSnackBar('Failed to load user information');
       }
     }
+  }
+
+  Future<void> loadNovuData() async {
+    final appId = await User().getNovuApplicationIdentifier();
+    final subscriberId = await User().getNovuSubscriberId();
+
+    setState(() {
+      novuAppId = appId;
+      novuSubscriberId = subscriberId;
+    });
   }
 
   Future<void> _loadDashboardData() async {
@@ -102,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_userRoles.contains('Warehouse Manager') || _userRoles.contains('General Manager')) {
       // Load from inventory list
       setState(() {
-        _pendingInventoryApprovals = 8; // Get from your inventory list where status = 'pending'
+        _pendingInventoryApprovals = 1; // Get from your inventory list where status = 'pending'
       });
     }
 
@@ -184,7 +201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: GlobalDrawer.getDrawer(context),
+      drawer: GlobalDrawer.getDrawer(context, userRoles: _userRoles.toSet()),
       appBar: _buildAppBar(),
       body: _isLoading ? _buildLoadingWidget() : _buildDashboardBody(),
     );
@@ -217,40 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onPressed: _isRefreshing ? null : _refreshDashboard,
           tooltip: 'Refresh Dashboard',
         ),
-        IconButton(
-          icon: Stack(
-            children: [
-              const Icon(Icons.notifications, color: Colors.white),
-              if (_getTotalPendingCount() > 0)
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    padding: EdgeInsets.all(2.w),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: BoxConstraints(
-                      minWidth: 16.w,
-                      minHeight: 16.h,
-                    ),
-                    child: Text(
-                      _getTotalPendingCount().toString(),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          onPressed: _showNotificationsBottomSheet,
-          tooltip: 'Notifications',
-        ),
+        Inbox(),
         SizedBox(width: 8.w),
       ],
     );
@@ -453,15 +437,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       sections.add(SizedBox(height: 24.h));
     }
 
-    // Warehouse Manager Content
-    if (_userRoles.contains('Warehouse Manager')) {
-      sections.add(_buildWarehouseManagerSection());
-      sections.add(SizedBox(height: 24.h));
-    }
-
     // Cashier Content
     if (_userRoles.contains('Cashier')) {
       sections.add(_buildCashierSection());
+      sections.add(SizedBox(height: 24.h));
+    }
+
+    // Warehouse Manager Content
+    if (_userRoles.contains('Warehouse Manager')) {
+      sections.add(_buildWarehouseManagerSection());
       sections.add(SizedBox(height: 24.h));
     }
 
@@ -514,8 +498,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onTap: () => _navigateToCashDeposit(),
             ),
             _buildActionCard(
-              title: 'Collect Items',
-              subtitle: 'Pick up inventory',
+              title: 'Challan',
+              subtitle: 'Create a challan',
               icon: Icons.add_circle_outline,
               color: Colors.orange,
               onTap: () => _navigateToInventoryCollect(),
@@ -540,6 +524,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _buildSectionHeader('Inventory Management', Icons.warehouse),
         SizedBox(height: 16.h),
         _buildApprovalCard(
+          title: 'Procurement  (Purchase Invoice)',
+          subtitle: 'Vehicle In/ out records',
+          count: _pendingInventoryApprovals,
+          icon: Icons.add,
+          color: Colors.orangeAccent,
+          onTap: () {
+            Navigator.push(
+              GlobalDrawer.navigatorContext!,
+              MaterialPageRoute(builder: (context) => const PurchaseInvoiceScreen()),
+            );
+          },
+          showViewAll: true,
+        ),
+        SizedBox(height: 16.h),
+        _buildApprovalCard(
           title: 'Inventory Approvals',
           subtitle: 'Review pending requests',
           count: _pendingInventoryApprovals,
@@ -549,27 +548,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           showViewAll: true,
         ),
         SizedBox(height: 12.h),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatsCard(
-                title: 'Today\'s Transfers',
-                value: '24',
-                icon: Icons.swap_horiz,
-                color: Colors.green,
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: _buildStatsCard(
-                title: 'Low Stock Items',
-                value: '5',
-                icon: Icons.warning,
-                color: Colors.orange,
-              ),
-            ),
-          ],
-        ),
+        // Warehouse stock card
+        const WarehouseStockCard(),
       ],
     );
   }
@@ -588,28 +568,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: Colors.green,
           onTap: () => _navigateToCashApprovals(),
           showViewAll: true,
-        ),
-        SizedBox(height: 12.h),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatsCard(
-                title: 'Today\'s Cash',
-                value: '₹${(_dashboardStats['total_cash_collected'] / 1000).toStringAsFixed(0)}k',
-                icon: Icons.currency_rupee,
-                color: Colors.green,
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: _buildStatsCard(
-                title: 'Transactions',
-                value: '18',
-                icon: Icons.receipt_long,
-                color: Colors.purple,
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -862,7 +820,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           boxShadow: [
             BoxShadow(
               color: count > 0 ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.05),
-              blurRadius: 8,
+              blurRadius: 0,
               offset: const Offset(0, 2),
             ),
           ],
@@ -1282,7 +1240,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const CashPage(), // Navigate to cash page with deposit mode
+        builder: (context) => CashDepositPage(), // Navigate to cash page with deposit mode
       ),
     ).then((_) => _refreshDashboard());
   }
@@ -1291,7 +1249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const InventoryPage(), // Navigate to inventory with collect mode
+        builder: (context) => const CollectInventoryScreen(), // Navigate to inventory with collect mode
       ),
     ).then((_) => _refreshDashboard());
   }
@@ -1300,7 +1258,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const InventoryPage(), // Navigate to inventory with deposit mode
+        builder: (context) => DepositInventoryScreen(
+          depositType: "sales_order",
+        ),// Navigate to inventory with deposit mode
       ),
     ).then((_) => _refreshDashboard());
   }
@@ -1415,13 +1375,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!mounted) return;
 
     try {
-      // Example WebSocket data structure:
-      // {
-      //   "type": "approval_update",
-      //   "module": "inventory", // or "cash", "orders", "cse"
-      //   "count": 5,
-      //   "action": "new_pending" // or "approved", "rejected"
-      // }
 
       final String? type = data['type'];
       final String? module = data['module'];

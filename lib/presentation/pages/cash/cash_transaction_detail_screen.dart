@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:ffi';
+
+import 'package:flutter/material.dart' hide Size;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -14,10 +16,10 @@ class TransactionDetailScreen extends StatefulWidget {
   final bool canApprove; // Whether current user can approve this transaction
 
   const TransactionDetailScreen({
-    Key? key,
+    super.key,
     required this.transactionId,
     this.canApprove = false,
-  }) : super(key: key);
+  });
 
   @override
   State<TransactionDetailScreen> createState() => _TransactionDetailScreenState();
@@ -30,12 +32,12 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   CashTransaction? _currentTransaction; // Keep track of current transaction
   String? _userName;
   bool _isTransactionUpdated = false; // Track if transaction was updated
+ Int? _userId;
 
   final List<String> _rejectionReasons = [
     'Incorrect Amount',
     'Cash Amount Mismatch',
     'Missing Receipt',
-    'Invalid Documentation',
     'Other'
   ];
 
@@ -51,8 +53,10 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
 
   Future<void> _fetchUserRole() async {
     final userName = await User().getUserName();
+    final userId = await User().getUserId();
     setState(() {
       _userName = userName;
+      _userId = userId as Int?;
     });
   }
 
@@ -66,7 +70,6 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // Return whether the transaction was updated to refresh the parent screen
         Navigator.of(context).pop(_isTransactionUpdated);
         return false;
       },
@@ -78,6 +81,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
+              // ✅ SIMPLE: Just pop, no refresh
               Navigator.of(context).pop(_isTransactionUpdated);
             },
           ),
@@ -96,6 +100,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
         body: BlocConsumer<CashManagementBloc, CashManagementState>(
           listener: (context, state) {
             if (state is TransactionActionSuccess) {
+
               // Mark that transaction was updated
               _isTransactionUpdated = true;
 
@@ -116,31 +121,6 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   );
                 }
               });
-            }
-
-            if (state is CashManagementError) {
-              // Show simple error dialog
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  content: Text(state.message),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        context.read<CashManagementBloc>().add(
-                            LoadTransactionDetails(transactionId: widget.transactionId)
-                        );
-                      },
-                      child: Text('Retry'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('Close'),
-                    ),
-                  ],
-                ),
-              );
             }
 
             if (state is TransactionDetailsLoaded) {
@@ -259,15 +239,84 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               ],
             ),
             Text(
-              DateFormat('MMMM d, yyyy • h:mm a').format(transaction.createdAt),
-              style: TextStyle(
-                fontSize: 13.sp,
-                color: Colors.grey[600],
-              ),
+              formatUpdatedAtAbsoluteDT(transaction.createdAt),
+              style: TextStyle(fontSize: 13.sp, color: Colors.grey[600]),
             ),
 
             SizedBox(height: 16.h),
 
+            // Amount Card with words
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                side: BorderSide(color: const Color(0xFF0E5CA8).withOpacity(0.2)),
+              ),
+              child: Container(
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12.r),
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF0E5CA8).withOpacity(0.05),
+                      Colors.white,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Transaction Amount',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 2.h),
+                    Padding(
+                      padding: EdgeInsetsGeometry.fromLTRB(5, 0, 0, 0),
+                      child: Text(
+                        NumberFormat.currency(
+                          symbol: '₹',
+                          decimalDigits: 0,
+                          locale: 'en_IN',
+                        ).format(transaction.amount),
+                        style: TextStyle(
+                          fontSize: 28.sp,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0E5CA8),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.all(2.w),
+                      // decoration: BoxDecoration(
+                      //   color: Colors.grey[100],
+                      //   borderRadius: BorderRadius.circular(8.r),
+                      // ),
+                      child: Text(
+                        _amountToWords(transaction.amount),
+                        style: TextStyle(
+                          fontSize: 15.sp,
+                          color: Colors.grey[700],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            SizedBox(height: 16.h),
             // Transaction Details Card
             Card(
               elevation: 0,
@@ -318,26 +367,21 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                     // Last updated info
                     if (transaction.updatedAt != null) ...[
                       SizedBox(height: 8.h),
+                      if (transaction.updatedAt != null)
                         Text(
-                            'Last updated: ${formatUpdatedAtAbsolute(transaction.updatedAt)}',
-                            style: TextStyle(
-                                fontSize: 12.sp,
-                                color: Colors.grey[500],
-                                fontStyle: FontStyle.italic,
-                            ),
-                        )
-                      ],
+                          'Last updated: ${formatUpdatedAtAbsoluteDT(transaction.updatedAt)}',
+                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                        ),
+                    ],
                   ],
                 ),
               ),
             ),
-
             SizedBox(height: 16.h),
 
-            // Status-specific information card
-            _buildStatusInfoCard(transaction),
-
-            SizedBox(height: 16.h),
+            // Add this after the receipt image section or wherever appropriate
+            if (transaction.type == TransactionType.bank)
+              _buildBankDepositSlipSection(transaction),
 
             // Receipt Preview (if available)
             if (transaction.receiptImagePath != null) ...[
@@ -432,7 +476,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                             : Colors.grey.shade300,
                       ),
                     ),
-                    minimumSize: Size(double.infinity, 48.h),
+                    // minimumSize: Size(double.infinity, 48.h),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -448,73 +492,68 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                 ),
                 SizedBox(height: 16.h),
               ],
-              // Approve/Reject action buttons
-              Card(
-                elevation: 0,
-                color: const Color(0xFFF5F5F5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(16.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Action Required',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      Container(
-                        height: 60.h,
-                        margin: EdgeInsets.symmetric(vertical: 8.h),
-                        child: SwipeActionButton(
-                          onReject: () => _showRejectionReasonSheet(transaction),
-                          onApprove: () => _approveTransaction(transaction),
-                        ),
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ] else ...[
-              // Close button for non-pending or non-approvable transactions
-              Center(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(_isTransactionUpdated),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    minimumSize: Size(200.w, 48.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                  child: const Text('Close',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
 
-            SizedBox(height: 24.h),
+              // Approve/Reject action buttons
+              if (
+                // show card if it's not a bank transaction
+                transaction.type != TransactionType.bank &&
+                  (
+                      // if it's deposit, always show
+                      transaction.type == TransactionType.deposit ||
+                          // if it's handover, show only if username matches
+                          (transaction.type == TransactionType.handover &&
+                              transaction.toAccountId != _userId)
+                      )
+                  ) ...[
+                Card(
+                  elevation: 0,
+                  color: const Color(0xFFF5F5F5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(16.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Action Required',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        Container(
+                          height: 60.h,
+                          margin: EdgeInsets.symmetric(vertical: 8.h),
+                          child: SwipeActionButton(
+                            onReject: () => _showRejectionReasonSheet(transaction),
+                            onApprove: () => _approveTransaction(transaction),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+            SizedBox(height: 15.h),
+            _buildStatusInfoCard(transaction),
+            SizedBox(height: 16.h),
           ],
         ),
       ),
     );
   }
 
-  String formatUpdatedAtAbsolute(DateTime? dt) {
+  String formatUpdatedAtAbsoluteDT(DateTime? dt, {String locale = 'en_US'}) {
     if (dt == null) return 'Unknown';
-    return DateFormat('MMM dd, yyyy • h:mm a').format(dt.toLocal());
+    final local = dt.toLocal();
+    return DateFormat('MMM dd, yyyy • h:mm a', locale).format(local);
   }
+
 
   Widget _buildStatusInfoCard(CashTransaction transaction) {
     if (transaction.status == TransactionStatus.approved) {
@@ -553,14 +592,19 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                 _buildDetailRow('Approved by:', 'System'),
 
               if (transaction.approvedAt != null)
-                _buildDetailRow('Approved on:',
-                    DateFormat('MMM dd, yyyy • h:mm a').format(transaction.approvedAt!)),
+                _buildDetailRow('Approved on:', formatUpdatedAtAbsoluteDT(transaction.approvedAt)),
+
+              if (transaction.rejectedAt != null)
+                _buildDetailRow('Rejected on:', formatUpdatedAtAbsoluteDT(transaction.rejectedAt)),
 
               if (transaction.approvedAsRole != null && transaction.approvedAsRole!.isNotEmpty)
                 _buildDetailRow('Approved as:', transaction.approvedAsRole!),
 
               if (transaction.approvedUsingAccount != null && transaction.approvedUsingAccount!.isNotEmpty)
                 _buildDetailRow('Account used:', transaction.approvedUsingAccount!),
+
+              SizedBox(height: 12.h),
+              closeButton()
             ],
           ),
         ),
@@ -638,6 +682,8 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                     ],
                   ),
                 ),
+                SizedBox(height: 12.h),
+                closeButton(),
               ],
             ],
           ),
@@ -685,7 +731,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     );
   }
 
-  void _approveTransaction(CashTransaction transaction) {
+  Future<void> _approveTransaction(CashTransaction transaction) async {
     if (transaction.type == TransactionType.handover && !_isCashReceived) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -699,6 +745,9 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     context.read<CashManagementBloc>().add(
         ApproveTransaction(transactionId: transaction.id)
     );
+    // The WillPopScope callback will handle the refresh
+
+    Navigator.pop(context);
   }
 
   void _showRejectionReasonSheet(CashTransaction transaction) {
@@ -784,7 +833,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                               borderRadius: BorderRadius.circular(8.r),
                             ),
                             side: BorderSide(color: Colors.grey[300]!),
-                            minimumSize: Size(0, 48.h),
+                            // minimumSize: Size(20, 48.h),
                           ),
                           child: Text(
                             'Cancel',
@@ -797,8 +846,8 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                       SizedBox(width: 16.w),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _selectedRejectionReason == null ? null : () {
-                            Navigator.pop(context);
+                          onPressed: _selectedRejectionReason == null ? null : () async {
+                            Navigator.pop(context); // Close the bottom sheet
 
                             context.read<CashManagementBloc>().add(
                                 RejectTransaction(
@@ -809,6 +858,9 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                                       : null,
                                 )
                             );
+
+                            // The WillPopScope callback will handle the refresh
+                            Navigator.pop(context); // Go back to cash_page
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
@@ -816,7 +868,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8.r),
                             ),
-                            minimumSize: Size(0, 48.h),
+                            // minimumSize: Size(20, 48.h)
                           ),
                           child: const Text('Reject'),
                         ),
@@ -879,12 +931,158 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
             child: Text(
               value,
               style: TextStyle(
-                fontSize: 13.sp,
+                fontSize: 15.sp,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBankDepositSlipSection(CashTransaction transaction) {
+    if (transaction.bankDepositDetails == null) return const SizedBox.shrink();
+
+    final bankSlipUrl = transaction.bankDepositDetails!['bank_deposit_slip'] as String? ??
+        transaction.bankDepositDetails!['bank_deposit_slip_url'] as String?;
+
+    if (bankSlipUrl == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 16.h),
+        Text(
+          'Bank Deposit Slip',
+          style: TextStyle(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[700],
+          ),
+        ),
+        SizedBox(height: 8.h),
+        GestureDetector(
+          onTap: () => _viewFullBankDepositSlip(bankSlipUrl),
+          child: Container(
+            height: 200.h,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8.r),
+              child: Image.network(
+                bankSlipUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 48.sp, color: Colors.red),
+                        SizedBox(height: 8.h),
+                        Text('Failed to load image', style: TextStyle(fontSize: 12.sp)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 4.h),
+        Center(
+          child: Text(
+            'Tap to view full image',
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: Colors.grey[600],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _viewFullBankDepositSlip(String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF0E5CA8),
+            title: const Text('Bank Deposit Slip'),
+          ),
+          body: Container(
+            color: Colors.black,
+            child: PhotoView(
+              imageProvider: NetworkImage(imageUrl),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 2,
+              backgroundDecoration: const BoxDecoration(
+                color: Colors.black,
+              ),
+              loadingBuilder: (context, event) => Center(
+                child: CircularProgressIndicator(
+                  value: event == null
+                      ? 0
+                      : event.cumulativeBytesLoaded / (event.expectedTotalBytes ?? 1),
+                ),
+              ),
+              errorBuilder: (context, error, stackTrace) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'Failed to load image',
+                      style: TextStyle(fontSize: 16.sp, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget closeButton() {
+    return Center(
+      child: ElevatedButton(
+        onPressed: () {
+          // ✅ SIMPLE: Just pop, no refresh
+          Navigator.of(context).pop(_isTransactionUpdated);
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Theme.of(context).primaryColor,
+          // minimumSize: Size(200.w, 48.h),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+        ),
+        child: const Text(
+          'Close',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -911,6 +1109,58 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       default:
         return 'Transaction';
     }
+  }
+
+  String _amountToWords(double amount) {
+    final int wholeAmount = amount.toInt();
+
+    if (wholeAmount == 0) return 'Zero Rupees';
+
+    final ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    final teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    final tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    String convertHundreds(int num) {
+      String result = '';
+      if (num >= 100) {
+        result += '${ones[num ~/ 100]} Hundred ';
+        num %= 100;
+      }
+      if (num >= 20) {
+        result += '${tens[num ~/ 10]} ';
+        num %= 10;
+      }
+      if (num >= 10) {
+        result += '${teens[num - 10]} ';
+        num = 0;
+      }
+      if (num > 0) {
+        result += '${ones[num]} ';
+      }
+      return result.trim();
+    }
+
+    String result = '';
+
+    if (wholeAmount >= 10000000) {
+      result += '${convertHundreds(wholeAmount ~/ 10000000)} Crore ';
+      final remaining = wholeAmount % 10000000;
+      if (remaining >= 100000) result += '${convertHundreds(remaining ~/ 100000)} Lakh ';
+      if (remaining % 100000 >= 1000) result += '${convertHundreds((remaining % 100000) ~/ 1000)} Thousand ';
+      if (remaining % 1000 > 0) result += convertHundreds(remaining % 1000);
+    } else if (wholeAmount >= 100000) {
+      result += '${convertHundreds(wholeAmount ~/ 100000)} Lakh ';
+      final remaining = wholeAmount % 100000;
+      if (remaining >= 1000) result += '${convertHundreds(remaining ~/ 1000)} Thousand ';
+      if (remaining % 1000 > 0) result += convertHundreds(remaining % 1000);
+    } else if (wholeAmount >= 1000) {
+      result += '${convertHundreds(wholeAmount ~/ 1000)} Thousand ';
+      if (wholeAmount % 1000 > 0) result += convertHundreds(wholeAmount % 1000);
+    } else {
+      result = convertHundreds(wholeAmount);
+    }
+
+    return '${result.trim()} Rupees Only';
   }
 
 }

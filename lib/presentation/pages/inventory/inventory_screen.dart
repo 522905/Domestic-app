@@ -150,11 +150,28 @@ class _InventoryPageState extends State<InventoryPage>
         backgroundColor: const Color(0xFF0E5CA8),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFFFFFFFF)),
+            icon: const Icon(
+                Icons.refresh,
+                color: Colors.white
+            ),
             onPressed: () {
-              context
-                  .read<InventoryBloc>()
-                  .add(const RefreshInventoryRequests());
+              _loadData().then((_) {
+                if (mounted) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (BuildContext context) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    },
+                  );
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    Navigator.of(context).pop(); // Close the dialog after 1 second
+                    context.read<InventoryBloc>().add(const RefreshInventoryRequests());
+                  });
+                }
+              });
             },
           ),
         ],
@@ -551,6 +568,24 @@ class _InventoryPageState extends State<InventoryPage>
                   ),
                 ],
               ),
+              SizedBox(height: 2.h),
+              Row(
+                children: [
+                  Icon(
+                    Icons.fire_truck,
+                    size: 16.sp,
+                    color: Colors.grey[600],
+                  ),
+                  SizedBox(width: 4.w),
+                  Text(
+                    'Vehicle Number: ${request.vehicle}',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
               SizedBox(height: 8.h),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -693,8 +728,8 @@ class _InventoryPageState extends State<InventoryPage>
               if (_userRole.contains('Delivery Boy'))
                 _buildBottomSheetOption(
                   icon: Icons.inventory,
-                  title: 'Collect Inventory',
-                  subtitle: 'Collect items from warehouse',
+                  title: 'Create Challan',
+                  subtitle: 'Create a inventory challan',
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToActionScreen(
