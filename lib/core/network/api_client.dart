@@ -30,13 +30,19 @@ class ApiClient {
     // Add version control interceptor
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
+        // Add auth token to ALL requests
+        final tokenManager = User();
+        final token = await tokenManager.getToken();
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+
         // Add version headers to all requests
         final versionHeaders = _versionManager.getVersionHeaders();
         options.headers.addAll(versionHeaders);
 
         // Add user ID if available
-        final user = User();
-        final userId = await user.getUserId();
+        final userId = await tokenManager.getUserId();
         if (userId != null) {
           options.headers['X-User-ID'] = userId;
         }
@@ -62,13 +68,13 @@ class ApiClient {
     ));
 
     // Load saved token
-    final tokenManager = User();
-    final savedToken = await tokenManager.getToken();
-    if (savedToken != null) {
-      _token = savedToken;
-      _dio.options.headers['Authorization'] = 'Bearer $_token';
-      print("Token loaded from storage: Bearer $_token");
-    }
+    // final tokenManager = User();
+    // final savedToken = await tokenManager.getToken();
+    // if (savedToken != null) {
+    //   _token = savedToken;
+    //   _dio.options.headers['Authorization'] = 'Bearer $_token';
+    //   print("Token loaded from storage: Bearer $_token");
+    // }
 
     _isInitialized = true;
   }
@@ -84,6 +90,7 @@ class ApiClient {
     _dio.options.headers.remove('Authorization');
     final tokenManager = User();
     await tokenManager.clearTokens();
+    _versionManager.clearCachedStatus(notify: true);
   }
 
   Future<Response> patch(String path, {dynamic data, Options? options}) async {
@@ -96,9 +103,9 @@ class ApiClient {
         Options? options,
       }) async {
     try {
-      if (_token != null) {
-        _dio.options.headers['Authorization'] = 'Bearer $_token';
-      }
+      // if (_token != null) {
+      //   _dio.options.headers['Authorization'] = 'Bearer $_token';
+      // }
 
       return await _dio.get(
         path,

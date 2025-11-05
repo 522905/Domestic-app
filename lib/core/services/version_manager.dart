@@ -27,6 +27,24 @@ class UpdateStatus {
   });
 }
 
+class UpdateRequiredException implements Exception {
+  final UpdateStatus status;
+
+  UpdateRequiredException(this.status);
+
+  @override
+  String toString() {
+    final buffer = StringBuffer('UpdateRequiredException');
+    if (status.latestVersion != null) {
+      buffer.write(' (v${status.latestVersion})');
+    }
+    if (status.message?.isNotEmpty == true) {
+      buffer.write(': ${status.message}');
+    }
+    return buffer.toString();
+  }
+}
+
 class VersionManager {
   static final _instance = VersionManager._internal();
   factory VersionManager() => _instance;
@@ -39,6 +57,7 @@ class VersionManager {
   String? _currentVersion;
   UpdateStatus? _currentStatus;
   bool _isBetaUser = false;
+  Map<String, dynamic>? _lastForcedUpdatePayload;
 
   // Callbacks for UI updates
   Function(UpdateStatus)? onStatusChanged;
@@ -91,13 +110,13 @@ class VersionManager {
         return;
     }
 
-    _currentStatus = UpdateStatus(
-      type: updateType,
-      message: 'Update available',
-      isBeta: status == 'beta',
+    setCurrentStatus(
+        UpdateStatus(
+          type: updateType,
+          message: 'Update available',
+          isBeta: status == 'beta',
+        ),
     );
-
-    onStatusChanged?.call(_currentStatus!);
   }
 
   // Check version via API
@@ -107,8 +126,8 @@ class VersionManager {
       final token = await user.getToken();
 
       final response = await _dio.get(
-        'http://192.168.171.49:9900/app-config',
-        // 'https://lpg.ops.arungas.com/app-config',
+        // 'http://192.168.171.49:9900/app-config',
+        'https://lpg.ops.arungas.com/app-config',
         options: Options(
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
@@ -119,35 +138,48 @@ class VersionManager {
 
       final data = response.data['android'];
       if (data == null) {
-        return UpdateStatus(type: UpdateType.none);
+        final status = UpdateStatus(type: UpdateType.none);
+        setCurrentStatus(status);
+        return status;
       }
 
       final status = _determineUpdateType(data);
+      final message = _getMessage(data, status);
 
-      _currentStatus = UpdateStatus(
+      var updateStatus = UpdateStatus(
         type: status,
-        message: _getMessage(data, status),
+        message: message,
         apkUrl: data['apk_url'],
         latestVersion: data['latest'],
         isBeta: data['update_channel'] == 'beta',
       );
 
-      _isBetaUser = _currentStatus!.isBeta;
-
       // Handle nudge dismissal tracking
       if (status == UpdateType.nudge) {
         final shouldShow = await _shouldShowNudge(data['latest']);
         if (!shouldShow) {
-          _currentStatus = UpdateStatus(type: UpdateType.none);
+          updateStatus = UpdateStatus(type: UpdateType.none);
         }
       }
 
-      onStatusChanged?.call(_currentStatus!);
+      Map<String, dynamic>? forcedPayload;
+      if (status == UpdateType.block) {
+        forcedPayload = {
+          'message': message,
+          'latest_version': data['latest'],
+          'download_url': data['apk_url'],
+          'update_channel': data['update_channel'],
+        };
+      }
+
+      setCurrentStatus(updateStatus, rawPayload: forcedPayload);
       return _currentStatus!;
 
     } catch (e) {
       print('Version check error: $e');
-      return UpdateStatus(type: UpdateType.none);
+      final status = UpdateStatus(type: UpdateType.none);
+      setCurrentStatus(status);
+      return status;
     }
   }
 
@@ -277,11 +309,31 @@ class VersionManager {
   bool get isBetaUser => _isBetaUser;
 
   // Set current status (needed when handling 426 from login)
-  void setCurrentStatus(UpdateStatus status) {
-    _currentStatus = status;
-    _isBetaUser = status.isBeta;
-  }
+    void setCurrentStatus(UpdateStatus status, {Map<String, dynamic>? rawPayload}) {
+      _currentStatus = status;
+      _isBetaUser = status.isBeta;
+      onStatusChanged?.call(_currentStatus!);
 
+      if (status.type == UpdateType.block) {
+        if (rawPayload != null) {
+          _lastForcedUpdatePayload = Map<String, dynamic>.from(rawPayload);
+        }
+      } else {
+        _lastForcedUpdatePayload = null;
+      }
+
+      onStatusChanged?.call(_currentStatus!);
+    }
+
+  void clearCachedStatus({bool notify = false}) {
+    _currentStatus = null;
+    _isBetaUser = false;
+    _lastForcedUpdatePayload = null;
+
+    if (notify) {
+      onStatusChanged?.call(UpdateStatus(type: UpdateType.none));
+    }
+  }
   // Headers for API requests
   Map<String, String> getVersionHeaders() {
     return {
@@ -289,6 +341,37 @@ class VersionManager {
       'X-Device-ID': _deviceId ?? '',
       'X-App-Platform': 'android',
     };
+  }
+
+  UpdateStatus createBlockedStatusFromResponse(Map<String, dynamic>? data) {
+    final message = data?['message'] as String?;
+    final latestVersion = data?['latest_version']?.toString();
+    final apkUrl = data?['download_url'] as String?;
+    final updateChannel = data?['update_channel'] as String?;
+
+    return UpdateStatus(
+      type: UpdateType.block,
+      message: message ??
+          'Your app version is no longer supported. Please update to continue.',
+      apkUrl: apkUrl,
+      latestVersion: latestVersion,
+      isBeta: updateChannel == 'beta',
+    );
+  }
+
+  Map<String, dynamic>? get lastForcedUpdatePayload =>
+      _lastForcedUpdatePayload == null
+          ? null
+          : Map<String, dynamic>.from(_lastForcedUpdatePayload!);
+
+  UpdateStatus? get storedForcedUpdateStatus {
+    if (_currentStatus?.type == UpdateType.block) {
+      return _currentStatus;
+    }
+    if (_lastForcedUpdatePayload != null) {
+      return createBlockedStatusFromResponse(_lastForcedUpdatePayload);
+    }
+    return null;
   }
 
   Future<void> downloadAndInstallAPKWithProgress(
@@ -302,12 +385,14 @@ class VersionManager {
     }
 
     final installPermission = await Permission.requestInstallPackages.request();
+
     if (!installPermission.isGranted) {
       throw Exception('Install permission denied');
     }
 
     // Use a simpler approach with overlays
     OverlayEntry? overlayEntry;
+
     final ValueNotifier<double> progressNotifier = ValueNotifier(0.0);
 
     overlayEntry = OverlayEntry(

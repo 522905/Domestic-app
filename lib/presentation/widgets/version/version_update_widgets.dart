@@ -139,113 +139,128 @@ class NudgeModal extends StatelessWidget {
 class BlockedUpdateScreen extends StatelessWidget {
   final UpdateStatus status;
   final VoidCallback onDownload;
+  final bool embed;
 
   const BlockedUpdateScreen({
     Key? key,
     required this.status,
     required this.onDownload,
+    this.embed = false,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final body = _buildBody(context);
+
+    if (embed) {
+      return Material(
+        color: Colors.transparent,
+        child: body,
+      );
+    }
+
     return WillPopScope(
       onWillPop: () async => false,
-      child: Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.red.shade50, Colors.white],
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.security_update_warning,
-                    size: 80,
-                    color: Colors.red.shade700,
+      child: Scaffold(body: body),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.red.shade50, Colors.white],
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.security_update_warning,
+                size: 80,
+                color: Colors.red.shade700,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Update Required',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Version ${status.latestVersion}',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  status.message ??
+                      'This version is no longer supported. Please update to continue using the app.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.download),
+                  label: const Text(
+                    'DOWNLOAD UPDATE',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Update Required',
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: onDownload,
+                ),
+              ),
+              if (status.isBeta)
+                Container(
+                  margin: const EdgeInsets.only(top: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'BETA CHANNEL',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 12,
+                      color: Colors.purple.shade700,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Version ${status.latestVersion}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      status.message ??
-                          'This version is no longer supported. Please update to continue using the app.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.download),
-                      label: const Text(
-                        'DOWNLOAD UPDATE',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: onDownload,
-                    ),
-                  ),
-                  if (status.isBeta)
-                    Container(
-                      margin: const EdgeInsets.only(top: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.shade100,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'BETA CHANNEL',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.purple.shade700,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
         ),
       ),

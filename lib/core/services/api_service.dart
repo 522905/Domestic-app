@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lpg_distribution_app/core/services/User.dart';
 import '../../data/models/sdms/sdms_transaction.dart';
+import 'package:lpg_distribution_app/core/services/version_manager.dart';
 import '../../utils/error_handler.dart';
 import '../models/inventory/inventory_request.dart';
 import '../models/purchase_invoice/api_response.dart';
@@ -36,6 +38,29 @@ class ApiService implements ApiServiceInterface {
       } else if (error.response != null) {
         final statusCode = error.response?.statusCode;
         final data = error.response?.data;
+
+        if (statusCode == 426) {
+          Map<String, dynamic>? payload;
+          if (data is Map<String, dynamic>) {
+            payload = Map<String, dynamic>.from(data);
+          } else if (data is String && data.isNotEmpty) {
+            try {
+              final decoded = jsonDecode(data);
+              if (decoded is Map<String, dynamic>) {
+                payload = decoded;
+              }
+            } catch (_) {
+              // ignore parsing failures and continue with a null payload
+            }
+          }
+
+          final versionManager = VersionManager();
+          final updateStatus = versionManager.createBlockedStatusFromResponse(payload);
+          versionManager.setCurrentStatus(updateStatus, rawPayload: payload);
+
+          throw UpdateRequiredException(updateStatus);
+        }
+
         debugPrint('SERVER ERROR [$statusCode]: $data');
 
         if (data is Map<String, dynamic> &&
@@ -118,7 +143,7 @@ class ApiService implements ApiServiceInterface {
       final userRoles = await User().getUserRoles();
       if (userRoles.isEmpty) {
         // Clear the session since roles are invalid
-        await User().clearTokens();
+        // await User().clearTokens();
         throw Exception('No user roles assigned. Please contact administrator.');
       }
 

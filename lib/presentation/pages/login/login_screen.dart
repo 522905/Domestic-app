@@ -289,35 +289,29 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       String errorMessage = 'Login failed. Please try again.';
 
-      if (e is DioException) {
+      if (e is UpdateRequiredException) {
+        _handleForcedUpdate(e.status);
+        return;
+      } else if (e is DioException) {
         // CRITICAL FIX: Handle 426 status code specifically
         if (e.response?.statusCode == 426) {
           try {
             final responseData = e.response!.data;
-            final updateStatus = UpdateStatus(
-              type: UpdateType.block,
-              message: responseData['message'] ?? 'Your app version is no longer supported. Please update to continue.',
-              apkUrl: responseData['download_url'],
-              latestVersion: responseData['latest_version'],
-              isBeta: responseData['update_channel'] == 'beta',
-            );
+            Map<String, dynamic>? payload;
 
-            _versionManager.setCurrentStatus(updateStatus);
+            if (responseData is Map<String, dynamic>) {
+              payload = responseData;
+            } else if (responseData is String && responseData.isNotEmpty) {
+              final decoded = jsonDecode(responseData);
+              if (decoded is Map<String, dynamic>) {
+                payload = decoded;
+              }
+            }
 
-            if (!mounted) return;
+            final updateStatus =
+            _versionManager.createBlockedStatusFromResponse(payload);
 
-            // Navigate to blocked update screen with safe download callback
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => BlockedUpdateScreen(
-                  status: updateStatus,
-                  onDownload: () async {
-                    // Use the new safe download method
-                    await _versionManager.downloadAndInstallAPKWithProgress(context, updateStatus);
-                  },
-                ),
-              ),
-            );
+            _handleForcedUpdate(updateStatus, payload: payload);
             return;
           } catch (parseError) {
             print('Error parsing 426 response: $parseError');
@@ -348,6 +342,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 }
               }
             } catch (parseError) {
+              if (_handleForcedUpdate(_versionManager.currentStatus)) {
+                return;
+              }
               debugPrint('Error parsing API response: $parseError');
             }
           } else {
@@ -365,7 +362,21 @@ class _LoginScreenState extends State<LoginScreen> {
             }
           }
         }
-      } else {
+      }
+      else {
+        if (_handleForcedUpdate(_versionManager.currentStatus)) {
+          return;
+        }
+
+        final normalizedMessage = e.toString().toLowerCase();
+        if (normalizedMessage.contains('upgrade required') ||
+            normalizedMessage.contains('no longer supported')) {
+          if (_handleForcedUpdate(
+              _versionManager.storedForcedUpdateStatus)) {
+            return;
+          }
+        }
+
         debugPrint('Non-Dio exception: $e');
 
         // Check if it's the "No user roles" exception
@@ -392,6 +403,41 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  bool _handleForcedUpdate(UpdateStatus? status,
+      {Map<String, dynamic>? payload}) {
+    final UpdateStatus? computedStatus =
+        status ?? _versionManager.currentStatus ??
+            _versionManager.storedForcedUpdateStatus;
+
+    if (computedStatus == null || computedStatus.type != UpdateType.block) {
+      return false;
+    }
+
+    final updateStatus = computedStatus;
+
+    final rawPayload = payload ?? _versionManager.lastForcedUpdatePayload;
+    _versionManager.setCurrentStatus(updateStatus, rawPayload: rawPayload);
+
+    if (!mounted) {
+      return true;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => BlockedUpdateScreen(
+          status: updateStatus,
+          onDownload: () async {
+            await _versionManager.downloadAndInstallAPKWithProgress(
+              context,
+              updateStatus,
+            );
+          },
+        ),
+      ),
+    );
+    return true;
   }
 
   void _startDownload(UpdateStatus status) async {

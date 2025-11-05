@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:lpg_distribution_app/core/models/inventory/inventory_request.dart';
@@ -12,14 +14,18 @@ class PrinterService {
   BluetoothDevice? _connectedDevice;
   BluetoothCharacteristic? _writeCharacteristic;
   bool _isConnected = false;
-  final StreamController<bool> _connectionStatusController = StreamController<bool>.broadcast();
+  final StreamController<bool> _connectionStatusController =
+  StreamController<bool>.broadcast();
 
   Stream<bool> get connectionStatus => _connectionStatusController.stream;
   bool get isConnected => _isConnected;
   String? get connectedDeviceName => _connectedDevice?.platformName;
 
-  // Maximum chunk size for Bluetooth write (safe value)
-  static const int _maxChunkSize = 400; // Reduced from 509 for safety
+  // Chunk size handling
+  static const int _fallbackChunkSize = 200;
+  static const int _minChunkSize = 20;
+  static const int _absoluteMaxChunkSize = 512;
+  int _negotiatedChunkSize = _fallbackChunkSize;
 
   Future<bool> connectToPrinter(BluetoothDevice device) async {
     try {
@@ -29,6 +35,8 @@ class PrinterService {
 
       await device.connect(timeout: const Duration(seconds: 10));
       _connectedDevice = device;
+
+      await _negotiateChunkSize(device);
 
       List<BluetoothService> services = await device.discoverServices();
 
@@ -71,6 +79,7 @@ class PrinterService {
       _connectedDevice = null;
       _writeCharacteristic = null;
       _isConnected = false;
+      _negotiatedChunkSize = _fallbackChunkSize;
       _connectionStatusController.add(false);
     }
   }
@@ -82,18 +91,28 @@ class PrinterService {
     try {
       int offset = 0;
       while (offset < data.length) {
-        final end = (offset + _maxChunkSize < data.length)
-            ? offset + _maxChunkSize
-            : data.length;
-
+        final chunkSize = _negotiatedChunkSize;
+        final end = min(offset + chunkSize, data.length);
         final chunk = data.sublist(offset, end);
 
-        await _writeCharacteristic!.write(chunk, withoutResponse: true);
+        try {
+          await _writeCharacteristic!.write(
+            chunk,
+            withoutResponse: _writeCharacteristic!.properties.writeWithoutResponse,
+          );
 
-        // Small delay between chunks for printer processing
-        await Future.delayed(const Duration(milliseconds: 100));
+          await Future.delayed(const Duration(milliseconds: 80));
+          offset = end;  // Only advance if successful
 
-        offset = end;
+        } on PlatformException catch (e) {
+          final allowedLength = _extractAllowedLength(e);
+          if (allowedLength != null && allowedLength < chunk.length) {
+            _updateChunkSize(allowedLength);
+            // Don't advance offset - retry with smaller chunk
+            continue;
+          }
+          return false;
+        }
       }
       return true;
     } catch (e) {
@@ -106,9 +125,9 @@ class PrinterService {
       InventoryRequest request,
       String date,
       String vehicleId,
-      String driverName,
-      {String company = 'arungas'}
-      ) async {
+      String driverName, {
+        String company = 'arungas',
+      }) async {
     if (!_isConnected || _writeCharacteristic == null) {
       return false;
     }
@@ -149,12 +168,12 @@ class PrinterService {
       bytes.addAll([10]); // 1 line feeds
 
       bytes.addAll([27, 69, 1]); // Bold ON
-      bytes.addAll('CHALLAN'.codeUnits);  // Changed from WAREHOUSE SLIP
+      bytes.addAll('CHALLAN'.codeUnits); // Changed from WAREHOUSE SLIP
       bytes.addAll([27, 69, 0]); // Bold OFF
       bytes.addAll([10, 10]);
 
       // Format date and time
-      final timestamp = DateTime.parse(request.timestamp);
+      final timestamp = DateTime.parse(request.timestamp).toLocal();
       final dateStr = DateFormat('dd/MM/yyyy').format(timestamp);
       final timeStr = DateFormat('hh:mm a').format(timestamp);
 
@@ -200,10 +219,10 @@ class PrinterService {
           final qtyStr = qtyDouble % 1 == 0 ? qtyDouble.toInt().toString() : qtyDouble.toStringAsFixed(1);
 
           // Format with proper spacing for full width
-          final srPadded = _padLeft(srNo.toString(), 2);        // 2 chars
-          final itemPadded = _padRight(itemCode, 12);            // 12 chars
-          final qtyPadded = _padLeft(qtyStr, 3);                 // 3 chars
-          final soPadded = _padRight(soRef, 18);                 // 18 chars
+          final srPadded = _padLeft(srNo.toString(), 2); // 2 chars
+          final itemPadded = _padRight(itemCode, 12); // 12 chars
+          final qtyPadded = _padLeft(qtyStr, 3); // 3 chars
+          final soPadded = _padRight(soRef, 18); // 18 chars
 
           bytes.addAll('$srPadded | $itemPadded | $qtyPadded | $soPadded'.codeUnits);
           bytes.addAll([10]);
@@ -278,7 +297,7 @@ class PrinterService {
       bytes.addAll([10, 10]);
 
       // Format date and time
-      final timestamp = DateTime.parse(request.timestamp);
+      final timestamp = DateTime.parse(request.timestamp).toLocal();
       final dateStr = DateFormat('dd/MM/yyyy').format(timestamp);
       final timeStr = DateFormat('hh:mm a').format(timestamp);
 
@@ -350,12 +369,12 @@ class PrinterService {
       final success = await _writeInChunks(bytes);
 
       if (success) {
-        debugPrint('Challan printed successfully');
+        debugPrint('Slip printed successfully');
       }
 
       return success;
     } catch (e) {
-      debugPrint('Error printing challan: $e');
+      debugPrint('Error printing slip: $e');
       return false;
     }
   }
@@ -492,4 +511,48 @@ class PrinterService {
     disconnectPrinter();
     _connectionStatusController.close();
   }
+  Future<void> _negotiateChunkSize(BluetoothDevice device) async {
+    _negotiatedChunkSize = _fallbackChunkSize;
+
+    try {
+      await device.requestMtu(_absoluteMaxChunkSize);
+      final mtuStream = device.mtu;
+      final mtu = await mtuStream.first
+          .timeout(const Duration(seconds: 2), onTimeout: () => device.mtuNow);
+      _updateChunkSize(mtu - 3);
+      debugPrint('Printer MTU negotiated: $mtu, chunk size: $_negotiatedChunkSize');
+    } catch (e) {
+      final mtuNow = device.mtuNow;
+      if (mtuNow > 0) {
+        _updateChunkSize(mtuNow - 3);
+        debugPrint(
+            'Using current MTU $mtuNow, chunk size: $_negotiatedChunkSize (negotiation failed: $e)');
+      } else {
+        debugPrint('MTU negotiation failed: $e');
+      }
+    }
+  }
+
+    void _updateChunkSize(int? proposedLength) {
+      if (proposedLength == null || proposedLength <= 0) {
+        _negotiatedChunkSize = _fallbackChunkSize;
+        return;
+      }
+
+      final clamped = proposedLength.clamp(_minChunkSize, _absoluteMaxChunkSize);
+      _negotiatedChunkSize = clamped is int ? clamped : clamped.toInt();
+    }
+
+    int? _extractAllowedLength(PlatformException exception) {
+      final message = exception.message ?? exception.details?.toString();
+      if (message == null) return null;
+
+      final match = RegExp(r'max:\s*(\d+)').firstMatch(message);
+      if (match != null) {
+        final value = int.tryParse(match.group(1)!);
+        return value;
+      }
+
+      return null;
+    }
 }

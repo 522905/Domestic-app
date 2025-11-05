@@ -1,156 +1,3 @@
-// import 'package:flutter/material.dart';
-// import 'package:flutter_screenutil/flutter_screenutil.dart';
-// import 'package:lpg_distribution_app/presentation/pages/cash/cash_page.dart';
-// import 'package:lpg_distribution_app/presentation/pages/dashboard/dashboard_screen.dart';
-// import 'package:lpg_distribution_app/presentation/pages/profile/profile_screen.dart';
-// import 'package:lpg_distribution_app/presentation/pages/orders/orders_page.dart';
-// import 'package:lpg_distribution_app/presentation/widgets/version/version_update_widgets.dart';
-// import '../../core/services/version_manager.dart';
-// import 'inventory/inventory_screen.dart';
-//
-// class MainContainer extends StatefulWidget {
-//   final int initialTab;
-//
-//   const MainContainer({Key? key, this.initialTab = 0}) : super(key: key);
-//
-//   @override
-//   State<MainContainer> createState() => _MainContainerState();
-// }
-//
-// class _MainContainerState extends State<MainContainer> with WidgetsBindingObserver {
-//   late int _currentIndex;
-//   final _versionManager = VersionManager();
-//   UpdateStatus? _updateStatus;
-//   bool _showBanner = false;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _currentIndex = widget.initialTab; // Use initial tab from constructor
-//     WidgetsBinding.instance.addObserver(this);
-//
-//     _versionManager.onStatusChanged = (status) {
-//       setState(() {
-//         _updateStatus = status;
-//         _showBanner = status.type == UpdateType.inform;
-//       });
-//     };
-//
-//     _checkVersion();
-//   }
-//
-//   @override
-//   void dispose() {
-//     WidgetsBinding.instance.removeObserver(this);
-//     super.dispose();
-//   }
-//
-//   @override
-//   void didChangeAppLifecycleState(AppLifecycleState state) {
-//     if (state == AppLifecycleState.resumed) {
-//       _checkVersion();
-//     }
-//   }
-//
-//   Future<void> _checkVersion() async {
-//     await _versionManager.checkVersionViaAPI();
-//   }
-//
-//   void _startDownload() async {
-//     try {
-//       // If no APK URL, fetch full config first
-//       if (_updateStatus?.apkUrl == null) {
-//         final fullStatus = await _versionManager.checkVersionViaAPI();
-//         if (fullStatus.type != UpdateType.none && fullStatus.apkUrl != null) {
-//           setState(() {
-//             _updateStatus = fullStatus;
-//           });
-//           await _versionManager.downloadAndInstallAPKWithProgress(context, fullStatus);
-//         } else {
-//           ScaffoldMessenger.of(context).showSnackBar(
-//             const SnackBar(content: Text('Unable to get download URL')),
-//           );
-//         }
-//       } else {
-//         await _versionManager.downloadAndInstallAPKWithProgress(context, _updateStatus);
-//       }
-//     } catch (e) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('Download failed: $e')),
-//       );
-//     }
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       body: IndexedStack(
-//         index: _currentIndex,
-//         children: const [
-//           DashboardScreen(),
-//           OrdersPage(),
-//           CashPage(),
-//           InventoryPage(),
-//           ProfileScreen(),
-//         ],
-//       ),
-//       bottomNavigationBar: Column(
-//         mainAxisSize: MainAxisSize.min,
-//         children: [
-//           // Update banner above navigation
-//           if (_showBanner && _updateStatus != null)
-//             UpdateBanner(
-//               status: _updateStatus!,
-//               onDownload: _startDownload,
-//               onDismiss: () {
-//                 setState(() {
-//                   _showBanner = false;
-//                 });
-//               },
-//             ),
-//
-//           // Navigation bar
-//           BottomNavigationBar(
-//             currentIndex: _currentIndex,
-//             onTap: (index) {
-//               setState(() {
-//                 _currentIndex = index;
-//               });
-//             },
-//             type: BottomNavigationBarType.fixed,
-//             selectedItemColor: const Color(0xFF0E5CA8),
-//             unselectedItemColor: Colors.grey,
-//             selectedLabelStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500),
-//             unselectedLabelStyle: TextStyle(fontSize: 12.sp),
-//             items: const [
-//               BottomNavigationBarItem(
-//                 icon: Icon(Icons.home),
-//                 label: 'Home',
-//               ),
-//               BottomNavigationBarItem(
-//                 icon: Icon(Icons.receipt_long),
-//                 label: 'Orders',
-//               ),
-//               BottomNavigationBarItem(
-//                 icon: Icon(Icons.account_balance_wallet),
-//                 label: 'Cash',
-//               ),
-//               BottomNavigationBarItem(
-//                 icon: Icon(Icons.inventory),
-//                 label: 'Inventory',
-//               ),
-//               BottomNavigationBarItem(
-//                 icon: Icon(Icons.person),
-//                 label: 'Profile',
-//               ),
-//             ],
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lottie/lottie.dart';
@@ -177,6 +24,7 @@ class _MainContainerState extends State<MainContainer>
   final _versionManager = VersionManager();
   UpdateStatus? _updateStatus;
   bool _showBanner = false;
+  UpdateStatus? _blockedStatus;
 
   // One controller per tab to allow replay on re-select
   late final List<AnimationController> _iconCtrls;
@@ -187,8 +35,7 @@ class _MainContainerState extends State<MainContainer>
     _currentIndex = widget.initialTab;
 
     _iconCtrls = List.generate(
-      5,
-          (_) => AnimationController(
+      5, (_) => AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 700),
       ),
@@ -196,12 +43,16 @@ class _MainContainerState extends State<MainContainer>
 
     WidgetsBinding.instance.addObserver(this);
 
-    _versionManager.onStatusChanged = (status) {
-      setState(() {
-        _updateStatus = status;
-        _showBanner = status.type == UpdateType.inform;
-      });
-    };
+    final currentStatus = _versionManager.currentStatus;
+    if (currentStatus != null) {
+      _updateStatus = currentStatus;
+      _showBanner = currentStatus.type == UpdateType.inform;
+      if (currentStatus.type == UpdateType.block) {
+        _blockedStatus = currentStatus;
+      }
+    }
+
+    _versionManager.onStatusChanged = _handleStatusChanged;
 
     _checkVersion();
   }
@@ -212,6 +63,7 @@ class _MainContainerState extends State<MainContainer>
       c.dispose();
     }
     WidgetsBinding.instance.removeObserver(this);
+    _versionManager.onStatusChanged = null;
     super.dispose();
   }
 
@@ -252,9 +104,19 @@ class _MainContainerState extends State<MainContainer>
     }
   }
 
+  void _handleStatusChanged(UpdateStatus status) {
+    if (!mounted) return;
+
+    setState(() {
+      _updateStatus = status;
+      _showBanner = status.type == UpdateType.inform;
+      _blockedStatus = status.type == UpdateType.block ? status : null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final scaffold = Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: const [
@@ -375,13 +237,30 @@ class _MainContainerState extends State<MainContainer>
         ],
       ),
     );
+    final forcedStatus = _blockedStatus;
+
+    if (forcedStatus == null) {
+      return scaffold;
+    }
+
+    return Stack(
+      children: [
+        scaffold,
+        Positioned.fill(
+          child: BlockedUpdateScreen(
+            status: forcedStatus,
+            onDownload: () async {
+              await _versionManager
+                  .downloadAndInstallAPKWithProgress(context, forcedStatus);
+            },
+            embed: true,
+          ),
+        ),
+      ],
+    );
   }
 }
 
-/// Internal: tab icon that plays a Lottie clip when selected.
-/// When unselected, shows the fallback Material icon.
-/// - We keep size small to avoid baseline jumps.
-/// - We don't auto-animate; we drive via the provided controller so we can replay.
 class _AnimatedTabIcon extends StatelessWidget {
   final bool selected;
   final IconData fallbackIcon;

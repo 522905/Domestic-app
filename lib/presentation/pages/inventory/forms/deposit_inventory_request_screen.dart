@@ -328,8 +328,6 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
     }
   }
 
-
-
   void _showConfirmDepositDialog() {
 
     bool hasItems = widget.depositType == DepositData.salesOrder

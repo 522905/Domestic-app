@@ -484,55 +484,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   )
                 else if (_updateStatus != null && _updateStatus!.type != UpdateType.none) ...[
                   SizedBox(height: 16.h),
-                  InkWell(
-                    onTap: _isDownloading ? null : _handleUpdate,
-                    borderRadius: BorderRadius.circular(8.r),
-                    child: Container(
-                      padding: EdgeInsets.all(12.w),
-                      decoration: BoxDecoration(
-                        color: _getUpdateColor().withOpacity(0.1),
+                  Builder(
+                    builder: (context) {
+                      final hasApkUrl = _updateStatus?.apkUrl?.isNotEmpty ?? false;
+                      final canDownload = !_isDownloading && hasApkUrl;
+
+                      return InkWell(
+                        onTap: canDownload ? _handleUpdate : null,
                         borderRadius: BorderRadius.circular(8.r),
-                        border: Border.all(color: _getUpdateColor().withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.system_update, color: _getUpdateColor()),
-                          SizedBox(width: 12.w),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Version ${_updateStatus!.latestVersion}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: _getUpdateColor(),
-                                  ),
-                                ),
-                                Text(
-                                  _getUpdateText(),
-                                  style: TextStyle(fontSize: 12.sp, color: Colors.grey),
-                                ),
-                              ],
-                            ),
+                        child: Container(
+                          padding: EdgeInsets.all(12.w),
+                          decoration: BoxDecoration(
+                            color: _getUpdateColor().withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8.r),
+                            border: Border.all(color: _getUpdateColor().withOpacity(0.3)),
                           ),
-                          _isDownloading
-                              ? SizedBox(
-                            width: 20.w,
-                            height: 20.h,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                              : Icon(Icons.download, color: _getUpdateColor()),
-                        ],
-                      ),
-                    ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.system_update, color: _getUpdateColor()),
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Version ${_updateStatus!.latestVersion}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: _getUpdateColor(),
+                                      ),
+                                    ),
+                                    Text(
+                                      _getUpdateText(),
+                                      style: TextStyle(fontSize: 12.sp, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (_isDownloading)
+                                SizedBox(
+                                  width: 20.w,
+                                  height: 20.h,
+                                  child: const CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                Icon(
+                                  hasApkUrl ? Icons.download : Icons.link_off,
+                                  color: _getUpdateColor(),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ],
             ),
           ),
         ),
-
       ],
     );
   }

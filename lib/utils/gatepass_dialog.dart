@@ -22,7 +22,8 @@ class GatepassDialog extends StatefulWidget {
 
 class _GatepassDialogState extends State<GatepassDialog> {
   final PrinterService _printerService = PrinterService();
-  bool _isPrinting = false;
+  bool _isSlipPrinting = false;
+  bool _isChallanPrinting = false;
   bool _isScanning = false;
   bool _isConnected = false;
   List<BluetoothDevice> _printers = [];
@@ -87,13 +88,26 @@ class _GatepassDialogState extends State<GatepassDialog> {
     return widget.request.vehicle ?? 'N/A';
   }
 
-  Future<void> _scanForPrinters() async {
+  Future<void> _scanForPrinters({StateSetter? dialogSetState}) async {
     if (_isScanning) return;
 
-    setState(() {
-      _isScanning = true;
-      _printers.clear();
-    });
+    void refreshDialog() {
+      if (dialogSetState != null) {
+        try {
+          dialogSetState!(() {});
+        } catch (e) {
+          debugPrint('Dialog refresh error: $e');
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isScanning = true;
+        _printers.clear();
+      });
+    }
+    refreshDialog();
 
     try {
       final adapterState = await FlutterBluePlus.adapterState.first;
@@ -106,7 +120,8 @@ class _GatepassDialogState extends State<GatepassDialog> {
             ),
           );
         }
-        setState(() => _isScanning = false);
+        if (mounted) setState(() => _isScanning = false);
+        refreshDialog();
         return;
       }
 
@@ -134,17 +149,22 @@ class _GatepassDialogState extends State<GatepassDialog> {
           if (mounted) {
             setState(() {
               _printers = foundPrinters;
-              // FIX: Stop showing "Scanning..." when printers are found
               if (foundPrinters.isNotEmpty) {
                 _isScanning = false;
               }
             });
+            refreshDialog();
+          }
+
+          if (foundPrinters.isNotEmpty) {
+            unawaited(FlutterBluePlus.stopScan());
           }
         },
         onError: (error) {
           debugPrint('Scan error: $error');
           if (mounted) {
             setState(() => _isScanning = false);
+            refreshDialog();
           }
         },
       );
@@ -159,11 +179,13 @@ class _GatepassDialogState extends State<GatepassDialog> {
       if (mounted) {
         await FlutterBluePlus.stopScan();
         setState(() => _isScanning = false);
+        refreshDialog();
       }
     } catch (e) {
       debugPrint('Scan error: $e');
       if (mounted) {
         setState(() => _isScanning = false);
+        refreshDialog();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Scan failed: $e'),
@@ -298,12 +320,14 @@ class _GatepassDialogState extends State<GatepassDialog> {
                 label: Text(_isScanning ? 'Stop' : 'Scan'),
                 onPressed: _isScanning
                     ? () async {
-                  await FlutterBluePlus.stopScan();
-                  setDialogState(() => _isScanning = false);
-                }
+                    await FlutterBluePlus.stopScan();
+                    if (mounted) {
+                      setState(() => _isScanning = false);
+                    }
+                    setDialogState(() {});
+                  }
                     : () {
-                  _scanForPrinters();
-                  setDialogState(() {});
+                  _scanForPrinters(dialogSetState: setDialogState);
                 },
               ),
               TextButton(
@@ -413,9 +437,9 @@ class _GatepassDialogState extends State<GatepassDialog> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _isConnected && !_isPrinting
+                      onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
                           ? () async {
-                        setState(() => _isPrinting = true);
+                        setState(() => _isSlipPrinting = true);
                         try {
                           final success = await _printerService.printSlip(
                             widget.request,
@@ -434,7 +458,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
                             );
                           }
                         } finally {
-                          if (mounted) setState(() => _isPrinting = false);
+                          if (mounted) setState(() => _isSlipPrinting = false);
                         }
                       }
                           : null,
@@ -447,8 +471,8 @@ class _GatepassDialogState extends State<GatepassDialog> {
                           borderRadius: BorderRadius.circular(24.r),
                         ),
                       ),
-                      child: _isPrinting
-                          ? SizedBox(
+                      child: _isSlipPrinting
+                        ? SizedBox(
                         height: 20.h,
                         width: 20.w,
                         child: CircularProgressIndicator(
@@ -462,9 +486,9 @@ class _GatepassDialogState extends State<GatepassDialog> {
                   SizedBox(width: 16.w),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _isConnected && !_isPrinting
+                      onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
                           ? () async {
-                        setState(() => _isPrinting = true);
+                        setState(() => _isChallanPrinting = true);
                         try {
                           final success = await _printerService.printGatepass(
                             widget.request,
@@ -483,7 +507,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
                             );
                           }
                         } finally {
-                          if (mounted) setState(() => _isPrinting = false);
+                          if (mounted) setState(() => _isChallanPrinting = false);
                         }
                       }
                           : null,
@@ -496,7 +520,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
                           borderRadius: BorderRadius.circular(24.r),
                         ),
                       ),
-                      child: _isPrinting
+                      child: _isChallanPrinting
                           ? SizedBox(
                         height: 20.h,
                         width: 20.w,

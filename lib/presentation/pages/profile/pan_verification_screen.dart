@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
-import 'package:dio/dio.dart';
+import '../../../core/services/User.dart';
 import '../../../core/services/api_service_interface.dart';
 
 class PanVerificationScreen extends StatefulWidget {
@@ -42,6 +42,10 @@ class _PanVerificationScreenState extends State<PanVerificationScreen> {
 
   Future<void> _verifyPan() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final token = await User().getToken();
+    debugPrint('🔐 Token exists: ${token != null}');
+    debugPrint('🔐 Token value: $token');
 
     setState(() {
       _isLoading = true;

@@ -147,11 +147,19 @@ Future<void> initializeNotifications() async {
       .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  String? token = await FirebaseMessaging.instance.getToken();
-  print("FCM Token on startup: $token");
+  try {
+    String? token = await FirebaseMessaging.instance.getToken();
+    print("FCM Token on startup: $token");
 
-  if (token != null) {
-    _storeTokenForUpdate(token);
+    if (token != null) {
+      _storeTokenForUpdate(token);
+    }
+  } on FirebaseException catch (e) {
+    // Gracefully handle cases where Google Play Services is unavailable so the
+    // app can continue booting without blocking the user on a white screen.
+    debugPrint('Failed to obtain FCM token: ${e.message ?? e.code}');
+  } catch (e) {
+    debugPrint('Failed to obtain FCM token: $e');
   }
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

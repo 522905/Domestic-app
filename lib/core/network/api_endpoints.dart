@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 class ApiEndpoints {
   final String baseUrl;
 
-  // final String tempUrl = 'https://lpg.ops.arungas.com';
-  final String tempUrl = 'http://192.168.171.49:9900';
+  final String tempUrl = 'https://lpg.ops.arungas.com';
+  // final String tempUrl = 'http://192.168.171.49:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
