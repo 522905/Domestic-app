@@ -9,6 +9,7 @@ import 'package:tus_client_dart/tus_client_dart.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../../core/services/api_service_interface.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class ReceiveVehicleScreen extends StatefulWidget {
   final String supplierGstin;
@@ -374,12 +375,11 @@ class _ReceiveVehicleScreenState extends State<ReceiveVehicleScreen> {
 
   // MARK: - UI Helpers
   void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? const Color(0xFFF44336) : const Color(0xFF4CAF50),
-      ),
-    );
+    if (isError) {
+      context.showErrorSnackBar(message);
+    } else {
+      context.showSuccessSnackBar(message);
+    }
   }
 
   // MARK: - Widget Builders

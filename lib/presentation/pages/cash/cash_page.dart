@@ -17,6 +17,7 @@ import '../../blocs/cash/cash_bloc.dart';
 import 'forms/bank_deposit_page.dart';
 import 'forms/handover_screen.dart';
 import 'general_ledger_detail_page.dart';
+import '../widgets/professional_snackbar.dart';
 
 class _AppLifecycleObserver extends WidgetsBindingObserver {
   final VoidCallback onResume;
@@ -383,13 +384,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
         listener: (context, state) {
           // Handle success states - just show a simple snackbar
           if (state is TransactionAddedSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            context.showSuccessSnackBar(state.message);
           }
           // Handle error states with simple dialog
           if (state is CashManagementError) {

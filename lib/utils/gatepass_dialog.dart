@@ -7,6 +7,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
 
 import '../core/services/User.dart';
+import '../presentation/widgets/professional_snackbar.dart';
 
 class GatepassDialog extends StatefulWidget {
   final InventoryRequest request;
@@ -113,12 +114,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
       final adapterState = await FlutterBluePlus.adapterState.first;
       if (adapterState != BluetoothAdapterState.on) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please turn on Bluetooth'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          context.showWarningSnackBar('Please turn on Bluetooth');
         }
         if (mounted) setState(() => _isScanning = false);
         refreshDialog();
@@ -186,12 +182,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
       if (mounted) {
         setState(() => _isScanning = false);
         refreshDialog();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Scan failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar('Scan failed: $e');
       }
     }
   }
@@ -222,21 +213,11 @@ class _GatepassDialogState extends State<GatepassDialog> {
         if (mounted) Navigator.pop(context);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Connected to ${device.platformName}'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          context.showSuccessSnackBar('Connected to ${device.platformName}');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to connect to printer'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          context.showErrorSnackBar('Failed to connect to printer');
         }
       }
     } catch (e) {
@@ -245,12 +226,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
 
       debugPrint('Connection error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Connection error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar('Connection error: $e');
       }
     }
   }
@@ -348,12 +324,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
       _connectedDevice = null;
     });
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Printer disconnected'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      context.showWarningSnackBar('Printer disconnected');
     }
   }
 
@@ -450,12 +421,11 @@ class _GatepassDialogState extends State<GatepassDialog> {
                           );
 
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(success ? 'Slip printed successfully' : 'Failed to print slip'),
-                                backgroundColor: success ? Colors.green : Colors.red,
-                              ),
-                            );
+                            if (success) {
+                              context.showSuccessSnackBar('Slip printed successfully');
+                            } else {
+                              context.showErrorSnackBar('Failed to print slip');
+                            }
                           }
                         } finally {
                           if (mounted) setState(() => _isSlipPrinting = false);
@@ -499,12 +469,11 @@ class _GatepassDialogState extends State<GatepassDialog> {
                           );
 
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(success ? 'Challan printed successfully' : 'Failed to print challan'),
-                                backgroundColor: success ? Colors.green : Colors.red,
-                              ),
-                            );
+                            if (success) {
+                              context.showSuccessSnackBar('Challan printed successfully');
+                            } else {
+                              context.showErrorSnackBar('Failed to print challan');
+                            }
                           }
                         } finally {
                           if (mounted) setState(() => _isChallanPrinting = false);

@@ -8,6 +8,7 @@ import '../../../../domain/entities/cash/cash_transaction.dart';
 import '../../../../utils/currency_utils.dart';
 import '../../../../utils/dialog_utils.dart';
 import '../../../blocs/cash/cash_bloc.dart';
+import '../../../widgets/professional_snackbar.dart';
 
 class CashDepositPage extends StatefulWidget {
   final double? initialAmount;
@@ -84,9 +85,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching accounts: $e')),
-      );
+      context.showErrorSnackBar('Error fetching accounts: $e');
     }
   }
 
@@ -312,9 +311,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
     }
 
     if (_selectedAccountType == null || _selectedAccount == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select account type and paid-to account')),
-      );
+      context.showWarningSnackBar('Please select account type and paid-to account');
       return;
     }
 
@@ -488,16 +485,12 @@ class _CashDepositPageState extends State<CashDepositPage> {
 
     // Validate IDs were found
     if (accountTypeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid account type selected')),
-      );
+      context.showErrorSnackBar('Invalid account type selected');
       return;
     }
 
     if (paidToAccountId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid paid-to account selected')),
-      );
+      context.showErrorSnackBar('Invalid paid-to account selected');
       return;
     }
 
@@ -542,12 +535,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
         Navigator.of(context).pop(); // Close loading
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Deposit submitted successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      context.showSuccessSnackBar('Deposit submitted successfully');
 
       if (mounted) {
         // Return to cash page with success flag
@@ -561,12 +549,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
         Navigator.of(context).pop(); // Close loading
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error submitting deposit: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      context.showErrorSnackBar('Error submitting deposit: $e');
     }
   }
 

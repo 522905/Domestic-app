@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../core/services/api_service_interface.dart';
+import '../professional_snackbar.dart';
 
 class ItemSelectorDialog extends StatefulWidget {
 
@@ -35,9 +36,7 @@ class ItemSelectorDialog extends StatefulWidget {
 
 
       if (items.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No items available from API')),
-        );
+        context.showInfoSnackBar('No items available from API');
         return;
       }
 
@@ -51,9 +50,7 @@ class ItemSelectorDialog extends StatefulWidget {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching items: $e')),
-      );
+      context.showErrorSnackBar('Error fetching items: $e');
     }
   }
 
@@ -66,9 +63,7 @@ class ItemSelectorDialog extends StatefulWidget {
       }) {
 
     if (availableItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No items available')),
-      );
+      context.showInfoSnackBar('No items available');
       return Future.value();
     }
 

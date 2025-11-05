@@ -13,6 +13,7 @@ import '../../../../core/models/order/order_data.dart';
 import '../../../blocs/vehicle/vehicle_bloc.dart';
 import '../../../blocs/vehicle/vehicle_state.dart';
 import '../../../blocs/vehicle/vehicle_event.dart';
+import '../../../widgets/professional_snackbar.dart';
 import '../../../blocs/orders/orders_bloc.dart';
 import '../../../widgets/selectors/vehicle_selector_dialog.dart';
 import '../../../widgets/selectors/warehouse_selector_dialog.dart';
@@ -388,30 +389,22 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
   void _submitOrder() async {
     // Validation
     if (_selectedItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one item')),
-      );
+      context.showWarningSnackBar('Please add at least one item');
       return;
     }
 
     if (_selectedWarehouseId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a warehouse')),
-      );
+      context.showWarningSnackBar('Please select a warehouse');
       return;
     }
 
     if (_selectedVehicleId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a vehicle')),
-      );
+      context.showWarningSnackBar('Please select a vehicle');
       return;
     }
 
     if (_isGeneralManager() && _selectedPartnerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a partner')),
-      );
+      context.showWarningSnackBar('Please select a partner');
       return;
     }
 

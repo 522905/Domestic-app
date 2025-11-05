@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import '../../../core/services/api_service_interface.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String aadhaarNumber;
@@ -238,12 +239,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         _startResendTimer();
         _clearOtp();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'OTP sent successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        context.showSuccessSnackBar(response['message'] ?? 'OTP sent successfully');
       } else {
         setState(() {
           _errorMessage = response['message'] ?? 'Failed to resend OTP';

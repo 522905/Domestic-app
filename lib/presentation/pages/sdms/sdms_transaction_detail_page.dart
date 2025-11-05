@@ -8,6 +8,7 @@ import '../../../utils/error_handler.dart';
 import '../../blocs/sdms/transaction/sdms_transaction_bloc.dart';
 import '../../blocs/sdms/transaction/sdms_transaction_event.dart';
 import '../../blocs/sdms/transaction/sdms_transaction_state.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class SDMSTransactionDetailPage extends StatefulWidget {
   final String transactionId;
@@ -537,11 +538,6 @@ class _SDMSTransactionDetailPageState extends State<SDMSTransactionDetailPage> {
   void _retryTask(String transactionId) {
     // Note: Since you mentioned for now you don't want retry functionality,
     // this is a placeholder. When ready, implement the retry API call here.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Retry functionality will be implemented later'),
-        backgroundColor: Colors.orange,
-      ),
-    );
+    context.showWarningSnackBar('Retry functionality will be implemented later');
   }
 }

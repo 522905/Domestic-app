@@ -10,6 +10,7 @@ import '../../blocs/sdms/create/sdms_create_bloc.dart';
 import '../../blocs/sdms/create/sdms_create_event.dart';
 import '../../blocs/sdms/create/sdms_create_state.dart';
 import '../../widgets/sdms/sdms_error_dialog.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class SDMSCreateTransactionPage extends StatefulWidget {
   const SDMSCreateTransactionPage({Key? key}) : super(key: key);
@@ -554,12 +555,7 @@ class _SDMSCreateTransactionPageState extends State<SDMSCreateTransactionPage> {
     final permission = await Permission.camera.request();
     if (permission != PermissionStatus.granted) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Camera permission is required to scan QR codes'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar('Camera permission is required to scan QR codes');
       }
       return;
     }

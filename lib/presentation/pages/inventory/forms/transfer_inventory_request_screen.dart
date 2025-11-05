@@ -12,6 +12,7 @@ import '../../../../utils/gatepass_dialog.dart';
 import '../../../widgets/selectors/driver_selector_dialog.dart';
 import '../../../widgets/selectors/item_selector_dialog.dart';
 import '../../../widgets/selectors/warehouse_selector_dialog.dart';
+import '../../../widgets/professional_snackbar.dart';
 
 class InventoryTransferScreen extends StatefulWidget {
   final List<Map<String, dynamic>> warehouses;
@@ -69,9 +70,7 @@ class _InventoryTransferScreenState extends State<InventoryTransferScreen> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load data: $e')),
-      );
+      context.showErrorSnackBar('Failed to load data: $e');
     }
   }
 
@@ -121,9 +120,7 @@ class _InventoryTransferScreenState extends State<InventoryTransferScreen> {
 
   void _showAddItemDialog({int? editIndex}) {
     if (widget.warehousesItemList.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No items available')),
-      );
+      context.showInfoSnackBar('No items available');
       return;
     }
 
@@ -705,23 +702,11 @@ class _InventoryTransferScreenState extends State<InventoryTransferScreen> {
                       //   ),
                       // );
                     } else if (_driverPhotoFile == null && isPhotoRequired) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Driver photo is required for unknown drivers'),
-                        ),
-                      );
+                      context.showInfoSnackBar('Driver photo is required for unknown drivers');
                     } else if (_selectedItems.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please add at least one item to transfer'),
-                        ),
-                      );
+                      context.showWarningSnackBar('Please add at least one item to transfer');
                     } else if (_selectedItems.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please add at least one item to transfer'),
-                        ),
-                      );
+                      context.showWarningSnackBar('Please add at least one item to transfer');
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -759,26 +744,13 @@ class _InventoryTransferScreenState extends State<InventoryTransferScreen> {
                           .read<InventoryBloc>()
                           .add(AddInventoryRequest(request: transferRequest));
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Transfer request created successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      context.showSuccessSnackBar('Transfer request created successfully');
 
                       Navigator.pop(context);
                     } else if (_driverPhotoFile == null && isPhotoRequired) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Driver photo is required for unknown drivers'),
-                        ),
-                      );
+                      context.showInfoSnackBar('Driver photo is required for unknown drivers');
                     } else if (_selectedItems.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please add at least one item to transfer'),
-                        ),
-                      );
+                      context.showWarningSnackBar('Please add at least one item to transfer');
                     }
                   },
                   style: ElevatedButton.styleFrom(

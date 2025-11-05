@@ -14,6 +14,7 @@ import '../blocs/orders/orders_bloc.dart';
 import '../blocs/inventory/inventory_bloc.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/User.dart';
+import '../widgets/professional_snackbar.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -152,9 +153,7 @@ class AppRoutes {
     } catch (e) {
       if (context.mounted) Navigator.pop(context);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to switch company: $e'), backgroundColor: Colors.red),
-        );
+        context.showErrorSnackBar('Failed to switch company: $e');
       }
       rethrow;
     }

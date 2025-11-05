@@ -12,6 +12,7 @@ import '../../../../core/services/api_service_interface.dart';
 import '../../../../domain/entities/cash/cash_transaction.dart';
 import '../../../../utils/currency_utils.dart';
 import '../../../blocs/cash/cash_bloc.dart';
+import '../../../widgets/professional_snackbar.dart';
 
 class BankDepositScreen extends StatefulWidget {
   const BankDepositScreen({Key? key}) : super(key: key);
@@ -76,9 +77,7 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching banks: $e')),
-      );
+      context.showErrorSnackBar('Error fetching banks: $e');
     }
   }
 
@@ -122,17 +121,13 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error taking photo: $e')),
-      );
+      context.showErrorSnackBar('Error taking photo: $e');
     }
   }
 
   Future<void> _uploadImageViaTus() async {
     if (_receiptImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No image to upload')),
-      );
+      context.showInfoSnackBar('No image to upload');
       return;
     }
 
@@ -153,12 +148,7 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
               _isUploadingPhoto = false;
               _uploadProgress = 100.0;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Receipt uploaded successfully'),
-                backgroundColor: Colors.green,
-              ),
-            );
+            context.showSuccessSnackBar('Receipt uploaded successfully');
           }
         },
       );
@@ -176,17 +166,7 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
           errorMessage = 'Network error. Check your connection.';
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: _uploadImageViaTus,
-            ),
-          ),
-        );
+        context.showErrorSnackBar(errorMessage);
       }
     }
   }
@@ -710,35 +690,24 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
   void _submitBankDeposit() async {
     if (_formKey.currentState!.validate()) {
       if (_receiptImage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please capture a receipt photo')),
-        );
+        context.showWarningSnackBar('Please capture a receipt photo');
         return;
       }
 
       if (_uploadedImageUrl == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please upload the receipt before submitting'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        context.showWarningSnackBar('Please upload the receipt before submitting');
         return;
       }
 
       if (_selectedBank == null || _selectedBank!.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select a bank')),
-        );
+        context.showWarningSnackBar('Please select a bank');
         return;
       }
 
       final bankId = _getBankId(_selectedBank!);
 
       if (bankId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid bank selected')),
-        );
+        context.showWarningSnackBar('Invalid bank selected');
         return;
       }
 
@@ -778,12 +747,7 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
           Navigator.of(context).pop(); // Close loading dialog
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Bank deposit submitted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        context.showSuccessSnackBar('Bank deposit submitted successfully');
 
         if (mounted) {
           await Future.delayed(const Duration(milliseconds: 100));
@@ -794,12 +758,7 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
           Navigator.of(context).pop(); // Close loading dialog
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error submitting bank deposit: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar('Error submitting bank deposit: $e');
       }
     }
   }
