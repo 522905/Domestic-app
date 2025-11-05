@@ -8,6 +8,7 @@ import '../../../utils/error_handler.dart';
 import '../../blocs/sdms/transaction/sdms_transaction_bloc.dart';
 import '../../blocs/sdms/transaction/sdms_transaction_event.dart';
 import '../../blocs/sdms/transaction/sdms_transaction_state.dart';
+import '../../widgets/professional_snackbar.dart';
 import '../../widgets/sdms/transaction_list_item.dart';
 import 'sdms_transaction_detail_page.dart';
 import 'sdms_create_transaction_page.dart';
