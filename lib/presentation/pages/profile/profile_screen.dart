@@ -12,6 +12,7 @@ import '../../../core/utils/global_drawer.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/localization/locale_notifier.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -105,13 +106,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_t('profileErrorLoading', params: {'error': '$e'})),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        context.showErrorSnackBar(_t('profileErrorLoading', params: {'error': '$e'}));
       }
     }
   }
@@ -151,13 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_t('profileSwitchFailed', params: {'error': '$e'})),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        context.showErrorSnackBar(_t('profileSwitchFailed', params: {'error': '$e'}));
       }
     }
   }
@@ -169,12 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _versionManager.downloadAndInstallAPKWithProgress(context, _updateStatus);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_t('profileVersionUpdateFailed', params: {'error': e.toString()})),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar(_t('profileVersionUpdateFailed', params: {'error': e.toString()}));
       }
     } finally {
       setState(() => _isDownloading = false);
@@ -210,13 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_t('profileCompaniesLoadFailed', params: {'error': '$e'})),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        context.showErrorSnackBar(_t('profileCompaniesLoadFailed', params: {'error': '$e'}));
       }
     }
   }
@@ -898,13 +876,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _copyToClipboard(String value, String label) {
     Clipboard.setData(ClipboardData(text: value));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_t('profileCopyMessage', params: {'label': label})),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    context.showSuccessSnackBar(_t('profileCopyMessage', params: {'label': label}));
   }
 
   void _editPassword() {
@@ -967,12 +939,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Colors.orange,
                     () {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(_t('profileActionChangePasswordMessage')),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  context.showInfoSnackBar(_t('profileActionChangePasswordMessage'));
                 },
               ),
               _buildActionMenuItem(
@@ -982,12 +949,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Colors.purple,
                     () {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(_t('profileActionNotificationSettingsMessage')),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  context.showInfoSnackBar(_t('profileActionNotificationSettingsMessage'));
                 },
               ),
               _buildActionMenuItem(
@@ -997,12 +959,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Colors.green,
                     () {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(_t('profileActionHelpMessage')),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  context.showInfoSnackBar(_t('profileActionHelpMessage'));
                 },
               ),
               _buildActionMenuItem(
@@ -1093,13 +1050,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       debugPrint(_t('profileLogoutError', params: {'error': '$e'}));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_t('profileLogoutError', params: {'error': '$e'})),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        context.showErrorSnackBar(_t('profileLogoutError', params: {'error': '$e'}));
       }
     } finally {
       if (mounted) {

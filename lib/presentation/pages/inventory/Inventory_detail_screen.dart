@@ -9,6 +9,7 @@ import 'package:lpg_distribution_app/utils/status_chip.dart';
 import '../../../../utils/swipeButton.dart';
 import '../../../utils/gatepass_dialog.dart';
 import '../../blocs/inventory/inventory_bloc.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class InventoryDetailScreen extends StatefulWidget {
   final String requestId;
@@ -82,12 +83,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
       onWillPop: () async {
         // If processing, prevent back navigation
         if (_isProcessing) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please wait while processing...'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          context.showWarningSnackBar('Please wait while processing...');
           return false;
         }
         return true;
@@ -116,12 +112,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
               if (mounted) {
                 setState(() => _isProcessing = false);
                 // Show success message and navigate back
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Request processed successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                context.showSuccessSnackBar('Request processed successfully');
                 Navigator.pop(context, true); // Return true to indicate success
               }
             }
@@ -130,12 +121,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
             if (state is InventoryError && _isProcessing) {
               if (mounted) {
                 setState(() => _isProcessing = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: ${state.message}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                context.showErrorSnackBar('Error: ${state.message}');
               }
             }
           },
@@ -1080,12 +1066,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to approve: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar('Failed to approve: $e');
       }
     }
   }
@@ -1109,12 +1090,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to reject: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar('Failed to reject: $e');
       }
     }
   }

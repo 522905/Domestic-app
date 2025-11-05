@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // import 'package:share_plus/share_plus.dart';
+import 'professional_snackbar.dart';
 
 class ErrorDialog extends StatelessWidget {
   final String title;
@@ -153,12 +154,7 @@ class ErrorDialog extends StatelessWidget {
                             Clipboard.setData(
                               ClipboardData(text: _formattedErrorDetails),
                             );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Error details copied to clipboard'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
+                            context.showSuccessSnackBar('Error details copied to clipboard');
                           },
                           icon: const Icon(Icons.copy, size: 16),
                           label: const Text('Copy'),

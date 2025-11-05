@@ -13,6 +13,7 @@ import '../../../blocs/vehicle/vehicle_state.dart';
 import '../../../widgets/inventory/collect/collect_order_items_widget.dart';
 import '../../../widgets/selectors/vehicle_selector_dialog.dart';
 import '../../../widgets/error_dialog.dart';
+import '../../../widgets/professional_snackbar.dart';
 
 class CollectInventoryScreen extends StatefulWidget {
   const CollectInventoryScreen({
@@ -407,16 +408,12 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
 
   void _showConfirmCollectionDialog() {
     if (_selectedItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one item')),
-      );
+      context.showWarningSnackBar('Please select at least one item');
       return;
     }
 
     if (_selectedVehicleId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a vehicle')),
-      );
+      context.showWarningSnackBar('Please select a vehicle');
       return;
     }
 

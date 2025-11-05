@@ -11,6 +11,7 @@ import '../../blocs/orders/orders_state.dart';
 import '../../../domain/entities/order.dart';
 import 'forms/create_sale_order_page.dart';
 import 'order_details_page.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({Key? key}) : super(key: key);
@@ -66,9 +67,7 @@ class _OrdersPageState extends State<OrdersPage> {
         _userRole = userRole.map((userRole) => userRole.role).toList();
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load data: $e')),
-      );
+      context.showErrorSnackBar('Failed to load data: $e');
     }
   }
 

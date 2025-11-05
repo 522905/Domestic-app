@@ -10,6 +10,7 @@ import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/service_provider.dart';
 import '../../../domain/entities/cash/general_ledger_response.dart';
 import '../../../domain/entities/cash/available_accounts_response.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class GeneralLedgerDetailPage extends StatefulWidget {
   final String? accountNames;
@@ -150,9 +151,7 @@ class _GeneralLedgerDetailPageState extends State<GeneralLedgerDetailPage> {
 
   void _showAccountSelector() {
     if (_availableAccounts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No accounts available')),
-      );
+      context.showInfoSnackBar('No accounts available');
       return;
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/api_service_interface.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class DispatchVehicleScreen extends StatefulWidget {
   final String supplierGstin;
@@ -517,12 +518,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                   Navigator.pop(context);
                 } else {
                   // Show snackbar for invalid quantity
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Quantity must be between 1 and $maxQty'),
-                      backgroundColor: const Color(0xFFF44336),
-                    ),
-                  );
+                  context.showErrorSnackBar('Quantity must be between 1 and $maxQty');
                 }
               } : null,
               style: ElevatedButton.styleFrom(
@@ -695,12 +691,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     if (_isSubmitting) return;
 
     if (_selectedItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one item'),
-          backgroundColor: Color(0xFFF44336),
-        ),
-      );
+      context.showErrorSnackBar('Please select at least one item');
       return;
     }
 
@@ -724,22 +715,12 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
       final response = await _apiService.submitDispatchVehicle(payload);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Dispatch submitted successfully'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
+        context.showSuccessSnackBar('Dispatch submitted successfully');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit dispatch: $e'),
-            backgroundColor: const Color(0xFFF44336),
-          ),
-        );
+        context.showErrorSnackBar('Failed to submit dispatch: $e');
       }
     } finally {
       setState(() {

@@ -9,6 +9,7 @@ import 'package:lpg_distribution_app/presentation/widgets/version/version_update
 import '../../core/services/version_manager.dart';
 import 'inventory/inventory_screen.dart';
 import '../../l10n/app_localizations.dart';
+import '../widgets/professional_snackbar.dart';
 
 class MainContainer extends StatefulWidget {
   final int initialTab;
@@ -91,9 +92,7 @@ class _MainContainerState extends State<MainContainer>
               .downloadAndInstallAPKWithProgress(context, fullStatus);
         } else {
           final l10n = context.l10n;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.translate('Unable to get download URL'))),
-          );
+          context.showErrorSnackBar(l10n.translate('Unable to get download URL'));
         }
       } else {
         await _versionManager
@@ -101,9 +100,7 @@ class _MainContainerState extends State<MainContainer>
       }
     } catch (e) {
       final l10n = context.l10n;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('Download failed: {error}', params: {'error': '$e'}))),
-      );
+      context.showErrorSnackBar(l10n.translate('Download failed: {error}', params: {'error': '$e'}));
     }
   }
 

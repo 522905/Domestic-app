@@ -3,6 +3,7 @@ import 'package:flutter_novu/inbox.dart';
 import 'package:flutter_novu/types.dart';
 import '../../../core/services/User.dart';
 import '../../pages/notifications/notifications.dart';
+import '../professional_snackbar.dart';
 
 class Inbox extends StatefulWidget {
   final String backendUrl;
@@ -106,12 +107,7 @@ class _InboxState extends State<Inbox> {
       );
     } else {
       // Fallback behavior if service failed to initialize
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Notifications service unavailable'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      context.showErrorSnackBar('Notifications service unavailable');
     }
   }
 

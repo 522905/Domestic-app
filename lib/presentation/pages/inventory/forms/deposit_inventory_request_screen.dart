@@ -19,6 +19,7 @@ import '../../../widgets/inventory/deposit/unlinked_items_widget.dart';
 import '../../../widgets/selectors/vehicle_selector_dialog.dart';
 import '../../../widgets/selectors/warehouse_selector_dialog.dart';
 import '../../../widgets/error_dialog.dart';
+import '../../../widgets/professional_snackbar.dart';
 
 class DepositInventoryScreen extends StatefulWidget {
   final String depositType;
@@ -335,9 +336,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
         : _selectedItems.isNotEmpty;
 
     if (!hasItems) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one item')),
-      );
+      context.showWarningSnackBar('Please add at least one item');
       return;
     }
 
@@ -346,16 +345,12 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
         : _selectedItems.isEmpty)
 
     if (_selectedWarehouseId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a warehouse')),
-      );
+      context.showWarningSnackBar('Please select a warehouse');
       return;
     }
 
     if (_selectedVehicleId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a vehicle')),
-      );
+      context.showWarningSnackBar('Please select a vehicle');
       return;
     }
 

@@ -8,6 +8,7 @@ import '../../../../domain/entities/cash/cash_transaction.dart';
 import '../../../../utils/currency_utils.dart';
 import '../../../../utils/dialog_utils.dart';
 import '../../../blocs/cash/cash_bloc.dart';
+import '../../../widgets/professional_snackbar.dart';
 
 class HandoverScreen extends StatefulWidget {
   const HandoverScreen({Key? key}) : super(key: key);
@@ -68,9 +69,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching accounts: $e')),
-      );
+      context.showErrorSnackBar('Error fetching accounts: $e');
     }
   }
 
@@ -89,9 +88,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
   void _submitHandover() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedAccount == null || _selectedAccount!.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select an account')),
-        );
+        context.showWarningSnackBar('Please select an account');
         return;
       }
 
@@ -100,25 +97,19 @@ class _HandoverScreenState extends State<HandoverScreen> {
 
       // Extra guard rails
       if (raw.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a valid amount')),
-        );
+        context.showWarningSnackBar('Please enter a valid amount');
         return;
       }
 
       final amount = double.tryParse(raw);
       if (amount == null || amount <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Amount must be a positive number')),
-        );
+        context.showInfoSnackBar('Amount must be a positive number');
         return;
       }
 
       final paidToAccountId = _getPaidToAccountId(_selectedAccount!);
       if (paidToAccountId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid account selected')),
-        );
+        context.showWarningSnackBar('Invalid account selected');
         return;
       }
 
@@ -157,12 +148,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
           Navigator.of(context).pop(); // Close loading dialog
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Handover submitted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        context.showSuccessSnackBar('Handover submitted successfully');
 
         if (mounted) {
           await Future.delayed(const Duration(milliseconds: 100));
@@ -174,12 +160,7 @@ class _HandoverScreenState extends State<HandoverScreen> {
           Navigator.of(context).pop(); // Close loading dialog
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error submitting handover: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        context.showErrorSnackBar('Error submitting handover: $e');
       }
     }
   }

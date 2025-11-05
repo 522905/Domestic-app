@@ -9,6 +9,7 @@ import '../../../core/services/User.dart';
 import '../../../domain/entities/cash/cash_transaction.dart';
 import '../../blocs/cash/cash_bloc.dart';
 import '../../../utils/swipeButton.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class TransactionDetailScreen extends StatefulWidget {
   final String transactionId;
@@ -104,13 +105,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               _isTransactionUpdated = true;
 
               // Show success message
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: state.action == 'approve' ? Colors.green : Colors.orange,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              context.showInfoSnackBar(state.message);
 
               // Refresh the transaction details after a short delay
               Future.delayed(const Duration(milliseconds: 500), () {
@@ -732,12 +727,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
 
   Future<void> _approveTransaction(CashTransaction transaction) async {
     if (transaction.type == TransactionType.handover && !_isCashReceived) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please verify cash received before approving'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      context.showWarningSnackBar('Please verify cash received before approving');
       return;
     }
 

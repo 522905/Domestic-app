@@ -129,9 +129,7 @@ class GlobalDrawer {
             (route) => false,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error logging out: $e')),
-      );
+      context.showInfoSnackBar('Error logging out: $e');
     }
   }
 }

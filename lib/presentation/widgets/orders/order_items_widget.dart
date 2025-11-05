@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/models/order/selectable_order_item.dart';
 import '../../../core/models/order/order_data.dart';
+import '../professional_snackbar.dart';
 
 class OrderItemsWidget extends StatefulWidget {
   final OrderData orderData;
@@ -598,21 +599,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
 
     // Don't allow selection if out of stock
     if (item.isOutOfStock) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.warning, color: Colors.white, size: 20.sp),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: Text('${item.displayName} is out of stock'),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      context.showErrorSnackBar('${item.displayName} is out of stock');
       return;
     }
 
@@ -811,21 +798,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                   Navigator.pop(context);
 
                   // Show success message
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.white, size: 20.sp),
-                          SizedBox(width: 8.w),
-                          Expanded(
-                            child: Text('Added $finalQty × ${item.displayName}'),
-                          ),
-                        ],
-                      ),
-                      backgroundColor: Colors.green,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
+                  context.showSuccessSnackBar('Added $finalQty × ${item.displayName}');
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -874,21 +847,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
     widget.onItemsChanged(updatedItems);
 
     // Show removal message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.remove_circle, color: Colors.white, size: 20.sp),
-            SizedBox(width: 8.w),
-            Expanded(
-              child: Text('Removed ${item.displayName} from order'),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    context.showWarningSnackBar('Removed ${item.displayName} from order');
   }
 }
 

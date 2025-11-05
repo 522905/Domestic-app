@@ -14,6 +14,7 @@ import 'Inventory_detail_screen.dart';
 import 'forms/collect_inventory_request_screen.dart';
 import 'forms/deposit_inventory_request_screen.dart';
 import 'forms/transfer_inventory_request_screen.dart';
+import '../../widgets/professional_snackbar.dart';
 
 class InventoryPage extends StatefulWidget {
   final int? initialTabIndex;
@@ -107,9 +108,7 @@ class _InventoryPageState extends State<InventoryPage>
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load data: $e')),
-      );
+      context.showErrorSnackBar('Failed to load data: $e');
     }
   }
 
