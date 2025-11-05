@@ -4,6 +4,7 @@ import '../../presentation/pages/profile/profile_screen.dart';
 import '../../presentation/pages/purchase_invoice/purchase_invoice_screen.dart';
 import '../../presentation/pages/reports/reports_screen.dart';
 import '../../presentation/pages/sdms/sdms_transaction_list_page.dart';
+import '../../presentation/widgets/professional_snackbar.dart';
 import '../../core/services/api_service.dart';
 
 class GlobalDrawer {
