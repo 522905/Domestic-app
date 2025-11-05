@@ -6,14 +6,13 @@ import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
 import '../../widgets/notification/inbox.dart';
 import '../../widgets/warehouse_stock_card_screen.dart';
+import '../../widgets/professional_snackbar.dart';
 import '../cash/forms/cash_deposit_page.dart';
 import '../inventory/forms/collect_inventory_request_screen.dart';
 import '../inventory/forms/deposit_inventory_request_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../purchase_invoice/purchase_invoice_screen.dart';
 import 'package:lpg_distribution_app/l10n/app_localizations.dart';
-import 'package:top_snackbar_flutter/top_snack_bar.dart';
-import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -181,47 +180,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // void _showErrorSnackBar(String message) {
-  //   ScaffoldMessenger.of(context).showSnackBar(
-  //     SnackBar(
-  //       content: Text(message),
-  //       backgroundColor: Colors.red,
-  //       behavior: SnackBarBehavior.floating,
-  //     ),
-  //   );
-  // }
-
-  // void _showSuccessSnackBar(String message) {
-  //   ScaffoldMessenger.of(context).showSnackBar(
-  //     SnackBar(
-  //       content: Text(message),
-  //       backgroundColor: Colors.green,
-  //       behavior: SnackBarBehavior.floating,
-  //     ),
-  //   );
-  // }
-
   void _showErrorSnackBar(String message) {
-    final overlay = Overlay.of(context);
-    if (overlay == null) return; // context not ready / disposed
-    showTopSnackBar(
-      overlay,
-      CustomSnackBar.error(
-        message: message,
-      ),
-      displayDuration: const Duration(seconds: 1),
+    if (!mounted) return;
+    context.showErrorSnackBar(
+      message,
+      duration: const Duration(seconds: 3),
     );
   }
 
   void _showSuccessSnackBar(String message) {
-    final overlay = Overlay.of(context);
-    if (overlay == null) return; // context not ready / disposed
-    showTopSnackBar(
-      overlay,
-      CustomSnackBar.success(
-        message: message,
-      ),
-      displayDuration: const Duration(seconds: 1),
+    if (!mounted) return;
+    context.showSuccessSnackBar(
+      message,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  void _showWarningSnackBar(String message) {
+    if (!mounted) return;
+    context.showWarningSnackBar(
+      message,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  void _showInfoSnackBar(String message) {
+    if (!mounted) return;
+    context.showInfoSnackBar(
+      message,
+      duration: const Duration(seconds: 3),
     );
   }
 
