@@ -76,6 +76,7 @@ dependencies:
   open_file: ^3.5.4
   device_info_plus: ^9.1.0
   flutter_pdfview: ^1.3.2
+  top_snackbar_flutter: ^3.3.0
 
   #permissions:
   permission_handler: ^11.3.1
@@ -105,6 +106,7 @@ flutter:
     - assets/lottie/cash.json
     - assets/lottie/inventory.json
     - assets/lottie/profile.json
+    - lib/l10n/
 
   fonts:
     - family: Roboto

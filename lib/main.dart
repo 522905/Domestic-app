@@ -24,6 +24,8 @@ import 'core/services/version_manager.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_novu/generated/app_localizations.dart';
+import 'l10n/app_localizations.dart';
+import 'utils/localization/locale_notifier.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -90,36 +92,69 @@ void main() async {
   await VersionManager().initialize();
 
   final apiService = await ServiceProvider.getApiService();
+  final localeNotifier = LocaleNotifier();
+  await localeNotifier.initialize();
 
   runApp(
-    Provider<ApiServiceInterface>.value(
-      value: apiService,
-      child: MultiBlocProvider(
-        providers: [
-          RepositoryProvider<ApiServiceInterface>.value(value: apiService),
-          BlocProvider<OrdersBloc>(
-            create: (context) => OrdersBloc(apiService: context.read<ApiServiceInterface>()),
+      Provider<ApiServiceInterface>.value(
+        value: apiService,
+        // child: MultiBlocProvider(
+        //   providers: [
+        //     RepositoryProvider<ApiServiceInterface>.value(value: apiService),
+        //     BlocProvider<OrdersBloc>(
+        //       create: (context) => OrdersBloc(apiService: context.read<ApiServiceInterface>()),
+        //     ),
+        //     BlocProvider<CashManagementBloc>(
+        //       create: (context) => CashManagementBloc(
+        //           apiService: context.read<ApiServiceInterface>()),
+        //     ),
+        //     BlocProvider<InventoryBloc>(
+        //       create: (context) => InventoryBloc(
+        //         apiService: apiService,
+        //       ),
+        //     ),
+        //     BlocProvider<VehicleBloc>(
+        //       create: (context) => VehicleBloc(apiService: context.read<ApiServiceInterface>()),
+        //     ),
+        //     BlocProvider<SDMSTransactionBloc>(
+        //       create: (context) => SDMSTransactionBloc(apiService: context.read<ApiServiceInterface>()),
+        //     ),
+        //     BlocProvider<SDMSCreateBloc>(
+        //       create: (context) => SDMSCreateBloc(apiService: context.read<ApiServiceInterface>()),
+        //     ),
+        //   ],
+        //   child: const MyApp(),
+        // ),
+
+        child: ChangeNotifierProvider<LocaleNotifier>.value(
+          value: localeNotifier,
+          child: MultiBlocProvider(
+            providers: [
+              RepositoryProvider<ApiServiceInterface>.value(value: apiService),
+              BlocProvider<OrdersBloc>(
+                create: (context) => OrdersBloc(apiService: context.read<ApiServiceInterface>()),
+              ),
+              BlocProvider<CashManagementBloc>(
+                create: (context) => CashManagementBloc(
+                    apiService: context.read<ApiServiceInterface>()),
+              ),
+              BlocProvider<InventoryBloc>(
+                create: (context) => InventoryBloc(
+                  apiService: apiService,
+                ),
+              ),
+              BlocProvider<VehicleBloc>(
+                create: (context) => VehicleBloc(apiService: context.read<ApiServiceInterface>()),
+              ),
+              BlocProvider<SDMSTransactionBloc>(
+                create: (context) => SDMSTransactionBloc(apiService: context.read<ApiServiceInterface>()),
+              ),
+              BlocProvider<SDMSCreateBloc>(
+                create: (context) => SDMSCreateBloc(apiService: context.read<ApiServiceInterface>()),
+              ),
+            ],
+            child: const MyApp(),
           ),
-          BlocProvider<CashManagementBloc>(
-            create: (context) => CashManagementBloc(
-                apiService: context.read<ApiServiceInterface>()),
-          ),
-          BlocProvider<InventoryBloc>(
-            create: (context) => InventoryBloc(
-              apiService: apiService,
-            ),
-          ),
-          BlocProvider<VehicleBloc>(
-            create: (context) => VehicleBloc(apiService: context.read<ApiServiceInterface>()),
-          ),
-          BlocProvider<SDMSTransactionBloc>(
-            create: (context) => SDMSTransactionBloc(apiService: context.read<ApiServiceInterface>()),
-          ),
-          BlocProvider<SDMSCreateBloc>(
-            create: (context) => SDMSCreateBloc(apiService: context.read<ApiServiceInterface>()),
-          ),
-        ],
-        child: const MyApp(),
       ),
     ),
   );
@@ -337,6 +372,15 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final localeNotifier = context.watch<LocaleNotifier>();
+    final delegates = <LocalizationsDelegate<dynamic>>[
+      ...AppLocalizations.localizationsDelegates,
+      ...SNovu.localizationsDelegates,
+    ];
+    final supportedLocales = <Locale>{
+      ...AppLocalizations.supportedLocales,
+      ...SNovu.supportedLocales,
+    }.toList();
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       minTextAdapt: true,
@@ -344,8 +388,12 @@ class _MyAppState extends State<MyApp> {
       builder: (context, child) {
         return MaterialApp(
           navigatorKey: NavKey,
-          title: 'LPG Distribution',
+          title: localeNotifier.locale.languageCode == 'hi'
+              ? 'एलपीजी वितरण'
+              : 'LPG Distribution',
+          onGenerateTitle: (context) => context.l10n.translate('appTitle'),
           debugShowCheckedModeBanner: false,
+          locale: localeNotifier.locale,
           theme: ThemeData(
             primaryColor: const Color(0xFF0E5CA8),
             colorScheme: ColorScheme.fromSeed(
@@ -400,8 +448,8 @@ class _MyAppState extends State<MyApp> {
           ),
           home: const SplashScreen(),
           onGenerateRoute: AppRoutes.generateRoute,
-          localizationsDelegates: SNovu.localizationsDelegates,
-          supportedLocales: SNovu.supportedLocales,
+          localizationsDelegates: delegates,
+          supportedLocales: supportedLocales,
         );
       },
     );

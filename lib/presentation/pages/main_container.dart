@@ -8,6 +8,7 @@ import 'package:lpg_distribution_app/presentation/pages/orders/orders_page.dart'
 import 'package:lpg_distribution_app/presentation/widgets/version/version_update_widgets.dart';
 import '../../core/services/version_manager.dart';
 import 'inventory/inventory_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class MainContainer extends StatefulWidget {
   final int initialTab;
@@ -89,8 +90,9 @@ class _MainContainerState extends State<MainContainer>
           await _versionManager
               .downloadAndInstallAPKWithProgress(context, fullStatus);
         } else {
+          final l10n = context.l10n;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unable to get download URL')),
+            SnackBar(content: Text(l10n.translate('Unable to get download URL'))),
           );
         }
       } else {
@@ -98,8 +100,9 @@ class _MainContainerState extends State<MainContainer>
             .downloadAndInstallAPKWithProgress(context, _updateStatus!);
       }
     } catch (e) {
+      final l10n = context.l10n;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
+        SnackBar(content: Text(l10n.translate('Download failed: {error}', params: {'error': '$e'}))),
       );
     }
   }
@@ -116,6 +119,7 @@ class _MainContainerState extends State<MainContainer>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scaffold = Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -158,7 +162,7 @@ class _MainContainerState extends State<MainContainer>
             unselectedLabelStyle: TextStyle(fontSize: 12.sp),
             items: [
               BottomNavigationBarItem(
-                label: 'Home',
+                label: l10n.translate('Home'),
                 icon: _AnimatedTabIcon(
                   selected: _currentIndex == 0,
                   fallbackIcon: Icons.home_outlined,
@@ -173,7 +177,7 @@ class _MainContainerState extends State<MainContainer>
                 ),
               ),
               BottomNavigationBarItem(
-                label: 'Orders',
+                label: l10n.translate('Orders'),
                 icon: _AnimatedTabIcon(
                   selected: _currentIndex == 1,
                   fallbackIcon: Icons.receipt_long_outlined,
@@ -188,7 +192,7 @@ class _MainContainerState extends State<MainContainer>
                 ),
               ),
               BottomNavigationBarItem(
-                label: 'Cash',
+                label: l10n.translate('Cash'),
                 icon: _AnimatedTabIcon(
                   selected: _currentIndex == 2,
                   fallbackIcon: Icons.account_balance_wallet_outlined,
@@ -203,7 +207,7 @@ class _MainContainerState extends State<MainContainer>
                 ),
               ),
               BottomNavigationBarItem(
-                label: 'Inventory',
+                label: l10n.translate('Inventory'),
                 icon: _AnimatedTabIcon(
                   selected: _currentIndex == 3,
                   fallbackIcon: Icons.inventory_2_outlined,
@@ -218,7 +222,7 @@ class _MainContainerState extends State<MainContainer>
                 ),
               ),
               BottomNavigationBarItem(
-                label: 'Profile',
+                label: l10n.translate('Profile'),
                 icon: _AnimatedTabIcon(
                   selected: _currentIndex == 4,
                   fallbackIcon: Icons.person_outline,

@@ -5,11 +5,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lpg_distribution_app/presentation/pages/profile/pan_verification_screen.dart';
 import 'package:lpg_distribution_app/presentation/pages/profile/password_change_screen.dart';
 import 'package:provider/provider.dart';
-import '../../../core/services/api_service_interface.dart';
+// import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/User.dart';
 import '../../../core/services/version_manager.dart';
 import '../../../core/utils/global_drawer.dart';
-import 'dart:io';
+import '../../../core/services/api_service_interface.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../utils/localization/locale_notifier.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -35,6 +37,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? userVehicleNumber;
   String? userEmail;
   UserCompany? activeCompany;
+
+  String _t(String key, {Map<String, String>? params}) =>
+      context.l10n.translate(key, params: params ?? <String, String>{});
 
   @override
   void initState() {
@@ -79,14 +84,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       try {
       } catch (e) {
-        debugPrint('Optional user data not available: $e');
+        debugPrint(_t('profileOptionalDataError', params: {'error': '$e'}));
       }
 
       if (mounted) {
         setState(() {
           userRoles = roles.map((role) => role.role).toList();
-          userName = _userName?.isNotEmpty == true ? _userName : 'User';
-          // userAccount = _userAccount;
+          userName = _userName?.isNotEmpty == true ? _userName : _t('profileActiveCompanyLabel');          // userAccount = _userAccount;
           userWarehouse = _userWarehouse;
           userPhoneNumber = _userPhoneNumber;
           userVehicleNumber = _userVehicleNumber;
@@ -103,7 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading profile: $e'),
+            content: Text(_t('profileErrorLoading', params: {'error': '$e'})),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -149,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to switch company: $e'),
+            content: Text(_t('profileSwitchFailed', params: {'error': '$e'})),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -167,7 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Update failed: ${e.toString()}'),
+            content: Text(_t('profileVersionUpdateFailed', params: {'error': e.toString()})),
             backgroundColor: Colors.red,
           ),
         );
@@ -208,7 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load companies: $e'),
+            content: Text(_t('profileCompaniesLoadFailed', params: {'error': '$e'})),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -222,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       drawer: GlobalDrawer.getDrawer(context),
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text(_t('profileTitle')),
         backgroundColor: const Color(0xFF0E5CA8),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -230,27 +234,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadUserProfile,
-            tooltip: 'Refresh Profile',
+            tooltip: _t('profileRefresh'),
           ),
           IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: _showActionMenu,
-            tooltip: 'More Options',
+            tooltip: _t('profileMoreOptionsTooltip'),
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading profile...'),
-          ],
-        ),
-      )
-          : RefreshIndicator(
+        ? Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text(_t('profileLoading')),
+              ],
+            ),
+          )
+        : RefreshIndicator(
         onRefresh: _loadUserProfile,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -312,7 +316,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               radius: 50.r,
               backgroundColor: const Color(0xFF0E5CA8),
               child: Text(
-                _getInitials(userName ?? 'User'),
+                _getInitials(userName ?? _t('profileActiveCompanyLabel')),
                 style: TextStyle(
                   fontSize: 32.sp,
                   fontWeight: FontWeight.bold,
@@ -339,8 +343,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Flexible(
                     child: Text(
                       activeCompany != null
-                          ? '${userName ?? 'User'} (${activeCompany!.shortCode})'
-                          : userName ?? 'User',
+                        ? '${userName ?? _t('profileActiveCompanyLabel')} (${activeCompany!.shortCode})'
+                        : userName ?? _t('profileActiveCompanyLabel'),
                       style: TextStyle(
                         fontSize: 20.sp,
                         fontWeight: FontWeight.bold,
@@ -360,6 +364,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+          _buildLanguageToggle(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageToggle() {
+    final localeNotifier = context.watch<LocaleNotifier>();
+    final String selectedCode = localeNotifier.locale.languageCode;
+    final isHindi = selectedCode == 'hi';
+
+    return Padding(
+      padding: EdgeInsets.only(top: 16.h),
+      child: Column(
+        children: [
+          Text(
+            _t('profileLanguageToggle'),
+            style: TextStyle(
+              fontSize: 14.sp,
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20.r),
+            ),
+            child: ToggleButtons(
+              isSelected: <bool>[!isHindi, isHindi],
+              borderRadius: BorderRadius.circular(20.r),
+              selectedColor: const Color(0xFF0E5CA8),
+              fillColor: Colors.white,
+              color: Colors.white,
+              borderColor: Colors.transparent,
+              selectedBorderColor: Colors.transparent,
+              constraints: BoxConstraints(minHeight: 36.h, minWidth: 120.w),
+              onPressed: (int index) {
+                final locale = Locale(index == 0 ? 'en' : 'hi');
+                localeNotifier.updateLocale(locale);
+              },
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  child: Text(
+                    _t('profileLanguageEnglish'),
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  child: Text(
+                    _t('profileLanguageHindi'),
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -371,7 +441,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         // Account Information Section
         if (userAccount != null || userWarehouse != null || userRoles?.isNotEmpty == true || activeCompany != null) ...[
-          _buildSectionHeader('Account Information'),
+          _buildSectionHeader(_t('profileAccountInformation')),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
@@ -382,7 +452,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (activeCompany != null) ...[
                     _buildInfoRow(
                       Icons.business,
-                      'Company',
+                      _t('profileCompanyLabel'),
                       '${activeCompany!.name} (${activeCompany!.shortCode})',
                     ),
                     SizedBox(height: 16.h),
@@ -390,7 +460,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (userAccount != null) ...[
                     _buildInfoRow(
                       Icons.account_balance,
-                      'Account',
+                      _t('profileAccountLabel'),
                       userAccount!,
                     ),
                   ],
@@ -398,7 +468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (userAccount != null) SizedBox(height: 16.h),
                     _buildInfoRow(
                       Icons.warehouse,
-                      'Warehouse',
+                      _t('profileWarehouseLabel'),
                       userWarehouse!,
                     ),
                   ],
@@ -415,7 +485,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Contact Information Section
         if (userPhoneNumber != null || userEmail != null) ...[
-          _buildSectionHeader('Contact Information'),
+          _buildSectionHeader(_t('profileContactInformation')),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
@@ -426,16 +496,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (userPhoneNumber != null) ...[
                     _buildInfoRow(
                       Icons.phone,
-                      'Phone Number',
+                      _t('profilePhoneNumber'),
                       userPhoneNumber!,
+                      copyEnabled: true,
                     ),
                   ],
                   if (userEmail != null) ...[
                     if (userPhoneNumber != null) SizedBox(height: 16.h),
                     _buildInfoRow(
                       Icons.email,
-                      'Email',
+                      _t('profileEmail'),
                       userEmail!,
+                      copyEnabled: true
                     ),
                   ],
                 ],
@@ -447,7 +519,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Vehicle Information Section
         if (userVehicleNumber != null) ...[
-          _buildSectionHeader('Vehicle Information'),
+          _buildSectionHeader(_t('profileVehicleInformation')),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
@@ -455,7 +527,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: EdgeInsets.all(16.w),
               child: _buildInfoRow(
                 Icons.local_shipping,
-                'Vehicle Number',
+                _t('profileVehicleNumber'),
                 userVehicleNumber!,
               ),
             ),
@@ -463,7 +535,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SizedBox(height: 24.h),
         ],
 
-        _buildSectionHeader('App Information'),
+        _buildSectionHeader(_t('profileAppInformation')),
         Card(
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
@@ -473,7 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 _buildInfoRow(
                   Icons.info,
-                  'Current Version',
+                  _t('profileCurrentVersion'),
                   _versionManager.currentVersion ?? '1.0.0',
                 ),
 
@@ -508,8 +580,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Version ${_updateStatus!.latestVersion}',
-                                      style: TextStyle(
+                                      _t('profileVersionPrefix', params: {'version': '${_updateStatus!.latestVersion}'}),                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: _getUpdateColor(),
                                       ),
@@ -574,7 +645,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(IconData icon, String label, String value, {bool copyEnabled = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -615,7 +686,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-        if (label == 'Phone Number' || label == 'Email') ...[
+        if (copyEnabled) ...[
           IconButton(
             onPressed: () => _copyToClipboard(value, label),
             icon: Icon(
@@ -623,7 +694,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               size: 18.sp,
               color: Colors.grey[600],
             ),
-            tooltip: 'Copy $label',
+            tooltip: _t('profileCopyTooltip', params: {'label': label}),
           ),
         ],
       ],
@@ -632,7 +703,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildRolesRow() {
     if (userRoles == null || userRoles!.isEmpty) {
-      return _buildInfoRow(Icons.badge, 'Role', 'Not assigned');
+      return _buildInfoRow(
+        Icons.badge,
+        _t('profileRoleLabel'),
+        _t('profileNotAssigned'),
+      );
     }
 
     return Row(
@@ -656,7 +731,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                userRoles!.length > 1 ? 'Roles' : 'Role',
+                userRoles!.length > 1 ? _t('profileRolesLabel') : _t('profileRoleLabel'),
                 style: TextStyle(
                   fontSize: 14.sp,
                   color: Colors.grey[600],
@@ -717,7 +792,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: _navigateToPartnerRegistration,
                   icon: const Icon(Icons.card_membership),
                   label: Text(
-                    'BECOME PARTNER',
+                    _t('profileBecomePartner'),
                     style: TextStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.bold,
@@ -744,7 +819,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: _navigateToChangePassword,
                   icon: const Icon(Icons.edit),
                   label: Text(
-                    'EDIT PASSWORD',
+                    _t('profileEditPassword'),
                     style: TextStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.bold,
@@ -782,7 +857,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _confirmLogout,
             icon: const Icon(Icons.logout),
             label: Text(
-              'LOGOUT',
+              _t('profileLogout'),
               style: TextStyle(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.bold,
@@ -825,7 +900,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Clipboard.setData(ClipboardData(text: value));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label copied to clipboard'),
+        content: Text(_t('profileCopyMessage', params: {'label': label})),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
@@ -858,7 +933,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               Text(
-                'Profile Options',
+                _t('profileActionSheetTitle'),
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.bold,
@@ -867,8 +942,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               SizedBox(height: 20.h),
               _buildActionMenuItem(
                 Icons.edit,
-                'Edit Profile',
-                'Update your personal information',
+                _t('profileActionEditProfileTitle'),
+                _t('profileActionEditProfileSubtitle'),
                 Colors.blue,
                     () {
                   Navigator.pop(context);
@@ -877,8 +952,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildActionMenuItem(
                 Icons.swap_horiz,
-                'Switch Company',
-                'Change your active company',
+                _t('profileActionSwitchCompanyTitle'),
+                _t('profileActionSwitchCompanySubtitle'),
                 Colors.purple,
                     () {
                   Navigator.pop(context);
@@ -887,14 +962,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildActionMenuItem(
                 Icons.lock,
-                'Change Password',
-                'Update your security credentials',
+                _t('profileActionChangePasswordTitle'),
+                _t('profileActionChangePasswordSubtitle'),
                 Colors.orange,
                     () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Change password feature coming soon'),
+                    SnackBar(
+                      content: Text(_t('profileActionChangePasswordMessage')),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -902,14 +977,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildActionMenuItem(
                 Icons.notifications,
-                'Notification Settings',
-                'Manage your notification preferences',
+                _t('profileActionNotificationSettingsTitle'),
+                _t('profileActionNotificationSettingsSubtitle'),
                 Colors.purple,
                     () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Notification settings feature coming soon'),
+                    SnackBar(
+                      content: Text(_t('profileActionNotificationSettingsMessage')),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -917,14 +992,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildActionMenuItem(
                 Icons.help,
-                'Help & Support',
-                'Get assistance and support',
+                _t('profileActionHelpTitle'),
+                _t('profileActionHelpSubtitle'),
                 Colors.green,
                     () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Help & support feature coming soon'),
+                    SnackBar(
+                      content: Text(_t('profileActionHelpMessage')),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -932,8 +1007,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildActionMenuItem(
                 Icons.logout,
-                'Logout',
-                'Sign out from your account',
+                _t('profileActionLogoutTitle'),
+                _t('profileActionLogoutSubtitle'),
                 Colors.red,
                     () {
                   Navigator.pop(context);
@@ -1012,15 +1087,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               (route) => false,
             );
           } catch (e) {
-            debugPrint('Navigation error: $e');
+            debugPrint(_t('profileNavigationError', params: {'error': '$e'}));
           }
         }
     } catch (e) {
-      debugPrint('Error during logout: $e');
+      debugPrint(_t('profileLogoutError', params: {'error': '$e'}));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error logging out: $e'),
+            content: Text(_t('profileLogoutError', params: {'error': '$e'})),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1059,11 +1134,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _getUpdateText() {
     switch (_updateStatus?.type) {
       case UpdateType.block:
-        return 'Required update - Tap to install';
+        return _t('profileRequiredUpdate');
       case UpdateType.nudge:
-        return 'Recommended update available';
+        return _t('profileRecommendedUpdate');
       case UpdateType.inform:
-        return 'New version available';
+        return _t('profileInformUpdate');
       default:
         return '';
     }
@@ -1097,6 +1172,7 @@ class _CompanySwitcherSheetState extends State<CompanySwitcherSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.all(20.w),
@@ -1116,7 +1192,7 @@ class _CompanySwitcherSheetState extends State<CompanySwitcherSheet> {
 
             // Title
             Text(
-              'Switch Company',
+              l10n.translate('profileCompanySwitcherTitle'),
               style: TextStyle(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.bold,
@@ -1188,7 +1264,7 @@ class _CompanySwitcherSheetState extends State<CompanySwitcherSheet> {
                                             borderRadius: BorderRadius.circular(12.r),
                                           ),
                                           child: Text(
-                                            'ACTIVE',
+                                            l10n.translate('profileCompanySwitcherActive'),
                                             style: TextStyle(
                                               fontSize: 10.sp,
                                               fontWeight: FontWeight.bold,
@@ -1201,7 +1277,7 @@ class _CompanySwitcherSheetState extends State<CompanySwitcherSheet> {
                                   ),
                                   SizedBox(height: 4.h),
                                   Text(
-                                    'Code: ${company.shortCode}',
+                                    l10n.translate('profileCompanyCode', params: {'code': company.shortCode}),
                                     style: TextStyle(
                                       fontSize: 14.sp,
                                       color: Colors.grey[600],
@@ -1228,7 +1304,7 @@ class _CompanySwitcherSheetState extends State<CompanySwitcherSheet> {
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: Text(
-                      'CANCEL',
+                      l10n.translate('profileLogoutConfirmCancel'),
                       style: TextStyle(
                         fontSize: 16.sp,
                         fontWeight: FontWeight.w600,
@@ -1255,7 +1331,7 @@ class _CompanySwitcherSheetState extends State<CompanySwitcherSheet> {
                       ),
                     ),
                     child: Text(
-                      'SWITCH',
+                      l10n.translate('profileCompanySwitchButton'),
                       style: TextStyle(
                         fontSize: 16.sp,
                         fontWeight: FontWeight.bold,
@@ -1281,6 +1357,7 @@ class LogoutConfirmationDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       title: Row(
@@ -1294,18 +1371,18 @@ class LogoutConfirmationDialog extends StatelessWidget {
             child: Icon(Icons.logout, color: Colors.red, size: 24.sp),
           ),
           SizedBox(width: 12.w),
-          const Text('Confirm Logout'),
+          Text(l10n.translate('profileLogoutConfirmTitle')),
         ],
       ),
-      content: const Text(
-        'Are you sure you want to logout from your account? You will need to login again to access the app.',
-        style: TextStyle(fontSize: 16),
+      content: Text(
+        l10n.translate('profileLogoutConfirmMessage'),
+        style: const TextStyle(fontSize: 16),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: Text(
-            'CANCEL',
+            l10n.translate('profileLogoutConfirmCancel'),
             style: TextStyle(
               color: Colors.grey[600],
               fontWeight: FontWeight.w600,
@@ -1324,9 +1401,9 @@ class LogoutConfirmationDialog extends StatelessWidget {
               borderRadius: BorderRadius.circular(8.r),
             ),
           ),
-          child: const Text(
-            'LOGOUT',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          child: Text(
+            l10n.translate('profileLogoutConfirmProceed'),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
       ],

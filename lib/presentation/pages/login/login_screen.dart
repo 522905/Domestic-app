@@ -13,7 +13,7 @@ import '../../../core/services/api_service_interface.dart';
 import '../main_container.dart';
 import '../profile/pan_verification_screen.dart';
 import 'forgot_password_screen.dart';
-import 'otp_verification_screen.dart';
+import '../../../l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -214,9 +214,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    final l10n = context.l10n;
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter both username and password';
+        _errorMessage = l10n.translate('Please enter both username and password');
       });
       return;
     }
@@ -287,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
     } catch (e) {
-      String errorMessage = 'Login failed. Please try again.';
+      String errorMessage = l10n.translate('Login failed. Please try again.');
 
       if (e is UpdateRequiredException) {
         _handleForcedUpdate(e.status);
@@ -315,8 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
             return;
           } catch (parseError) {
             print('Error parsing 426 response: $parseError');
-            errorMessage = 'App update required. Please download the latest version.';
-          }
+            errorMessage = l10n.translate('App update required. Please download the latest version.');          }
         } else {
           // Handle other DioExceptions as before
           if (e.response?.data != null) {
@@ -468,15 +468,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showDownloadError() {
+    final l10n = context.l10n;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Download Failed'),
-        content: const Text('Failed to download update. Please try again or download from website.'),
+        title: Text(l10n.translate('Download Failed')),
+        content: Text(l10n.translate('Failed to download update. Please try again or download from website.')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: Text(l10n.translate('OK')),
           ),
         ],
       ),
@@ -547,6 +548,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -564,7 +566,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(height: 24.h),
 
                 Text(
-                  'Arun Gas Services',
+                  l10n.translate('Arun Gas Services'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28.sp,
@@ -575,7 +577,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(height: 8.h),
 
                 Text(
-                  'Login to your account',
+                  l10n.translate('Login to your account'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16.sp,
@@ -594,7 +596,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     });
                   },
                   decoration: InputDecoration(
-                    labelText: 'Username',
+                    labelText: l10n.translate('Username'),
                     prefixIcon: const Icon(Icons.person),
                     suffixIcon: _buildValidationIcon(),
                     border: OutlineInputBorder(
@@ -639,7 +641,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     });
                   },
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: l10n.translate('Password'),
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -671,7 +673,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                     child: Text(
-                      'Forgot Password?',
+                      l10n.translate('Forgot Password?'),
                       style: TextStyle(
                         color: Theme.of(context).primaryColor,
                         fontSize: 14.sp,
@@ -742,7 +744,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     )
                         : Text(
-                      'LOGIN',
+                      l10n.translate('LOGIN'),
                       style: TextStyle(
                         fontSize: 16.sp,
                         fontWeight: FontWeight.bold,
@@ -792,6 +794,7 @@ class _NoRoleAssignedDialogState extends State<NoRoleAssignedDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.r),
@@ -808,7 +811,7 @@ class _NoRoleAssignedDialogState extends State<NoRoleAssignedDialog> {
             ),
             SizedBox(height: 16.h),
             Text(
-              'No User Role Assigned',
+              l10n.translate('No User Role Assigned'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 20.sp,
@@ -818,7 +821,7 @@ class _NoRoleAssignedDialogState extends State<NoRoleAssignedDialog> {
             ),
             SizedBox(height: 12.h),
             Text(
-              'Please contact administrator.',
+              l10n.translate('Please contact administrator.'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14.sp,
@@ -834,7 +837,7 @@ class _NoRoleAssignedDialogState extends State<NoRoleAssignedDialog> {
                 });
               },
               title: Text(
-                'Become a Partner',
+                l10n.translate('Become a Partner'),
                 style: TextStyle(
                   fontSize: 14.sp,
                   color: Colors.grey[800],
@@ -866,7 +869,7 @@ class _NoRoleAssignedDialogState extends State<NoRoleAssignedDialog> {
                     ),
                   ),
                   child: Text(
-                    'Continue to Partner Registration',
+                    l10n.translate('Continue to Partner Registration'),
                     style: TextStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w600,

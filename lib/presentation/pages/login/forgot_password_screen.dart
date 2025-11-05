@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/api_service_interface.dart';
+import '../../../l10n/app_localizations.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
@@ -25,6 +26,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   String? _errorMessage;
   String? _successMessage;
   String? _validationState; // 'valid', 'invalid', null
+  AppLocalizations get l10n => context.l10n;
 
   // Verhoeff algorithm tables
   static const List<List<int>> _d = [
@@ -113,40 +115,40 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   String? _validateAadharField(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Aadhar number is required';
+      return l10n.translate('Aadhar number is required');
     }
     if (value.length != 12 || !RegExp(r'^\d{12}$').hasMatch(value)) {
-      return 'Aadhar must be exactly 12 digits';
+      return l10n.translate('Aadhar must be exactly 12 digits');
     }
     if (!_verhoeffValidate(value)) {
-      return 'Invalid Aadhar number';
+      return l10n.translate('Invalid Aadhar number');
     }
     return null;
   }
 
   String? _validateOTP(String? value) {
     if (value == null || value.isEmpty) {
-      return 'OTP is required';
+      return l10n.translate('OTP is required');
     }
     if (value.length != 6 || !RegExp(r'^\d{6}$').hasMatch(value)) {
-      return 'OTP must be exactly 6 digits';
+      return l10n.translate('OTP must be exactly 6 digits');
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password is required';
+      return l10n.translate('Password is required');
     }
     if (value.length < 6) {
-      return 'Password must be at least 6 characters';
+      return l10n.translate('Password must be at least 6 characters');
     }
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
     if (value != _passwordController.text) {
-      return 'Passwords do not match';
+      return l10n.translate('Passwords do not match');
     }
     return null;
   }

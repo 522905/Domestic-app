@@ -11,6 +11,9 @@ import '../inventory/forms/collect_inventory_request_screen.dart';
 import '../inventory/forms/deposit_inventory_request_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../purchase_invoice/purchase_invoice_screen.dart';
+import 'package:lpg_distribution_app/l10n/app_localizations.dart';
+import 'package:top_snackbar_flutter/top_snack_bar.dart';
+import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -62,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (mounted) {
         setState(() {
-          _userName = userName?.isNotEmpty == true ? userName : 'User';
+          _userName = userName?.isNotEmpty == true ? userName : null;
           _userRoles = userRole.map((userRole) => userRole.role).toList();
           activeCompany = _activeCompany;
         });
@@ -70,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       debugPrint('Error loading user data: $e');
       if (mounted) {
-        _showErrorSnackBar('Failed to load user information');
+        _showErrorSnackBar(context.l10n.translate('dashboardUserLoadFailure'));
       }
     }
   }
@@ -103,7 +106,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
       if (mounted) {
-        _showErrorSnackBar('Failed to load dashboard data');
+        _showErrorSnackBar(context.l10n.translate('dashboardDataLoadFailure'));
       }
     } finally {
       if (mounted) {
@@ -163,11 +166,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       await _loadDashboardData();
       if (mounted) {
-        _showSuccessSnackBar('Dashboard refreshed');
+        _showSuccessSnackBar(context.l10n.translate('dashboardRefreshSuccess'));
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('Failed to refresh dashboard');
+        _showErrorSnackBar(context.l10n.translate('dashboardRefreshFailure'));
       }
     } finally {
       if (mounted) {
@@ -178,23 +181,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // void _showErrorSnackBar(String message) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(
+  //       content: Text(message),
+  //       backgroundColor: Colors.red,
+  //       behavior: SnackBarBehavior.floating,
+  //     ),
+  //   );
+  // }
+
+  // void _showSuccessSnackBar(String message) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(
+  //       content: Text(message),
+  //       backgroundColor: Colors.green,
+  //       behavior: SnackBarBehavior.floating,
+  //     ),
+  //   );
+  // }
+
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
+    final overlay = Overlay.of(context);
+    if (overlay == null) return; // context not ready / disposed
+    showTopSnackBar(
+      overlay,
+      CustomSnackBar.error(
+        message: message,
       ),
+      displayDuration: const Duration(seconds: 1),
     );
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
+    final overlay = Overlay.of(context);
+    if (overlay == null) return; // context not ready / disposed
+    showTopSnackBar(
+      overlay,
+      CustomSnackBar.success(
+        message: message,
       ),
+      displayDuration: const Duration(seconds: 1),
     );
   }
 
@@ -210,7 +237,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: Text(
-        'Dashboard',
+        context.l10n.translate('dashboardTitle'),
         style: TextStyle(
           fontSize: 20.sp,
           fontWeight: FontWeight.w600,
@@ -232,7 +259,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           )
               : const Icon(Icons.refresh, color: Colors.white),
           onPressed: _isRefreshing ? null : _refreshDashboard,
-          tooltip: 'Refresh Dashboard',
+          tooltip: context.l10n.translate('dashboardRefreshTooltip'),
         ),
         Inbox(),
         SizedBox(width: 8.w),
@@ -262,7 +289,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             SizedBox(height: 16.h),
             Text(
-              'Loading dashboard...',
+              context.l10n.translate('dashboardLoadingLabel'),
               style: TextStyle(
                 fontSize: 16.sp,
                 color: Colors.grey[600],
@@ -307,10 +334,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildWelcomeSection() {
-    String greeting = _getTimeBasedGreeting();
-    String userName = _userName?.split(' ').first ?? 'User';
-    String roleDisplay = _formatUserRoles();
-
+    final String greeting = _getTimeBasedGreeting(context);
+    final String fallbackName = context.l10n.translate('dashboardUserFallback');
+    final String userName = _userName?.split(' ').first ?? fallbackName;
+    final String roleDisplay = _formatUserRoles(context);
+    final String? companyCode = activeCompany?.shortCode;
+    final String greetingLine = context.l10n.translate(
+      'dashboardGreetingMessage',
+      params: <String, String>{
+        'greeting': greeting,
+        'name': userName,
+      },
+    );
+    final String roleLine = companyCode != null
+        ? context.l10n.translate(
+      'dashboardRoleWithCompany',
+      params: <String, String>{
+        'roles': roleDisplay,
+        'company': companyCode,
+      },
+    )
+      : roleDisplay;
 
     return Container(
       width: double.infinity,
@@ -364,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$greeting, $userName!',
+                      greetingLine,
                       style: TextStyle(
                         fontSize: 22.sp,
                         fontWeight: FontWeight.bold,
@@ -373,7 +417,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     SizedBox(height: 4.h),
                     Text(
-                    '$roleDisplay  (${activeCompany!.shortCode})',
+                      roleLine,
                       style: TextStyle(
                         fontSize: 14.sp,
                         color: const Color(0xFF0E5CA8),
@@ -412,7 +456,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   SizedBox(width: 6.w),
                   Text(
-                    '${_getTotalPendingCount()} pending approval${_getTotalPendingCount() > 1 ? 's' : ''}',
+                    _pendingApprovalLabel(context),
                     style: TextStyle(
                       fontSize: 12.sp,
                       color: Colors.orange[800],
@@ -470,10 +514,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDeliveryBoySection() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Quick Actions', Icons.flash_on),
+        _buildSectionHeader(l10n.translate('dashboardQuickActionsTitle'), Icons.flash_on),
         SizedBox(height: 16.h),
         GridView.count(
           shrinkWrap: true,
@@ -484,29 +529,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           childAspectRatio: 1.1,
           children: [
             _buildActionCard(
-              title: 'Create Order',
-              subtitle: 'New sale order',
+              title: l10n.translate('dashboardCreateOrderTitle'),
+              subtitle: l10n.translate('dashboardCreateOrderSubtitle'),
               icon: Icons.add_shopping_cart,
               color: const Color(0xFF0E5CA8),
               onTap: () => _navigateToCreateOrder(),
             ),
             _buildActionCard(
-              title: 'Cash Deposit',
-              subtitle: 'Deposit collections',
+              title: l10n.translate('dashboardCashDepositTitle'),
+              subtitle: l10n.translate('dashboardCashDepositSubtitle'),
               icon: Icons.account_balance_wallet,
               color: Colors.green,
               onTap: () => _navigateToCashDeposit(),
             ),
             _buildActionCard(
-              title: 'Challan',
-              subtitle: 'Create a challan',
+              title: l10n.translate('dashboardChallanTitle'),
+              subtitle: l10n.translate('dashboardChallanSubtitle'),
               icon: Icons.add_circle_outline,
               color: Colors.orange,
               onTap: () => _navigateToInventoryCollect(),
             ),
             _buildActionCard(
-              title: 'Deposit Items',
-              subtitle: 'Return inventory',
+              title: l10n.translate('dashboardDepositItemsTitle'),
+              subtitle: l10n.translate('dashboardDepositItemsSubtitle'),
               icon: Icons.remove_circle_outline,
               color: Colors.blue,
               onTap: () => _navigateToInventoryDeposit(),
@@ -518,14 +563,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildWarehouseManagerSection() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Inventory Management', Icons.warehouse),
+        _buildSectionHeader(l10n.translate('dashboardInventoryManagementTitle'), Icons.warehouse),
         SizedBox(height: 16.h),
         _buildApprovalCard(
-          title: 'Procurement  (Purchase Invoice)',
-          subtitle: 'Vehicle In/ out records',
+          title: l10n.translate('dashboardProcurementTitle'),
+          subtitle: l10n.translate('dashboardProcurementSubtitle'),
           count: _pendingInventoryApprovals,
           icon: Icons.add,
           color: Colors.orangeAccent,
@@ -539,8 +585,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         SizedBox(height: 16.h),
         _buildApprovalCard(
-          title: 'Inventory Approvals',
-          subtitle: 'Review pending requests',
+          title: l10n.translate('dashboardInventoryApprovalsTitle'),
+          subtitle: l10n.translate('dashboardInventoryApprovalsSubtitle'),
           count: _pendingInventoryApprovals,
           icon: Icons.inventory,
           color: Colors.blue,
@@ -555,14 +601,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildCashierSection() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Cash Management', Icons.account_balance_wallet),
+        _buildSectionHeader(l10n.translate('dashboardCashManagementTitle'), Icons.account_balance_wallet),
         SizedBox(height: 16.h),
         _buildApprovalCard(
-          title: 'Cash Approvals',
-          subtitle: 'Review pending deposits',
+          title: l10n.translate('dashboardCashApprovalsTitle'),
+          subtitle: l10n.translate('dashboardCashApprovalsSubtitle'),
           count: _pendingCashApprovals,
           icon: Icons.account_balance_wallet,
           color: Colors.green,
@@ -574,14 +621,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildCSESection() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Customer Support', Icons.support_agent),
+        _buildSectionHeader(l10n.translate('dashboardCustomerSupportTitle'), Icons.support_agent),
         SizedBox(height: 16.h),
         _buildApprovalCard(
-          title: 'Open Tickets',
-          subtitle: 'Customer support requests',
+          title: l10n.translate('dashboardOpenTicketsTitle'),
+          subtitle: l10n.translate('dashboardOpenTicketsSubtitle'),
           count: _pendingCSETickets,
           icon: Icons.support_agent,
           color: Colors.purple,
@@ -593,7 +641,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(
               child: _buildStatsCard(
-                title: 'Resolved Today',
+                title: l10n.translate('dashboardResolvedTodayLabel'),
                 value: '12',
                 icon: Icons.check_circle,
                 color: Colors.green,
@@ -602,7 +650,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SizedBox(width: 12.w),
             Expanded(
               child: _buildStatsCard(
-                title: 'Avg Response',
+                title: l10n.translate('dashboardAverageResponseLabel'),
                 value: '2h',
                 icon: Icons.schedule,
                 color: Colors.blue,
@@ -615,10 +663,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildGeneralManagerSection() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('System Overview', Icons.dashboard),
+        _buildSectionHeader(l10n.translate('dashboardSystemOverviewTitle'), Icons.dashboard),
         SizedBox(height: 16.h),
 
         // Quick Stats Row
@@ -626,7 +675,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Expanded(
               child: _buildStatsCard(
-                title: 'Today\'s Orders',
+                title: l10n.translate('dashboardTodaysOrdersLabel'),
                 value: _dashboardStats['today_orders'].toString(),
                 icon: Icons.shopping_cart,
                 color: const Color(0xFF0E5CA8),
@@ -635,7 +684,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SizedBox(width: 12.w),
             Expanded(
               child: _buildStatsCard(
-                title: 'Active Users',
+                title: l10n.translate('dashboardActiveUsersLabel'),
                 value: _dashboardStats['active_users'].toString(),
                 icon: Icons.people,
                 color: Colors.green,
@@ -647,14 +696,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         SizedBox(height: 16.h),
 
         // Approvals Overview
-        _buildSectionHeader('All Approvals', Icons.approval, size: 16),
+        _buildSectionHeader(l10n.translate('dashboardAllApprovalsTitle'), Icons.approval, size: 16),
         SizedBox(height: 12.h),
 
         Row(
           children: [
             Expanded(
               child: _buildApprovalSummaryCard(
-                title: 'Inventory',
+                title: l10n.translate('Inventory'),
                 count: _pendingInventoryApprovals,
                 color: Colors.blue,
                 onTap: () => _navigateToInventoryApprovals(),
@@ -663,7 +712,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SizedBox(width: 8.w),
             Expanded(
               child: _buildApprovalSummaryCard(
-                title: 'Cash',
+                title: l10n.translate('Cash'),
                 count: _pendingCashApprovals,
                 color: Colors.green,
                 onTap: () => _navigateToCashApprovals(),
@@ -672,7 +721,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SizedBox(width: 8.w),
             Expanded(
               child: _buildApprovalSummaryCard(
-                title: 'Orders',
+                title: l10n.translate('Orders'),
                 count: _pendingOrderApprovals,
                 color: Colors.orange,
                 onTap: () => _navigateToOrderApprovals(),
@@ -685,14 +734,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDefaultSection() {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader('Getting Started', Icons.info),
+        _buildSectionHeader(l10n.translate('dashboardGettingStartedTitle'), Icons.info),
         SizedBox(height: 16.h),
         _buildActionCard(
-          title: 'View Profile',
-          subtitle: 'Personal information',
+          title: l10n.translate('dashboardViewProfileTitle'),
+          subtitle: l10n.translate('dashboardViewProfileSubtitle'),
           icon: Icons.person,
           color: const Color(0xFF0E5CA8),
           onTap: () => Navigator.pushNamed(context, '/profile'),
@@ -889,7 +939,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       borderRadius: BorderRadius.circular(20.r),
                     ),
                     child: Text(
-                      'Clear',
+                      context.l10n.translate('dashboardStatusClear'),
                       style: TextStyle(
                         fontSize: 11.sp,
                         color: Colors.green,
@@ -1017,6 +1067,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showNotificationsBottomSheet() {
+    final l10n = context.l10n;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1049,7 +1100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Notifications',
+                        l10n.translate('dashboardNotificationsTitle'),
                         style: TextStyle(
                           fontSize: 20.sp,
                           fontWeight: FontWeight.bold,
@@ -1063,7 +1114,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             borderRadius: BorderRadius.circular(12.r),
                           ),
                           child: Text(
-                            '${_getTotalPendingCount()} pending',
+                            l10n.translate(
+                              'dashboardPendingCountLabel',
+                              params: <String, String>{
+                                'count': _getTotalPendingCount().toString(),
+                              },
+                            ),
                             style: TextStyle(
                               fontSize: 12.sp,
                               color: Colors.red,
@@ -1082,8 +1138,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         if (_pendingInventoryApprovals > 0)
                           _buildNotificationItem(
-                            'Inventory Approvals',
-                            '$_pendingInventoryApprovals items need approval',
+                            l10n.translate('dashboardInventoryApprovalsTitle'),
+                            l10n.translate(
+                              'dashboardInventoryPendingSubtitle',
+                              params: <String, String>{
+                                'count': _pendingInventoryApprovals.toString(),
+                              },
+                            ),
                             Icons.inventory,
                             Colors.blue,
                                 () {
@@ -1093,8 +1154,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         if (_pendingCashApprovals > 0)
                           _buildNotificationItem(
-                            'Cash Approvals',
-                            '$_pendingCashApprovals deposits need approval',
+                            l10n.translate('dashboardCashApprovalsTitle'),
+                            l10n.translate(
+                              'dashboardCashPendingSubtitle',
+                              params: <String, String>{
+                                'count': _pendingCashApprovals.toString(),
+                              },
+                            ),
                             Icons.account_balance_wallet,
                             Colors.green,
                                 () {
@@ -1104,8 +1170,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         if (_pendingOrderApprovals > 0)
                           _buildNotificationItem(
-                            'Order Approvals',
-                            '$_pendingOrderApprovals orders need approval',
+                            l10n.translate('dashboardOrderApprovalsTitle'),
+                            l10n.translate(
+                              'dashboardOrdersPendingSubtitle',
+                              params: <String, String>{
+                                'count': _pendingOrderApprovals.toString(),
+                              },
+                            ),
                             Icons.shopping_cart,
                             Colors.orange,
                                 () {
@@ -1115,8 +1186,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         if (_pendingCSETickets > 0)
                           _buildNotificationItem(
-                            'CSE Tickets',
-                            '$_pendingCSETickets tickets need attention',
+                            l10n.translate('dashboardCseTicketsTitle'),
+                            l10n.translate(
+                              'dashboardTicketsPendingSubtitle',
+                              params: <String, String>{
+                                'count': _pendingCSETickets.toString(),
+                              },
+                            ),
                             Icons.support_agent,
                             Colors.purple,
                                 () {
@@ -1136,7 +1212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 SizedBox(height: 16.h),
                                 Text(
-                                  'No pending notifications',
+                                  l10n.translate('dashboardNoPendingNotifications'),
                                   style: TextStyle(
                                     fontSize: 16.sp,
                                     color: Colors.grey[600],
@@ -1285,12 +1361,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _navigateToOrderApprovals() {
     // Navigate to order approvals screen
-    _showSuccessSnackBar('Order approvals feature coming soon');
+    _showSuccessSnackBar(context.l10n.translate('dashboardOrderApprovalsComingSoon'));
   }
 
   void _navigateToCSETickets() {
     // Navigate to CSE tickets screen
-    _showSuccessSnackBar('CSE tickets feature coming soon');
+    _showSuccessSnackBar(context.l10n.translate('dashboardCseTicketsComingSoon'));
   }
 
   // Helper methods
@@ -1317,28 +1393,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return total;
   }
 
-  String _getTimeBasedGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+  String _pendingApprovalLabel(BuildContext context) {
+    final int pendingCount = _getTotalPendingCount();
+    final String countString = pendingCount.toString();
+    return pendingCount == 1
+        ? context.l10n
+        .translate('dashboardPendingApprovalSingle', params: <String, String>{'count': countString})
+        : context.l10n.translate(
+      'dashboardPendingApprovalsMultiple',
+      params: <String, String>{'count': countString},
+    );
   }
 
-  String _formatUserRoles() {
-    if (_userRoles.isEmpty) return 'User';
+  String _getTimeBasedGreeting(BuildContext context) {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return context.l10n.translate('dashboardGreetingMorning');
+    }
+    if (hour < 17) {
+      return context.l10n.translate('dashboardGreetingAfternoon');
+    }
+    return context.l10n.translate('dashboardGreetingEvening');
+  }
+
+  String _formatUserRoles(BuildContext context) {
+    if (_userRoles.isEmpty) {
+      return context.l10n.translate('dashboardUserFallback');
+    }
 
     List<String> formattedRoles = _userRoles.map((role) {
       switch (role.toLowerCase()) {
         case 'delivery boy':
-          return 'Delivery Boy';
+          return context.l10n.translate('dashboardRoleDeliveryBoy');
         case 'warehouse manager':
-          return 'Warehouse Manager';
+          return context.l10n.translate('dashboardRoleWarehouseManager');
         case 'general manager':
-          return 'General Manager';
+          return context.l10n.translate('dashboardRoleGeneralManager');
         case 'cse':
-          return 'Customer Service Executive';
+          return context.l10n.translate('dashboardRoleCustomerServiceExecutive');
         case 'cashier':
-          return 'Cashier';
+          return context.l10n.translate('dashboardRoleCashier');
         default:
           return role.split(' ').map((word) =>
           word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}'
@@ -1349,9 +1443,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (formattedRoles.length == 1) {
       return formattedRoles.first;
     } else if (formattedRoles.length == 2) {
-      return formattedRoles.join(' & ');
+      final String separator = context.l10n.translate('dashboardRolesSeparator');
+      return '${formattedRoles.first}$separator${formattedRoles.last}';
     } else {
-      return '${formattedRoles.first} + ${formattedRoles.length - 1} more';
+      return context.l10n.translate(
+        'dashboardAdditionalRoles',
+        params: <String, String>{
+          'firstRole': formattedRoles.first,
+          'remainingCount': (formattedRoles.length - 1).toString(),
+        },
+      );
+    }
+  }
+
+  String _localizedModuleName(String module) {
+    switch (module) {
+      case 'inventory':
+        return context.l10n.translate('dashboardModuleInventory');
+      case 'cash':
+        return context.l10n.translate('dashboardModuleCash');
+      case 'orders':
+        return context.l10n.translate('dashboardModuleOrders');
+      case 'cse':
+        return context.l10n.translate('dashboardModuleCse');
+      default:
+        return module;
     }
   }
 
@@ -1398,8 +1514,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Show notification if new pending items
         if (data['action'] == 'new_pending') {
-          _showSuccessSnackBar('New $module approval pending');
-        }
+          final String moduleName = _localizedModuleName(module);
+          _showSuccessSnackBar(
+            context.l10n.translate(
+              'dashboardNewApprovalPending',
+              params: <String, String>{'module': moduleName},
+            ),
+          );        }
       }
     } catch (e) {
       debugPrint('Error handling WebSocket update: $e');
