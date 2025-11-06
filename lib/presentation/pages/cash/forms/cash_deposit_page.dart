@@ -24,6 +24,8 @@ class _CashDepositPageState extends State<CashDepositPage> {
   final _formKey = GlobalKey<FormState>();
   final _remarksController = TextEditingController();
   final _amountController = TextEditingController();
+  final _paidToController = TextEditingController();
+
   String? _selectedAccountType;
   String? _selectedAccount;
 
@@ -57,34 +59,34 @@ class _CashDepositPageState extends State<CashDepositPage> {
 
   Future<void> _fetchCashData() async {
     try {
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() => _isLoading = true);
 
-      // Fetch account type list - store full objects
       final accountTypeResponse = await apiService.getAccountType();
       _accountTypeObjects = List<Map<String, dynamic>>.from(accountTypeResponse);
       final accountTypeList = _accountTypeObjects
           .map<String>((item) => item['account_label'] as String)
           .toList();
 
-      // Fetch paid-to account list - store full objects
       final paidToAccountResponse = await apiService.getCashAccount();
       _paidToAccountObjects = List<Map<String, dynamic>>.from(paidToAccountResponse);
       final paidToAccountList = _paidToAccountObjects
           .map<String>((item) => item['account_label'] as String)
           .toList();
 
-      // Update state with the fetched data
       setState(() {
         _isLoading = false;
         _accountType = accountTypeList;
         _paidToAccountList = paidToAccountList;
+
+        // ✅ auto-select first items if nothing selected yet
+        _selectedAccountType ??= _accountType.isNotEmpty ? _accountType.first : null;
+        _selectedAccount ??= _paidToAccountList.isNotEmpty ? _paidToAccountList.first : null;
+
+        // keep the text field in sync
+        _paidToController.text = _selectedAccount ?? '';
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       context.showErrorSnackBar('Error fetching accounts: $e');
     }
   }
@@ -232,7 +234,7 @@ class _CashDepositPageState extends State<CashDepositPage> {
                       SizedBox(height: 8.h),
                       TextFormField(
                         readOnly: true,
-                        controller: TextEditingController(text: _selectedAccount),
+                        controller: _paidToController,
                         decoration: InputDecoration(
                           hintText: 'Select Account Paid To',
                           border: OutlineInputBorder(
@@ -646,14 +648,16 @@ class _CashDepositPageState extends State<CashDepositPage> {
     DialogUtils.showAccountSelectionDialog(
       context: context,
       isLoading: _isLoading,
-      accounts: _paidToAccountObjects, // Pass full objects instead of just names
+      accounts: _paidToAccountObjects,
       onAccountSelected: (selectedAccount) {
         setState(() {
           _selectedAccount = selectedAccount;
+          _paidToController.text = selectedAccount!;
         });
       },
     );
   }
+
 
   Widget _buildDynamicAccountRadios() {
     return Column(
@@ -676,6 +680,12 @@ class _CashDepositPageState extends State<CashDepositPage> {
                     if (value != null) {
                       setState(() {
                         _selectedAccountType = value;
+
+                        // if changing type should reset "Paid To", do it here (adjust filter if you have one)
+                        if (_paidToAccountList.isNotEmpty) {
+                          _selectedAccount = _paidToAccountList.first;
+                          _paidToController.text = _selectedAccount!;
+                        }
                       });
                     }
                   },

@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:lpg_distribution_app/core/services/printer_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
-
 import '../core/services/User.dart';
 import '../domain/entities/cash/cash_transaction.dart';
 import '../presentation/widgets/professional_snackbar.dart';
@@ -94,59 +93,87 @@ class _CashReceiptDialogState extends State<CashReceiptDialog> {
           debugPrint('Dialog refresh error: $e');
         }
       }
-      setState(() {});
     }
 
-    setState(() {
-      _isScanning = true;
-      _printers.clear();
-    });
+    if (mounted) {
+      setState(() {
+        _isScanning = true;
+        _printers.clear();
+      });
+    }
     refreshDialog();
 
     try {
       final adapterState = await FlutterBluePlus.adapterState.first;
       if (adapterState != BluetoothAdapterState.on) {
         if (mounted) {
-          context.showWarningSnackBar('Please enable Bluetooth');
+          context.showWarningSnackBar('Please turn on Bluetooth');
         }
-        setState(() => _isScanning = false);
+        if (mounted) setState(() => _isScanning = false);
         refreshDialog();
         return;
       }
 
-      if (FlutterBluePlus.isScanningNow) {
-        await FlutterBluePlus.stopScan();
-      }
+      await _scanSubscription?.cancel();
 
-      _scanSubscription?.cancel();
       _scanSubscription = FlutterBluePlus.scanResults.listen(
             (results) {
-          final Set<String> seenAddresses = {};
-          final List<BluetoothDevice> uniquePrinters = [];
+          if (!mounted) return;
 
+          debugPrint('========== SCAN RESULTS ==========');
+          debugPrint('Total results: ${results.length}');
+
+          final foundPrinters = <BluetoothDevice>[];
           for (var result in results) {
             final device = result.device;
             final name = device.platformName.toLowerCase();
-            final address = device.remoteId.toString();
 
-            if (!seenAddresses.contains(address) &&
-                (name.contains('printer') || name.contains('pos') ||
-                    name.contains('bt') || name.contains('rpp') ||
-                    name.contains('mtp') || name.contains('escpos'))) {
-              seenAddresses.add(address);
-              uniquePrinters.add(device);
+            debugPrint('Device found: "${device.platformName}" (${device.remoteId})');
+            debugPrint('Lowercase name: "$name"');
+
+            if (device.platformName.isNotEmpty &&
+                (name.contains('printer') ||
+                    name.contains('tvs') ||
+                    name.contains('mlp') ||
+                    name.contains('rpp') ||
+                    name.contains('pos') ||
+                    name.contains('bt') ||
+                    name.contains('mtp') ||
+                    name.contains('escpos'))) {
+
+              debugPrint('✅ Printer matched: ${device.platformName}');
+
+              if (!foundPrinters.any((d) => d.remoteId == result.device.remoteId)) {
+                foundPrinters.add(result.device);
+              }
+            } else {
+              debugPrint('❌ Printer NOT matched');
             }
           }
 
-          setState(() {
-            _printers = uniquePrinters;
-          });
-          refreshDialog();
+          debugPrint('Found printers count: ${foundPrinters.length}');
+          debugPrint('==================================');
+
+          if (mounted) {
+            setState(() {
+              _printers = foundPrinters;
+              if (foundPrinters.isNotEmpty) {
+                _isScanning = false;
+              }
+            });
+            refreshDialog();
+          }
+
+          if (foundPrinters.isNotEmpty) {
+            unawaited(FlutterBluePlus.stopScan());
+          }
         },
         onError: (error) {
           debugPrint('Scan error: $error');
-          setState(() => _isScanning = false);
-          refreshDialog();
+          if (mounted) {
+            setState(() => _isScanning = false);
+            refreshDialog();
+          }
         },
       );
 
@@ -155,39 +182,63 @@ class _CashReceiptDialogState extends State<CashReceiptDialog> {
         androidUsesFineLocation: false,
       );
 
+      // Auto-stop after timeout
       await Future.delayed(const Duration(seconds: 10));
-
-      setState(() => _isScanning = false);
-      refreshDialog();
-    } catch (e) {
-      debugPrint('Scan exception: $e');
-      setState(() {
-        _isScanning = false;
-      });
-      refreshDialog();
-
       if (mounted) {
-        context.showErrorSnackBar('Failed to scan: ${e.toString()}');
+        await FlutterBluePlus.stopScan();
+        setState(() => _isScanning = false);
+        refreshDialog();
+      }
+    } catch (e) {
+      debugPrint('Scan error: $e');
+      if (mounted) {
+        setState(() => _isScanning = false);
+        refreshDialog();
+        context.showErrorSnackBar('Scan failed: $e');
       }
     }
   }
 
   Future<void> _connectToPrinter(BluetoothDevice device) async {
-    setState(() => _isScanning = false);
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
 
-    bool success = await _printerService.connectToPrinter(device);
+      final success = await _printerService.connectToPrinter(device);
 
-    if (success) {
-      setState(() {
-        _isConnected = true;
-        _connectedDevice = device;
-      });
-      if (mounted) {
-        context.showSuccessSnackBar('Connected to ${device.platformName}');
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      if (success) {
+        setState(() {
+          _isConnected = true;
+          _connectedDevice = device;
+        });
+
+        // Close printer selection dialog - THIS WAS MISSING
+        if (mounted) Navigator.pop(context);
+
+        if (mounted) {
+          context.showSuccessSnackBar('Connected to ${device.platformName}');
+        }
+      } else {
+        if (mounted) {
+          context.showErrorSnackBar('Failed to connect to ${device.platformName}');
+        }
       }
-    } else {
+    } catch (e) {
+      // Close loading dialog if still open
+      if (mounted) Navigator.pop(context);
+
+      debugPrint('Connection error: $e');
       if (mounted) {
-        context.showErrorSnackBar('Failed to connect to ${device.platformName}');
+        context.showErrorSnackBar('Connection error: $e');
       }
     }
   }
@@ -195,90 +246,86 @@ class _CashReceiptDialogState extends State<CashReceiptDialog> {
   void _showPrinterDialog() {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setDialogState) {
-            return AlertDialog(
-              title: Text('Select Printer', style: TextStyle(fontSize: 16.sp)),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: 300.h,
-                child: Column(
-                  children: [
-                    if (_isScanning)
-                      Column(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Select Printer'),
+            content: SizedBox(
+              height: 300.h,
+              width: double.maxFinite,
+              child: Column(
+                children: [
+                  if (_isScanning)
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const CircularProgressIndicator(),
-                          SizedBox(height: 8.h),
-                          Text('Scanning...', style: TextStyle(fontSize: 12.sp)),
-                        ],
-                      )
-                    else if (_printers.isEmpty)
-                      Column(
-                        children: [
-                          Icon(Icons.bluetooth_searching, size: 48.sp, color: Colors.grey),
-                          SizedBox(height: 8.h),
-                          Text('No printers found', style: TextStyle(fontSize: 12.sp)),
+                          SizedBox(height: 16.h),
+                          const Text('Scanning for printers...'),
                         ],
                       ),
-                    if (_printers.isNotEmpty)
-                      Expanded(
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _printers.length,
-                          itemBuilder: (context, index) {
-                            final printer = _printers[index];
-                            return ListTile(
-                              leading: const Icon(Icons.print),
+                    )
+                  else if (_printers.isEmpty)
+                    const Expanded(
+                      child: Center(
+                        child: Text('No printers found.\nTap Scan to search.'),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _printers.length,
+                        itemBuilder: (context, index) {
+                          final printer = _printers[index];
+                          return Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.print, color: Colors.blue),
                               title: Text(
                                 printer.platformName.isNotEmpty
                                     ? printer.platformName
                                     : 'Unknown Printer',
-                                style: TextStyle(fontSize: 14.sp),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
-                                printer.remoteId.toString(),
+                                printer.remoteId.str,
                                 style: TextStyle(fontSize: 11.sp),
                               ),
-                              onTap: () {
-                                Navigator.pop(dialogContext);
-                                _connectToPrinter(printer);
-                              },
-                            );
-                          },
-                        ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _connectToPrinter(printer),
+                            ),
+                          );
+                        },
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
-              actions: [
-                TextButton.icon(
-                  icon: Icon(
-                    _isScanning ? Icons.stop : Icons.refresh,
-                    size: 16.sp,
-                  ),
-                  label: Text(_isScanning ? 'Stop Scan' : 'Scan Again'),
-                  onPressed: _isScanning
-                      ? () async {
-                    await FlutterBluePlus.stopScan();
-                    if (mounted) {
-                      setState(() => _isScanning = false);
-                    }
-                    setDialogState(() {});
+            ),
+            actions: [
+              TextButton.icon(
+                icon: Icon(_isScanning ? Icons.stop : Icons.bluetooth_searching),
+                label: Text(_isScanning ? 'Stop' : 'Scan'),
+                onPressed: _isScanning
+                    ? () async {
+                  await FlutterBluePlus.stopScan();
+                  if (mounted) {
+                    setState(() => _isScanning = false);
                   }
-                      : () {
-                    _scanForPrinters(dialogSetState: setDialogState);
-                  },
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+                  setDialogState(() {});
+                }
+                    : () {
+                  _scanForPrinters(dialogSetState: setDialogState);
+                },
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

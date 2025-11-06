@@ -56,11 +56,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   Future<void> _fetchUserRole() async {
     final userName = await User().getUserName();
     final userId = await User().getUserId();
-    final userRole = await User().getUserRoles();
+    final roles = await User().getUserRoles();
     setState(() {
+      _userRole =  roles.map((role) => role.role).toList();
       _userName = userName;
       _userId = userId as Int?;
-      _userRole = userRole.map((role) => role.role).toList();
     });
   }
 

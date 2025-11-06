@@ -17,7 +17,8 @@ import '../../blocs/cash/cash_bloc.dart';
 import 'forms/bank_deposit_page.dart';
 import 'forms/handover_screen.dart';
 import 'general_ledger_detail_page.dart';
-import '../widgets/professional_snackbar.dart';
+import '../../widgets/professional_snackbar.dart';
+
 
 class _AppLifecycleObserver extends WidgetsBindingObserver {
   final VoidCallback onResume;

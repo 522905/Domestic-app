@@ -692,44 +692,48 @@ class PrinterService {
       }
 
       bytes.addAll([10]);
+      bytes.addAll('------------------------------------------------'.codeUnits);
+      bytes.addAll([10]);
+      bytes.addAll([10]);
 
       // Status
-      bytes.addAll('------------------------------------------------'.codeUnits);
-      bytes.addAll([10]);
-      String status = 'PENDING';
-      switch (transaction.status) {
-        case TransactionStatus.pending:
-          status = 'PENDING';
-          break;
-        case TransactionStatus.approved:
-          status = 'APPROVED';
-          break;
-        case TransactionStatus.rejected:
-          status = 'REJECTED';
-          break;
-      }
-      bytes.addAll([27, 69, 1]); // Bold ON
-      bytes.addAll('Status: $status'.codeUnits);
-      bytes.addAll([27, 69, 0]); // Bold OFF
-      bytes.addAll([10]);
-
-      // Approved by (if approved)
-      if (transaction.status == TransactionStatus.approved) {
-        if (transaction.approvedByName != null && transaction.approvedByName!.isNotEmpty) {
-          bytes.addAll('Approved by: ${transaction.approvedByName}'.codeUnits);
-          bytes.addAll([10]);
-        }
-        if (transaction.approvedAt != null) {
-          final approvedDate = DateFormat('dd/MM/yyyy hh:mm a').format(transaction.approvedAt!.toLocal());
-          bytes.addAll('Approved on: $approvedDate'.codeUnits);
-          bytes.addAll([10]);
-        }
-      }
-
-      bytes.addAll('------------------------------------------------'.codeUnits);
-      bytes.addAll([10, 10, 10, 10, 10]); // Extra spacing at end
+      // bytes.addAll('------------------------------------------------'.codeUnits);
+      // bytes.addAll([10]);
+      // String status = 'PENDING';
+      // switch (transaction.status) {
+      //   case TransactionStatus.pending:
+      //     status = 'PENDING';
+      //     break;
+      //   case TransactionStatus.approved:
+      //     status = 'APPROVED';
+      //     break;
+      //   case TransactionStatus.rejected:
+      //     status = 'REJECTED';
+      //     break;
+      // }
+      // bytes.addAll([27, 69, 1]); // Bold ON
+      // bytes.addAll('Status: $status'.codeUnits);
+      // bytes.addAll([27, 69, 0]); // Bold OFF
+      // bytes.addAll([10]);
+      //
+      // // Approved by (if approved)
+      // if (transaction.status == TransactionStatus.approved) {
+      //   if (transaction.approvedByName != null && transaction.approvedByName!.isNotEmpty) {
+      //     bytes.addAll('Approved by: ${transaction.approvedByName}'.codeUnits);
+      //     bytes.addAll([10]);
+      //   }
+      //   if (transaction.approvedAt != null) {
+      //     final approvedDate = DateFormat('dd/MM/yyyy hh:mm a').format(transaction.approvedAt!.toLocal());
+      //     bytes.addAll('Approved on: $approvedDate'.codeUnits);
+      //     bytes.addAll([10]);
+      //   }
+      // }
+      //
+      // bytes.addAll('------------------------------------------------'.codeUnits);
+      // bytes.addAll([10, 10, 10, 10, 10]); // Extra spacing at end
 
       // Cut paper
+
       bytes.addAll([29, 86, 66, 0]);
 
       debugPrint('Total receipt bytes: ${bytes.length}');
