@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:lpg_distribution_app/core/models/inventory/inventory_request.dart';
+import 'package:lpg_distribution_app/domain/entities/cash/cash_transaction.dart';
 
 class PrinterService {
   static final PrinterService _instance = PrinterService._internal();
@@ -555,4 +556,194 @@ class PrinterService {
 
       return null;
     }
+
+  // Cash Receipt Print Method
+  Future<bool> printCashReceipt(
+      CashTransaction transaction,
+      String date, {
+        String company = 'arungas',
+      }) async {
+    if (!_isConnected || _writeCharacteristic == null) {
+      return false;
+    }
+
+    try {
+      List<int> bytes = [];
+
+      // Initialize printer
+      bytes.addAll([27, 64]); // ESC @
+
+      // Dynamic Header based on company
+      bytes.addAll([27, 97, 1]); // Center align
+      bytes.addAll([29, 33, 17]); // Double size
+      bytes.addAll([27, 69, 1]); // Bold ON
+
+      if (company.toLowerCase() == 'arungas') {
+        bytes.addAll('ARUN GAS SERVICE'.codeUnits);
+      } else {
+        bytes.addAll('ARUN INDANE'.codeUnits);
+      }
+
+      bytes.addAll([27, 69, 0]); // Bold OFF
+      bytes.addAll([10]); // Line feed
+
+      // Subtitle - Distributor info (Normal size, Center, compact)
+      bytes.addAll([29, 33, 0]); // Normal size
+      bytes.addAll('Distributors: India Oil Corporation Limited'.codeUnits);
+      bytes.addAll([10]);
+      bytes.addAll('12 A, Sherpur Khurd, Backside Apollo Hospital'.codeUnits);
+      bytes.addAll([10]);
+      bytes.addAll('Sherpur, LUDHIANA'.codeUnits);
+      bytes.addAll([10, 10]); // 2 line feeds
+
+      // Title - CASH RECEIPT (Bold, Center, compact)
+      bytes.addAll([27, 69, 1]); // Bold ON
+      bytes.addAll('CASH RECEIPT'.codeUnits);
+      bytes.addAll([27, 69, 0]); // Bold OFF
+      bytes.addAll([10, 10]);
+
+      // Format date and time
+      final timestamp = transaction.createdAt?.toLocal() ?? DateTime.now();
+      final dateStr = DateFormat('dd/MM/yyyy').format(timestamp);
+      final timeStr = DateFormat('hh:mm a').format(timestamp);
+
+      // Left align for details
+      bytes.addAll([27, 97, 0]); // Left align
+
+      // Top section - compact format
+      bytes.addAll('Receipt No: ${transaction.id}'.codeUnits);
+      bytes.addAll([10]);
+      bytes.addAll('Date: $dateStr'.codeUnits);
+      bytes.addAll([10]);
+      bytes.addAll('Time: $timeStr'.codeUnits);
+      bytes.addAll([10, 10]); // 2 line feeds
+
+      // Transaction details
+      bytes.addAll('------------------------------------------------'.codeUnits);
+      bytes.addAll([10]);
+      bytes.addAll([27, 69, 1]); // Bold ON
+      bytes.addAll('TRANSACTION DETAILS'.codeUnits);
+      bytes.addAll([27, 69, 0]); // Bold OFF
+      bytes.addAll([10]);
+      bytes.addAll('------------------------------------------------'.codeUnits);
+      bytes.addAll([10, 10]);
+
+      // Transaction Type
+      String transactionType = 'Deposit';
+      switch (transaction.type) {
+        case TransactionType.deposit:
+          transactionType = 'Deposit';
+          break;
+        case TransactionType.handover:
+          transactionType = 'Handover';
+          break;
+        case TransactionType.bank:
+          transactionType = 'Bank Deposit';
+          break;
+      }
+      bytes.addAll('Type: $transactionType'.codeUnits);
+      bytes.addAll([10]);
+
+      // Amount
+      final amountStr = NumberFormat.currency(
+        symbol: 'Rs. ',
+        decimalDigits: 2,
+        locale: 'en_IN',
+      ).format(transaction.amount);
+      bytes.addAll([27, 69, 1]); // Bold ON
+      bytes.addAll('Amount: $amountStr'.codeUnits);
+      bytes.addAll([27, 69, 0]); // Bold OFF
+      bytes.addAll([10]);
+
+      // From Account
+      if (transaction.fromAccount.isNotEmpty) {
+        bytes.addAll('From: ${transaction.fromAccount}'.codeUnits);
+        bytes.addAll([10]);
+      }
+
+      // To Account
+      if (transaction.selectedAccount != null && transaction.selectedAccount!.isNotEmpty) {
+        bytes.addAll('To: ${transaction.selectedAccount}'.codeUnits);
+        bytes.addAll([10]);
+      }
+
+      // Bank info if applicable
+      if (transaction.selectedBank != null && transaction.selectedBank!.isNotEmpty) {
+        bytes.addAll('Bank: ${transaction.selectedBank}'.codeUnits);
+        bytes.addAll([10]);
+      }
+
+      // Bank Reference
+      if (transaction.bankReferenceNo != null && transaction.bankReferenceNo!.isNotEmpty) {
+        bytes.addAll('Ref No: ${transaction.bankReferenceNo}'.codeUnits);
+        bytes.addAll([10]);
+      }
+
+      bytes.addAll([10]);
+
+      // Initiator
+      bytes.addAll('Initiated by: ${transaction.requestedByName ?? transaction.initiator}'.codeUnits);
+      bytes.addAll([10]);
+
+      // Remarks
+      if (transaction.notes != null && transaction.notes!.isNotEmpty) {
+        bytes.addAll('Remarks: ${transaction.notes}'.codeUnits);
+        bytes.addAll([10]);
+      }
+
+      bytes.addAll([10]);
+
+      // Status
+      bytes.addAll('------------------------------------------------'.codeUnits);
+      bytes.addAll([10]);
+      String status = 'PENDING';
+      switch (transaction.status) {
+        case TransactionStatus.pending:
+          status = 'PENDING';
+          break;
+        case TransactionStatus.approved:
+          status = 'APPROVED';
+          break;
+        case TransactionStatus.rejected:
+          status = 'REJECTED';
+          break;
+      }
+      bytes.addAll([27, 69, 1]); // Bold ON
+      bytes.addAll('Status: $status'.codeUnits);
+      bytes.addAll([27, 69, 0]); // Bold OFF
+      bytes.addAll([10]);
+
+      // Approved by (if approved)
+      if (transaction.status == TransactionStatus.approved) {
+        if (transaction.approvedByName != null && transaction.approvedByName!.isNotEmpty) {
+          bytes.addAll('Approved by: ${transaction.approvedByName}'.codeUnits);
+          bytes.addAll([10]);
+        }
+        if (transaction.approvedAt != null) {
+          final approvedDate = DateFormat('dd/MM/yyyy hh:mm a').format(transaction.approvedAt!.toLocal());
+          bytes.addAll('Approved on: $approvedDate'.codeUnits);
+          bytes.addAll([10]);
+        }
+      }
+
+      bytes.addAll('------------------------------------------------'.codeUnits);
+      bytes.addAll([10, 10, 10, 10, 10]); // Extra spacing at end
+
+      // Cut paper
+      bytes.addAll([29, 86, 66, 0]);
+
+      debugPrint('Total receipt bytes: ${bytes.length}');
+
+      final success = await _writeInChunks(bytes);
+
+      if (success) {
+        debugPrint('Cash receipt printed successfully');
+      }
+
+      return success;
+    } catch (e) {
+      debugPrint('Error printing cash receipt: $e');
+      return false;
+    }
+  }
 }

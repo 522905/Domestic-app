@@ -9,6 +9,7 @@ import '../../../core/services/User.dart';
 import '../../../domain/entities/cash/cash_transaction.dart';
 import '../../blocs/cash/cash_bloc.dart';
 import '../../../utils/swipeButton.dart';
+import '../../../utils/cash_receipt_dialog.dart';
 import '../../widgets/professional_snackbar.dart';
 
 class TransactionDetailScreen extends StatefulWidget {
@@ -31,6 +32,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   final TextEditingController _rejectionCommentController = TextEditingController();
   CashTransaction? _currentTransaction; // Keep track of current transaction
   String? _userName;
+  List<String> _userRole = [];
   bool _isTransactionUpdated = false; // Track if transaction was updated
  Int? _userId;
 
@@ -54,9 +56,11 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   Future<void> _fetchUserRole() async {
     final userName = await User().getUserName();
     final userId = await User().getUserId();
+    final userRole = await User().getUserRoles();
     setState(() {
       _userName = userName;
       _userId = userId as Int?;
+      _userRole = userRole.map((role) => role.role).toList();
     });
   }
 
@@ -439,6 +443,12 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                   ),
                 ),
               ),
+              SizedBox(height: 16.h),
+            ],
+
+            // Print Receipt Button - Only visible for Cashier role
+            if (_userRole.contains('Cashier')) ...[
+              CashReceiptDialog(transaction: transaction),
               SizedBox(height: 16.h),
             ],
 
