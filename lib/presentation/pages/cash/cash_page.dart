@@ -19,7 +19,6 @@ import 'forms/handover_screen.dart';
 import 'general_ledger_detail_page.dart';
 import '../../widgets/professional_snackbar.dart';
 
-
 class _AppLifecycleObserver extends WidgetsBindingObserver {
   final VoidCallback onResume;
 
