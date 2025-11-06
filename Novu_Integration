@@ -1,0 +1,39 @@
+Novu Notifications – Server + Client Integration (In-App + Push via FCM)
+
+This repo documents how we use Novu to send in-app and push notifications for three workflows:
+
+Name:escalation.event → Identifier: escalation-event
+
+Name: approval.event → Identifier: approval-event
+
+Name: transaction.event → Identifier: transaction-event
+
+Each workflow has two steps:
+
+In-App
+
+Title: {{payload.title}}
+
+Body: {{payload.body}}
+
+Redirect URL: {{payload.route}}
+
+Push (FCM)
+
+Title: {{payload.title}}
+
+Body: {{payload.body}}
+
+The backend triggers events with a uniform payload contract (see below). Push delivery uses Firebase Cloud Messaging configured in Novu’s Integrations store.
+
+
+
+backend payload = {
+                "title": content["title"],
+                "body": content["body"],
+                "eventType": event_type,
+                "action": action,
+                "route": route,
+                "redirectUrl": route,  # For in-app notification
+                **template_data  # Include all data for potential future use
+        }
