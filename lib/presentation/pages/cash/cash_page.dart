@@ -7,6 +7,7 @@ import 'package:lpg_distribution_app/presentation/pages/cash/tabs/all_transactio
 import 'package:lpg_distribution_app/presentation/pages/cash/tabs/bank_tab.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/tabs/deposit_tab.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/tabs/handovers_tab.dart';
+import 'package:lpg_distribution_app/presentation/pages/cash/tabs/pending_tab.dart';
 import '../../../core/services/User.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/service_provider.dart';
@@ -128,7 +129,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       if (userRole?.contains('Delivery Boy') ?? false) {
         tabCount = 1; // Only 'All Transactions'
       } else {
-        tabCount = 3; // 'Deposits', 'Handovers', 'Bank'
+        tabCount = 4; // 'Pending', 'Deposits', 'Handovers', 'Bank'
       }
       _tabController = TabController(length: tabCount, vsync: this);
       _tabController!.addListener(_onTabChanged);
@@ -146,6 +147,9 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       return ['All Transactions ($allCount)'];
     } else if (userRole?.contains('Cashier') ?? false) {
       // Count in ALL transactions (total)
+      final pendingCountTotal = allTransactions
+          .where((tx) => tx.status == TransactionStatus.pending)
+          .length;
       final depositCountTotal = allTransactions
           .where((tx) => tx.type == TransactionType.deposit)
           .length;
@@ -157,6 +161,9 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
           .length;
 
       // Count in FILTERED transactions (search results)
+      final pendingCountFiltered = filteredTransactions
+          .where((tx) => tx.status == TransactionStatus.pending)
+          .length;
       final depositCountFiltered = filteredTransactions
           .where((tx) => tx.type == TransactionType.deposit)
           .length;
@@ -169,6 +176,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
 
       if (isSearching && filteredTransactions.length != allTransactions.length) {
         return [
+          'Pending ($pendingCountFiltered/$pendingCountTotal)',
           'Deposits ($depositCountFiltered/$depositCountTotal)',
           'Handovers ($handoverCountFiltered/$handoverCountTotal)',
           'Bank ($bankCountFiltered/$bankCountTotal)'
@@ -176,12 +184,16 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       }
 
       return [
+        'Pending ($pendingCountTotal)',
         'Deposits ($depositCountTotal)',
         'Handovers ($handoverCountTotal)',
         'Bank ($bankCountTotal)'
       ];
     } else {
       // Same logic for managers
+      final pendingCountTotal = allTransactions
+          .where((tx) => tx.status == TransactionStatus.pending)
+          .length;
       final depositCountTotal = allTransactions
           .where((tx) => tx.type == TransactionType.deposit)
           .length;
@@ -192,6 +204,9 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
           .where((tx) => tx.type == TransactionType.bank)
           .length;
 
+      final pendingCountFiltered = filteredTransactions
+          .where((tx) => tx.status == TransactionStatus.pending)
+          .length;
       final depositCountFiltered = filteredTransactions
           .where((tx) => tx.type == TransactionType.deposit)
           .length;
@@ -204,6 +219,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
 
       if (isSearching && filteredTransactions.length != allTransactions.length) {
         return [
+          'Pending ($pendingCountFiltered/$pendingCountTotal)',
           'Deposits ($depositCountFiltered/$depositCountTotal)',
           'Handovers ($handoverCountFiltered/$handoverCountTotal)',
           'Bank ($bankCountFiltered/$bankCountTotal)'
@@ -211,6 +227,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       }
 
       return [
+        'Pending ($pendingCountTotal)',
         'Deposits ($depositCountTotal)',
         'Handovers ($handoverCountTotal)',
         'Bank ($bankCountTotal)'
@@ -223,13 +240,14 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       return [AllTransactionsTab()];
     } else if (userRole?.contains('Cashier') ?? false) {
       return [
+        PendingTab(),
         DepositsTab(),
         HandoversTab(),
         BankTab()
       ];
     } else {
       return [
-        // AllTransactionsTab(),
+        PendingTab(),
         DepositsTab(),
         HandoversTab(),
         BankTab()
@@ -915,7 +933,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
           if (userRole?.contains('Delivery Boy') ?? false) {
             tabs = ['All Transactions (...)'];
           } else {
-            tabs = ['Deposits (...)', 'Handovers (...)', 'Bank (...)'];
+            tabs = ['Pending (...)', 'Deposits (...)', 'Handovers (...)', 'Bank (...)'];
           }
         }
 
