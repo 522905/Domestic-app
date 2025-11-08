@@ -1006,7 +1006,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
         ),
       )
           : _errorMessage.isNotEmpty
-          ? Center(
+      ? Center(
         child: Padding(
           padding: EdgeInsets.all(16.w),
           child: Column(
@@ -1139,6 +1139,12 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                             children: _selectedItems.asMap().entries.map((entry) {
                               final index = entry.key;
                               final item = entry.value;
+                              final isDefective = item['return_type'] == 'Defective';
+                              final serialNos = item['serial_nos'] as List?;
+                              final hasSerialNos = serialNos != null && serialNos.isNotEmpty;
+                              final quantity = item['quantity'] as int;
+                              final isSerialComplete = hasSerialNos && serialNos.length == quantity;
+
                               return Container(
                                 margin: EdgeInsets.only(bottom: 8.h),
                                 padding: EdgeInsets.all(12.w),
@@ -1150,59 +1156,123 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                                   borderRadius: BorderRadius.circular(8.r),
                                   color: const Color(0xFF0E5CA8).withOpacity(0.05),
                                 ),
-                                child: Row(
+                                child: Column(
                                   children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item['item_code'] ?? '',
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item['item_code'] ?? '',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14.sp,
+                                                ),
+                                              ),
+                                              SizedBox(height: 4.h),
+                                              Text(
+                                                item['item_name'] ?? '',
+                                                style: TextStyle(
+                                                  fontSize: 12.sp,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                              if (isDefective) ...[
+                                                SizedBox(height: 4.h),
+                                                Container(
+                                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red.shade100,
+                                                    borderRadius: BorderRadius.circular(4.r),
+                                                  ),
+                                                  child: Text(
+                                                    'Defective',
+                                                    style: TextStyle(
+                                                      fontSize: 10.sp,
+                                                      color: Colors.red.shade700,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 8.w,
+                                            vertical: 4.h,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF0E5CA8),
+                                            borderRadius: BorderRadius.circular(12.r),
+                                          ),
+                                          child: Text(
+                                            'Qty: ${item['quantity']}',
                                             style: TextStyle(
+                                              color: Colors.white,
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 14.sp,
-                                            ),
-                                          ),
-                                          SizedBox(height: 4.h),
-                                          Text(
-                                            item['item_name'] ?? '',
-                                            style: TextStyle(
                                               fontSize: 12.sp,
-                                              color: Colors.grey[600],
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                        SizedBox(width: 8.w),
+                                        IconButton(
+                                          onPressed: () {
+                                            _showItemSelectionDialog();
+                                          },
+                                          icon: const Icon(
+                                            Icons.edit,
+                                            color: Colors.green,
+                                          ),
+                                          iconSize: 20.sp,
+                                        ),
+                                      ],
                                     ),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 8.w,
-                                        vertical: 4.h,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF0E5CA8),
-                                        borderRadius: BorderRadius.circular(12.r),
-                                      ),
-                                      child: Text(
-                                        'Qty: ${item['quantity']}',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12.sp,
+                                    // Serial Numbers Section for Defective Items
+                                    if (isDefective) ...[
+                                      SizedBox(height: 8.h),
+                                      Container(
+                                        padding: EdgeInsets.all(8.w),
+                                        decoration: BoxDecoration(
+                                          color: isSerialComplete
+                                              ? Colors.green.shade50
+                                              : Colors.red.shade50,
+                                          borderRadius: BorderRadius.circular(6.r),
+                                          border: Border.all(
+                                            color: isSerialComplete
+                                                ? Colors.green.shade300
+                                                : Colors.red.shade300,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              isSerialComplete ? Icons.check_circle : Icons.warning,
+                                              size: 16.sp,
+                                              color: isSerialComplete ? Colors.green : Colors.red,
+                                            ),
+                                            SizedBox(width: 8.w),
+                                            Expanded(
+                                              child: Text(
+                                                isSerialComplete
+                                                    ? 'Serial Nos: ${serialNos!.join(', ')}'
+                                                    : 'Serial numbers missing!',
+                                                style: TextStyle(
+                                                  fontSize: 11.sp,
+                                                  color: isSerialComplete
+                                                      ? Colors.green.shade700
+                                                      : Colors.red.shade700,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ),
-                                    SizedBox(width: 8.w),
-                                    IconButton(
-                                      onPressed: () {
-                                        _showItemSelectionDialog();
-                                      },
-                                      icon: const Icon(
-                                        Icons.edit,
-                                        color: Colors.green,
-                                      ),
-                                      iconSize: 20.sp,
-                                    ),
+                                    ],
                                   ],
                                 ),
                               );
