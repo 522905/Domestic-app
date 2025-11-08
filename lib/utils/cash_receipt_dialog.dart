@@ -250,11 +250,15 @@ class _CashReceiptDialogState extends State<CashReceiptDialog> {
         builder: (context, setDialogState) {
           return AlertDialog(
             title: const Text('Select Printer'),
-            content: SizedBox(
-              height: 300.h,
-              width: double.maxFinite,
-              child: Column(
-                children: [
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+                maxWidth: double.infinity,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   if (_isScanning)
                     Center(
                       child: Column(
@@ -300,6 +304,7 @@ class _CashReceiptDialogState extends State<CashReceiptDialog> {
                       ),
                     ),
                 ],
+                ),
               ),
             ),
             actions: [

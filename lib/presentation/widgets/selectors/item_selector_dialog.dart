@@ -124,12 +124,16 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
         borderRadius: BorderRadius.circular(16.r),
       ),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.9,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         padding: EdgeInsets.all(16.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -326,6 +330,7 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
