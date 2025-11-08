@@ -109,10 +109,16 @@ class ErrorDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+          maxWidth: 400,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Text(
             message,
             style: const TextStyle(fontSize: 16),
@@ -192,6 +198,8 @@ class ErrorDialog extends StatelessWidget {
             ),
           ],
         ],
+          ),
+        ),
       ),
       actions: [
         if (onRetry != null)
