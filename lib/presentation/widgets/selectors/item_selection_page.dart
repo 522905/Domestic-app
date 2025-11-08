@@ -746,7 +746,8 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
 
   void _showQuantityDialog(Map<String, dynamic> item) {
     int maxQty = item['max_qty'] ?? 0;
-    int selectedQty = 1;
+    int selectedQty = 0;
+    bool isManualEntry = false; // Track if user is manually entering
     late TextEditingController quantityController;
 
     // Check if item is already selected
@@ -759,7 +760,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
       selectedQty = existingItem['selected_qty'];
     }
 
-    quantityController = TextEditingController(text: selectedQty.toString());
+    quantityController = TextEditingController(text: selectedQty == 0 ? '' : selectedQty.toString());
 
     showDialog(
       context: context,
@@ -809,10 +810,11 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: selectedQty > 1 ? () {
+                    onPressed: selectedQty > 0 ? () {
                       setDialogState(() {
+                        isManualEntry = false;
                         selectedQty--;
-                        quantityController.text = selectedQty.toString();
+                        quantityController.text = selectedQty == 0 ? '' : selectedQty.toString();
                       });
                     } : null,
                   ),
@@ -827,10 +829,32 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
                           borderRadius: BorderRadius.circular(8.r),
                         ),
                         contentPadding: EdgeInsets.symmetric(vertical: 8.h),
+                        hintText: '0',
                       ),
+                      onTap: () {
+                        setDialogState(() {
+                          isManualEntry = true;
+                          quantityController.selection = TextSelection(
+                            baseOffset: 0,
+                            extentOffset: quantityController.text.length,
+                          );
+                        });
+                      },
                       onChanged: (value) {
+                        if (value.isEmpty) {
+                          setDialogState(() {
+                            selectedQty = 0;
+                          });
+                          return;
+                        }
+
                         final parsedValue = int.tryParse(value);
-                        if (parsedValue != null && parsedValue >= 1 && parsedValue <= maxQty) {
+                        if (parsedValue != null && parsedValue >= 0 && parsedValue <= maxQty) {
+                          setDialogState(() {
+                            selectedQty = parsedValue;
+                          });
+                        } else if (parsedValue != null && parsedValue > maxQty) {
+                          // Show it's over limit but still update
                           setDialogState(() {
                             selectedQty = parsedValue;
                           });
@@ -842,6 +866,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
                     icon: const Icon(Icons.add_circle_outline),
                     onPressed: selectedQty < maxQty ? () {
                       setDialogState(() {
+                        isManualEntry = false;
                         selectedQty++;
                         quantityController.text = selectedQty.toString();
                       });
@@ -849,6 +874,17 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
                   ),
                 ],
               ),
+              if (selectedQty > maxQty) ...[
+                SizedBox(height: 8.h),
+                Text(
+                  'Quantity exceeds maximum!',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -857,20 +893,18 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: (selectedQty >= 1 && selectedQty <= maxQty) ? () {
                 final finalQty = int.tryParse(quantityController.text) ?? selectedQty;
                 if (finalQty >= 1 && finalQty <= maxQty) {
                   final newItem = {
                     ...item,
                     'selected_qty': finalQty,
-                    // Add compatibility fields for existing code
                     'itemId': item['item_code'],
                     'quantity': finalQty,
                     'item_name': item['item_name'] ?? item['item_code'],
                   };
 
                   setState(() {
-                    // Remove existing item if it exists
                     _selectedItems.removeWhere((selected) =>
                     _getItemIdentifier(selected) == _getItemIdentifier(item)
                     );
@@ -878,9 +912,11 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
                   });
                   Navigator.pop(context);
                 }
-              },
+              } : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0E5CA8),
+                backgroundColor: (selectedQty >= 1 && selectedQty <= maxQty)
+                    ? const Color(0xFF0E5CA8)
+                    : Colors.grey,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Confirm'),
@@ -890,6 +926,7 @@ class _ItemSelectionPageState extends State<ItemSelectionPage> {
       ),
     );
   }
+
 
   void _removeSelectedItem(Map<String, dynamic> item) {
     setState(() {

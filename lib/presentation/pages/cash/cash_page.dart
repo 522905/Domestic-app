@@ -96,6 +96,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
   // }
 
   // Initialize everything in proper order
+
   Future<void> _initializeApp() async {
     try {
       // First, get user roles
@@ -184,10 +185,10 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       }
 
       return [
-        'Pending ($pendingCountTotal)',
-        'Deposits ($depositCountTotal)',
-        'Handovers ($handoverCountTotal)',
-        'Bank ($bankCountTotal)'
+        'Pending($pendingCountTotal)',
+        'Deposit($depositCountTotal)',
+        'Handover($handoverCountTotal)',
+        'Bank($bankCountTotal)'
       ];
     } else {
       // Same logic for managers
@@ -227,10 +228,10 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       }
 
       return [
-        'Pending ($pendingCountTotal)',
-        'Deposits ($depositCountTotal)',
-        'Handovers ($handoverCountTotal)',
-        'Bank ($bankCountTotal)'
+        'Pending($pendingCountTotal)',
+        'Deposit($depositCountTotal)',
+        'Handover($handoverCountTotal)',
+        'Bank($bankCountTotal)'
       ];
     }
   }
