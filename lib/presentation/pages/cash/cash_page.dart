@@ -934,7 +934,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
           if (userRole?.contains('Delivery Boy') ?? false) {
             tabs = ['All Transactions (...)'];
           } else {
-            tabs = ['Pending', 'Deposit(...)', 'Handover(...)', 'Bank(...)'];
+            tabs = ['Pending (...)', 'Deposits (...)', 'Handovers (...)', 'Bank (...)'];
           }
         }
 
