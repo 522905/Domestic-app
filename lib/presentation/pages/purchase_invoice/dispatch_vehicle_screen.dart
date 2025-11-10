@@ -108,14 +108,13 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     });
 
     try {
-      // Get user warehouse
-      final userWarehouse = await _apiService.getUserWarehouse();
-
+      // Note: Warehouse comes from the receive vehicle step
+      // For initial API call, we'll use a placeholder and get the actual warehouse from the response
       final response = await _apiService.getEqualERVCalculation(
         supplierGstin: widget.supplierGstin,
         supplierInvoiceDate: widget.supplierInvoiceDate,
         supplierInvoiceNumber: widget.supplierInvoiceNumber,
-        warehouse: userWarehouse ?? '1',
+        warehouse: 'Focal Point - AI', // TODO: Get from receive vehicle step
       );
 
       if (response == null || response['success'] != true) {
@@ -567,6 +566,61 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
             ),
           ],
         ),
+        // Warning for is_capped (defective items)
+        if (type == 'Defective' && data['is_capped'] == true) ...[
+          SizedBox(height: 8.h),
+          Container(
+            padding: EdgeInsets.all(8.w),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(6.r),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber, size: 16.sp, color: Colors.orange.shade700),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    'Received quantity limit reached. Additional defectives exist but cannot be returned.',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      color: Colors.orange.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        // Error for insufficient_stock (empty items)
+        if (type == 'Empty' && data['insufficient_stock'] == true) ...[
+          SizedBox(height: 8.h),
+          Container(
+            padding: EdgeInsets.all(8.w),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(6.r),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, size: 16.sp, color: Colors.red.shade700),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    'Insufficient stock. Need ${data['qty']} but only $availableQty available. Cannot submit.',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         SizedBox(height: 8.h),
         if (!isSelected)
           SizedBox(
@@ -643,6 +697,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                 _buildDefectiveSerialButton(
                   selectedItem,
                   primaryOption,
+                  filledItemCode,
                   setPageState,
                 ),
               ],
@@ -655,6 +710,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
   Widget _buildDefectiveSerialButton(
     Map<String, dynamic> selectedItem,
     Map<String, dynamic> itemOption,
+    String filledItemCode,
     StateSetter setPageState,
   ) {
     final serialNosCount = selectedItem['serial_nos']?.length ?? 0;
@@ -666,6 +722,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
         onPressed: () => _showDefectiveSerialDialog(
           selectedItem,
           itemOption,
+          filledItemCode,
           setPageState,
         ),
         icon: Icon(Icons.qr_code_scanner, size: 18.sp),
@@ -917,41 +974,43 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
   Future<void> _showDefectiveSerialDialog(
     Map<String, dynamic> selectedItem,
     Map<String, dynamic> itemOption,
+    String filledItemCode,
     StateSetter setPageState,
   ) async {
     final quantity = selectedItem['quantity'] ?? 1;
     final itemCode = itemOption['item_code'];
 
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF0E5CA8)),
-      ),
+    // Get defective data from the item group (contains all serial arrays)
+    final defectiveData = _getDefectiveDataForFilledItem(filledItemCode);
+
+    // Get the three serial arrays from the API response
+    final autoSuggestedSerials = List<Map<String, dynamic>>.from(
+      defectiveData['auto_suggested_serials'] ?? [],
+    );
+    final unavailableSerials = List<String>.from(
+      defectiveData['unavailable_serials'] ?? [],
+    );
+    final additionalSerials = List<Map<String, dynamic>>.from(
+      defectiveData['additional_serials'] ?? [],
     );
 
-    try {
-      // Get user warehouse
-      final userWarehouse = await _apiService.getUserWarehouse();
+    // Combine all available serials (auto-suggested + additional)
+    final allAvailableSerials = [...autoSuggestedSerials, ...additionalSerials];
 
-      // Fetch serial details
-      final response = await _apiService.getItemSerialDetails(
-        itemCode: itemCode,
-        warehouse: userWarehouse ?? _invoiceDetails?['warehouse'] ?? '',
-      );
+    // Get current selected serials or default to auto-suggested serial numbers
+    final currentSerialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
+    List<String> tempSelectedSerials;
 
-      Navigator.pop(context); // Close loading
+    if (currentSerialNos.isEmpty) {
+      // Pre-select auto-suggested serials
+      tempSelectedSerials = autoSuggestedSerials
+          .map((s) => s['serial_no'] as String)
+          .toList();
+    } else {
+      tempSelectedSerials = List<String>.from(currentSerialNos);
+    }
 
-      if (response == null || response['success'] != true) {
-        throw Exception('Failed to load serial details');
-      }
-
-      final serials = List<Map<String, dynamic>>.from(response['serials'] ?? []);
-      final currentSerialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
-      List<String> tempSelectedSerials = List<String>.from(currentSerialNos);
-
-      if (!mounted) return;
+    if (!mounted) return;
 
       showDialog(
         context: context,
@@ -995,6 +1054,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                     ),
                   ),
                   SizedBox(height: 16.h),
+                  // Selection counter
                   Container(
                     padding: EdgeInsets.all(8.w),
                     decoration: BoxDecoration(
@@ -1034,53 +1094,159 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                       ],
                     ),
                   ),
+                  // Show unavailable serials info if any
+                  if (unavailableSerials.isNotEmpty) ...[
+                    SizedBox(height: 12.h),
+                    Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(6.r),
+                        border: Border.all(color: Colors.amber.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 16.sp, color: Colors.amber.shade700),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              '${unavailableSerials.length} serial(s) from inspection reports are no longer available',
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: Colors.amber.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   SizedBox(height: 16.h),
-                  if (serials.isEmpty)
+                  if (allAvailableSerials.isEmpty)
                     const Text('No serial numbers available')
                   else
                     Flexible(
-                      child: ListView.builder(
+                      child: ListView(
                         shrinkWrap: true,
-                        itemCount: serials.length,
-                        itemBuilder: (context, index) {
-                          final serial = serials[index];
-                          final serialNo = serial['serial_no'];
-                          final isSelected = tempSelectedSerials.contains(serialNo);
-                          final canSelect = tempSelectedSerials.length < quantity || isSelected;
-
-                          return CheckboxListTile(
-                            title: Text(
-                              serialNo,
-                              style: TextStyle(fontSize: 14.sp),
-                            ),
-                            subtitle: serial['custom_fault_type'] != null
-                                ? Text(
-                                    'Fault: ${serial['custom_fault_type']}',
+                        children: [
+                          // Auto-suggested serials section
+                          if (autoSuggestedSerials.isNotEmpty) ...[
+                            Padding(
+                              padding: EdgeInsets.only(bottom: 8.h),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.auto_awesome, size: 14.sp, color: Colors.blue),
+                                  SizedBox(width: 4.w),
+                                  Text(
+                                    'Auto-Suggested (from this PI)',
                                     style: TextStyle(
-                                      fontSize: 11.sp,
-                                      color: Colors.red[700],
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
                                     ),
-                                  )
-                                : null,
-                            value: isSelected,
-                            enabled: canSelect,
-                            onChanged: canSelect
-                                ? (bool? value) {
-                                    setDialogState(() {
-                                      if (value == true && !isSelected) {
-                                        tempSelectedSerials.add(serialNo);
-                                      } else if (value == false && isSelected) {
-                                        tempSelectedSerials.remove(serialNo);
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ...autoSuggestedSerials.map((serial) {
+                              final serialNo = serial['serial_no'] as String;
+                              final isSelected = tempSelectedSerials.contains(serialNo);
+                              final canSelect = tempSelectedSerials.length < quantity || isSelected;
+
+                              return CheckboxListTile(
+                                title: Text(
+                                  serialNo,
+                                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: serial['custom_fault_type'] != null
+                                    ? Text(
+                                        'Fault: ${serial['custom_fault_type']} | Weight: ${serial['custom_net_weight_of_cylinder']} kg',
+                                        style: TextStyle(
+                                          fontSize: 11.sp,
+                                          color: Colors.red[700],
+                                        ),
+                                      )
+                                    : null,
+                                value: isSelected,
+                                enabled: canSelect,
+                                onChanged: canSelect
+                                    ? (bool? value) {
+                                        setDialogState(() {
+                                          if (value == true && !isSelected) {
+                                            tempSelectedSerials.add(serialNo);
+                                          } else if (value == false && isSelected) {
+                                            tempSelectedSerials.remove(serialNo);
+                                          }
+                                        });
                                       }
-                                    });
-                                  }
-                                : null,
-                            activeColor: const Color(0xFF0E5CA8),
-                            controlAffinity: ListTileControlAffinity.leading,
-                            contentPadding: EdgeInsets.zero,
-                            dense: true,
-                          );
-                        },
+                                    : null,
+                                activeColor: Colors.blue,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                              );
+                            }).toList(),
+                          ],
+                          // Additional serials section
+                          if (additionalSerials.isNotEmpty) ...[
+                            SizedBox(height: 12.h),
+                            Padding(
+                              padding: EdgeInsets.only(bottom: 8.h),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.add_circle_outline, size: 14.sp, color: Colors.grey[700]),
+                                  SizedBox(width: 4.w),
+                                  Text(
+                                    'Additional Available Serials',
+                                    style: TextStyle(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ...additionalSerials.map((serial) {
+                              final serialNo = serial['serial_no'] as String;
+                              final isSelected = tempSelectedSerials.contains(serialNo);
+                              final canSelect = tempSelectedSerials.length < quantity || isSelected;
+
+                              return CheckboxListTile(
+                                title: Text(
+                                  serialNo,
+                                  style: TextStyle(fontSize: 14.sp),
+                                ),
+                                subtitle: serial['custom_fault_type'] != null
+                                    ? Text(
+                                        'Fault: ${serial['custom_fault_type']} | Weight: ${serial['custom_net_weight_of_cylinder']} kg',
+                                        style: TextStyle(
+                                          fontSize: 11.sp,
+                                          color: Colors.red[700],
+                                        ),
+                                      )
+                                    : null,
+                                value: isSelected,
+                                enabled: canSelect,
+                                onChanged: canSelect
+                                    ? (bool? value) {
+                                        setDialogState(() {
+                                          if (value == true && !isSelected) {
+                                            tempSelectedSerials.add(serialNo);
+                                          } else if (value == false && isSelected) {
+                                            tempSelectedSerials.remove(serialNo);
+                                          }
+                                        });
+                                      }
+                                    : null,
+                                activeColor: const Color(0xFF0E5CA8),
+                                controlAffinity: ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                              );
+                            }).toList(),
+                          ],
+                        ],
                       ),
                     ),
                 ],
@@ -1110,12 +1276,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
           ),
         ),
       );
-    } catch (e) {
-      Navigator.pop(context); // Close loading
-      if (mounted) {
-        context.showErrorSnackBar('Failed to load serial details: $e');
-      }
-    }
   }
 
   // Continue with Unequal mode methods...

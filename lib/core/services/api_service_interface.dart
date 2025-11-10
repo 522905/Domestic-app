@@ -86,13 +86,6 @@ abstract class ApiServiceInterface {
     required String warehouse,
   });
 
-  Future<Map<String, dynamic>> getItemSerialDetails({
-    required String itemCode,
-    required String warehouse,
-  });
-
-  Future<String?> getUserWarehouse();
-
   Future<List<dynamic>> getVehiclesList();
 
   Future<Map<String, dynamic>> assignVehicle(
