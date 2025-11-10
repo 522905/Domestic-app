@@ -200,4 +200,13 @@ abstract class ApiServiceInterface {
     required String voucherType,
     required String voucherNo,
   });
+
+  // ERV Calculation Method
+  Future<Map<String, dynamic>> getERVCalculation({
+    required String supplierGstin,
+    required String supplierInvoiceDate,
+    required String supplierInvoiceNumber,
+    required String warehouse,
+    String mode = 'equal',
+  });
 }
