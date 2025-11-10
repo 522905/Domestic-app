@@ -1699,4 +1699,33 @@ class ApiService implements ApiServiceInterface {
     );
   }
 
+  @override
+  Future<Map<String, dynamic>> getERVCalculation({
+    required String supplierGstin,
+    required String supplierInvoiceDate,
+    required String supplierInvoiceNumber,
+    required String warehouse,
+    String mode = 'equal',
+  }) async {
+    try {
+      final queryParams = {
+        'supplier_gstin': supplierGstin,
+        'supplier_invoice_date': supplierInvoiceDate,
+        'supplier_invoice_number': supplierInvoiceNumber,
+        'warehouse': warehouse,
+        'mode': mode,
+      };
+
+      final response = await apiClient.get(
+        apiClient.endpoints.ervCalculation,
+        queryParameters: queryParams,
+      );
+
+      return response.data;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
 }
