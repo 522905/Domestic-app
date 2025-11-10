@@ -93,8 +93,6 @@ abstract class ApiServiceInterface {
 
   Future<String?> getUserWarehouse();
 
-  Future<Map<String, dynamic>> submitDispatchVehicle(Map<String, dynamic> payload);
-
   Future<List<dynamic>> getVehiclesList();
 
   Future<Map<String, dynamic>> assignVehicle(

@@ -832,25 +832,11 @@ class ApiService implements ApiServiceInterface {
     @override
     Future<String?> getUserWarehouse() async {
       try {
-        final user = await User().getUser();
-        return user?['warehouse'];
+        final profile = await getUserProfile();
+        return profile['warehouse'];
       } catch (e) {
         _handleError(e);
         return null;
-      }
-    }
-
-    @override
-    Future<Map<String, dynamic>> submitDispatchVehicle(Map<String, dynamic> payload) async {
-      try {
-        final response = await apiClient.post(
-          '/procurement/dispatch-vehicle',
-          data: payload,
-        );
-        return response.data;
-      } catch (e) {
-        _handleError(e);
-        rethrow;
       }
     }
 
