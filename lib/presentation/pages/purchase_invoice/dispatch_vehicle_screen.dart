@@ -25,36 +25,37 @@ class DispatchVehicleScreen extends StatefulWidget {
 class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
   late ApiServiceInterface _apiService;
 
-  // State variables
+  // Dispatch mode (Equal/Unequal)
+  String _dispatchMode = 'Unequal';
+
+  // State variables for Unequal mode
   Map<String, List<Map<String, dynamic>>> _availableItems = {};
   List<Map<String, dynamic>> _selectedItems = [];
+
+  // State variables for Equal mode
+  Map<String, dynamic>? _invoiceDetails;
+  List<Map<String, dynamic>> _itemGroups = [];
 
   bool _isLoading = true;
   bool _isSubmitting = false;
   String _errorMessage = '';
 
-  // Mock serial numbers for demonstration
-  final List<String> _mockSerialNumbers = [
-    'SN001234',
-    'SN005678',
-    'SN009012',
-    'SN003456',
-    'SN007890',
-    'SN001122',
-    'SN003344',
-    'SN005566',
-    'SN007788',
-    'SN009900',
-  ];
-
   @override
   void initState() {
     super.initState();
     _apiService = Provider.of<ApiServiceInterface>(context, listen: false);
-    _loadAvailableItems();
+    _loadData();
   }
 
-  Future<void> _loadAvailableItems() async {
+  Future<void> _loadData() async {
+    if (_dispatchMode == 'Unequal') {
+      await _loadUnequalData();
+    } else {
+      await _loadEqualData();
+    }
+  }
+
+  Future<void> _loadUnequalData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -63,10 +64,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     try {
       final itemsData = await _apiService.getUnlinkedItemList();
 
-      // Debug: Print the actual response structure
-      print('API Response: $itemsData');
-
-      // Check if the response has the expected structure
       if (itemsData == null) {
         throw Exception('API returned null response');
       }
@@ -80,7 +77,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
         throw Exception('No buckets found in API response');
       }
 
-      // Process buckets data
       Map<String, List<Map<String, dynamic>>> processedBuckets = {};
 
       if (bucketsData is Map) {
@@ -97,12 +93,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
         _availableItems = processedBuckets;
         _isLoading = false;
       });
-
-      // Debug: Print processed buckets
-      print('Processed buckets: $_availableItems');
-
     } catch (e) {
-      print('Error in _loadAvailableItems: $e');
       setState(() {
         _errorMessage = 'Failed to load items: ${e.toString()}';
         _isLoading = false;
@@ -110,6 +101,1024 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     }
   }
 
+  Future<void> _loadEqualData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      // Get user warehouse
+      final userWarehouse = await _apiService.getUserWarehouse();
+
+      final response = await _apiService.getEqualERVCalculation(
+        supplierGstin: widget.supplierGstin,
+        supplierInvoiceDate: widget.supplierInvoiceDate,
+        supplierInvoiceNumber: widget.supplierInvoiceNumber,
+        warehouse: userWarehouse ?? '1',
+      );
+
+      if (response == null || response['success'] != true) {
+        throw Exception('Failed to load equal ERV data');
+      }
+
+      final data = response['data'];
+
+      setState(() {
+        _invoiceDetails = data['invoice_details'];
+        _itemGroups = List<Map<String, dynamic>>.from(data['item_groups'] ?? []);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load equal ERV data: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Widget _buildDispatchModeSelector() {
+    return Container(
+      margin: EdgeInsets.all(16.w),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildModeRadio(
+              title: 'Unequal',
+              value: 'Unequal',
+              groupValue: _dispatchMode,
+            ),
+          ),
+          SizedBox(width: 16.w),
+          Expanded(
+            child: _buildModeRadio(
+              title: 'Equal',
+              value: 'Equal',
+              groupValue: _dispatchMode,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeRadio({
+    required String title,
+    required String value,
+    required String groupValue,
+  }) {
+    final isSelected = groupValue == value;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: isSelected ? const Color(0xFF0E5CA8) : Colors.grey[300]!,
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(12.r),
+        color: isSelected ? const Color(0xFF0E5CA8).withOpacity(0.1) : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: RadioListTile<String>(
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? const Color(0xFF0E5CA8) : Colors.grey[700],
+          ),
+        ),
+        value: value,
+        groupValue: groupValue,
+        onChanged: (value) {
+          if (value != null) {
+            setState(() {
+              _dispatchMode = value;
+              _selectedItems.clear();
+              _loadData();
+            });
+          }
+        },
+        activeColor: const Color(0xFF0E5CA8),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+      ),
+    );
+  }
+
+  Widget _buildEqualInvoiceDetails() {
+    if (_invoiceDetails == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.description, color: const Color(0xFF0E5CA8), size: 20.sp),
+              SizedBox(width: 8.w),
+              Text(
+                'Invoice Details',
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF333333),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          _buildInfoRow('Purchase Invoice', _invoiceDetails!['purchase_invoice']),
+          _buildInfoRow('Supplier', _invoiceDetails!['supplier_name']),
+          _buildInfoRow('Warehouse', _invoiceDetails!['warehouse']),
+          _buildInfoRow('Bill No', _invoiceDetails!['bill_no']),
+          _buildInfoRow('Bill Date', _invoiceDetails!['bill_date']),
+          _buildInfoRow('Grand Total', '₹${_invoiceDetails!['grand_total']}'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, dynamic value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value?.toString() ?? '-',
+              style: TextStyle(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF333333),
+              ),
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEqualItemSelectionDialog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _buildEqualItemSelectionPage(),
+      ),
+    );
+  }
+
+  Widget _buildEqualItemSelectionPage() {
+    return StatefulBuilder(
+      builder: (context, setPageState) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Select Items to Dispatch (Equal)'),
+            backgroundColor: const Color(0xFF0E5CA8),
+            foregroundColor: Colors.white,
+            actions: [
+              if (_selectedItems.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.only(right: 8.w),
+                  child: Center(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15.r),
+                      ),
+                      child: Text(
+                        '${_selectedItems.length} items',
+                        style: TextStyle(
+                          color: const Color(0xFF0E5CA8),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          body: Column(
+            children: [
+              Expanded(
+                child: _buildEqualItemsList(setPageState),
+              ),
+              if (_selectedItems.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(16.w),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E5CA8),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 16.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                    ),
+                    child: Text(
+                      'Back to Dispatch Screen',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16.sp,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEqualItemsList(StateSetter setPageState) {
+    if (_itemGroups.isEmpty) {
+      return const Center(
+        child: Text('No items available'),
+      );
+    }
+
+    return ListView(
+      padding: EdgeInsets.all(16.w),
+      children: _itemGroups.map((itemGroup) {
+        final filledItemCode = itemGroup['filled_item_code'];
+        final filledItemName = itemGroup['filled_item_name'];
+        final targetQty = itemGroup['target_qty']?.toDouble() ?? 0.0;
+        final receivedQtyCap = itemGroup['received_qty_cap']?.toDouble() ?? 0.0;
+        final calculatedSplit = itemGroup['calculated_split'];
+
+        final emptyData = calculatedSplit['empty'];
+        final defectiveData = calculatedSplit['defective'];
+
+        return Card(
+          margin: EdgeInsets.only(bottom: 16.h),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Filled Item Header
+                Row(
+                  children: [
+                    Container(
+                      width: 50.w,
+                      height: 50.w,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(25.r),
+                      ),
+                      child: Icon(
+                        Icons.propane_tank_rounded,
+                        color: const Color(0xFF0E5CA8),
+                        size: 24.sp,
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            filledItemName ?? '',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16.sp,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            'Code: $filledItemCode',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: Text(
+                              'Target: ${targetQty.toInt()} | Received: ${receivedQtyCap.toInt()}',
+                              style: TextStyle(
+                                fontSize: 10.sp,
+                                color: Colors.blue.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 12.h),
+                Divider(height: 1, color: Colors.grey[300]),
+                SizedBox(height: 12.h),
+
+                // Empty Item Selection
+                _buildEqualItemTypeSection(
+                  'Empty',
+                  emptyData,
+                  filledItemCode,
+                  targetQty.toInt(),
+                  setPageState,
+                ),
+
+                SizedBox(height: 12.h),
+
+                // Defective Item Selection
+                _buildEqualItemTypeSection(
+                  'Defective',
+                  defectiveData,
+                  filledItemCode,
+                  targetQty.toInt(),
+                  setPageState,
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildEqualItemTypeSection(
+    String type,
+    Map<String, dynamic> data,
+    String filledItemCode,
+    int targetQty,
+    StateSetter setPageState,
+  ) {
+    final selectedItemCode = data['selected_item_code'];
+    final options = List<Map<String, dynamic>>.from(data['options'] ?? []);
+
+    if (options.isEmpty) return const SizedBox.shrink();
+
+    final primaryOption = options.firstWhere(
+      (opt) => opt['is_primary'] == true,
+      orElse: () => options.first,
+    );
+
+    final selectedItem = _selectedItems.firstWhere(
+      (item) => item['item_code'] == selectedItemCode && item['filled_item_code'] == filledItemCode,
+      orElse: () => <String, dynamic>{},
+    );
+
+    final isSelected = selectedItem.isNotEmpty;
+    final selectedQty = selectedItem['quantity'] ?? 0;
+    final availableQty = primaryOption['available_qty']?.toInt() ?? 0;
+
+    // Calculate maximum allowed quantity based on target and other selections
+    final otherType = type == 'Empty' ? 'Defective' : 'Empty';
+    final otherTypeData = type == 'Empty'
+        ? _getDefectiveDataForFilledItem(filledItemCode)
+        : _getEmptyDataForFilledItem(filledItemCode);
+
+    final otherTypeQty = _getSelectedQuantityForItemType(filledItemCode, otherType);
+    final maxAllowed = (targetQty - otherTypeQty).clamp(0, availableQty);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 30.w,
+              height: 30.w,
+              decoration: BoxDecoration(
+                color: type == 'Defective'
+                    ? Colors.red.withOpacity(0.1)
+                    : Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15.r),
+              ),
+              child: Icon(
+                type == 'Defective' ? Icons.warning : Icons.inventory_2,
+                color: type == 'Defective' ? Colors.red : Colors.blue,
+                size: 16.sp,
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    primaryOption['item_name'] ?? '',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                  Text(
+                    'Code: ${primaryOption['item_code']} | Available: $availableQty',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8.h),
+        if (!isSelected)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: availableQty > 0
+                  ? () => _showEqualQuantityDialog(
+                      primaryOption,
+                      type,
+                      filledItemCode,
+                      maxAllowed,
+                      availableQty,
+                      targetQty,
+                      setPageState,
+                    )
+                  : null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: type == 'Defective' ? Colors.red : Colors.blue,
+                side: BorderSide(
+                  color: type == 'Defective' ? Colors.red : Colors.blue,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+              child: Text(availableQty > 0 ? 'Select' : 'Out of Stock'),
+            ),
+          )
+        else
+          Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _showEqualQuantityDialog(
+                        primaryOption,
+                        type,
+                        filledItemCode,
+                        maxAllowed,
+                        availableQty,
+                        targetQty,
+                        setPageState,
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF0E5CA8),
+                        side: const BorderSide(color: Color(0xFF0E5CA8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                      ),
+                      child: Text('Qty: $selectedQty'),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _removeEqualItem(selectedItemCode, filledItemCode, setPageState),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                      ),
+                      child: const Text('Remove'),
+                    ),
+                  ),
+                ],
+              ),
+              // Show serial numbers button for defective items
+              if (type == 'Defective' && isSelected) ...[
+                SizedBox(height: 8.h),
+                _buildDefectiveSerialButton(
+                  selectedItem,
+                  primaryOption,
+                  setPageState,
+                ),
+              ],
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDefectiveSerialButton(
+    Map<String, dynamic> selectedItem,
+    Map<String, dynamic> itemOption,
+    StateSetter setPageState,
+  ) {
+    final serialNosCount = selectedItem['serial_nos']?.length ?? 0;
+    final quantity = selectedItem['quantity'] ?? 0;
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _showDefectiveSerialDialog(
+          selectedItem,
+          itemOption,
+          setPageState,
+        ),
+        icon: Icon(Icons.qr_code_scanner, size: 18.sp),
+        label: Text(
+          serialNosCount > 0
+              ? 'Serial Nos: $serialNosCount/$quantity selected'
+              : 'Select Serial Numbers',
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: serialNosCount == quantity ? Colors.green : Colors.orange,
+          side: BorderSide(
+            color: serialNosCount == quantity ? Colors.green : Colors.orange,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _getDefectiveDataForFilledItem(String filledItemCode) {
+    final itemGroup = _itemGroups.firstWhere(
+      (group) => group['filled_item_code'] == filledItemCode,
+      orElse: () => <String, dynamic>{},
+    );
+    return itemGroup['calculated_split']?['defective'] ?? {};
+  }
+
+  Map<String, dynamic> _getEmptyDataForFilledItem(String filledItemCode) {
+    final itemGroup = _itemGroups.firstWhere(
+      (group) => group['filled_item_code'] == filledItemCode,
+      orElse: () => <String, dynamic>{},
+    );
+    return itemGroup['calculated_split']?['empty'] ?? {};
+  }
+
+  int _getSelectedQuantityForItemType(String filledItemCode, String type) {
+    final typeData = type == 'Defective'
+        ? _getDefectiveDataForFilledItem(filledItemCode)
+        : _getEmptyDataForFilledItem(filledItemCode);
+
+    final selectedItemCode = typeData['selected_item_code'];
+    if (selectedItemCode == null) return 0;
+
+    final selectedItem = _selectedItems.firstWhere(
+      (item) => item['item_code'] == selectedItemCode && item['filled_item_code'] == filledItemCode,
+      orElse: () => <String, dynamic>{},
+    );
+
+    return selectedItem['quantity'] ?? 0;
+  }
+
+  void _showEqualQuantityDialog(
+    Map<String, dynamic> item,
+    String type,
+    String filledItemCode,
+    int maxAllowed,
+    int availableQty,
+    int targetQty,
+    StateSetter setPageState,
+  ) {
+    final selectedItem = _selectedItems.firstWhere(
+      (selected) => selected['item_code'] == item['item_code'] && selected['filled_item_code'] == filledItemCode,
+      orElse: () => <String, dynamic>{},
+    );
+
+    int selectedQty = selectedItem['quantity'] ?? 1;
+    late TextEditingController quantityController;
+    quantityController = TextEditingController(text: selectedQty.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Select Quantity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item['item_name'] ?? '',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16.sp,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                'Code: ${item['item_code'] ?? ''}',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14.sp,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                'Available: $availableQty | Max Allowed: $maxAllowed',
+                style: TextStyle(
+                  color: Colors.green[600],
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: selectedQty > 1 ? () {
+                      setDialogState(() {
+                        selectedQty--;
+                        quantityController.text = selectedQty.toString();
+                      });
+                    } : null,
+                  ),
+                  SizedBox(
+                    width: 80.w,
+                    child: TextField(
+                      controller: quantityController,
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(vertical: 8.h),
+                        errorText: selectedQty > maxAllowed ? 'Exceeds limit' : null,
+                      ),
+                      onChanged: (value) {
+                        final parsedValue = int.tryParse(value);
+                        if (parsedValue != null && parsedValue >= 1) {
+                          setDialogState(() {
+                            selectedQty = parsedValue;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: selectedQty < maxAllowed ? () {
+                      setDialogState(() {
+                        selectedQty++;
+                        quantityController.text = selectedQty.toString();
+                      });
+                    } : null,
+                  ),
+                ],
+              ),
+              if (selectedQty > maxAllowed) ...[
+                SizedBox(height: 8.h),
+                Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(6.r),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.red, size: 16.sp),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          'Total cannot exceed target quantity of $targetQty',
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 12.sp,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: selectedQty >= 1 && selectedQty <= maxAllowed ? () {
+                final finalQty = int.tryParse(quantityController.text) ?? selectedQty;
+                if (finalQty >= 1 && finalQty <= maxAllowed) {
+                  _updateEqualItemSelection(item, finalQty, type, filledItemCode, setPageState);
+                  Navigator.pop(context);
+                } else {
+                  context.showErrorSnackBar('Quantity must be between 1 and $maxAllowed');
+                }
+              } : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: selectedQty >= 1 && selectedQty <= maxAllowed
+                    ? const Color(0xFF0E5CA8)
+                    : Colors.grey,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateEqualItemSelection(
+    Map<String, dynamic> item,
+    int quantity,
+    String returnType,
+    String filledItemCode,
+    StateSetter setPageState,
+  ) {
+    setPageState(() {
+      setState(() {
+        _selectedItems.removeWhere(
+          (selected) => selected['item_code'] == item['item_code'] && selected['filled_item_code'] == filledItemCode,
+        );
+
+        final newItem = {
+          'item_code': item['item_code'],
+          'item_name': item['item_name'],
+          'quantity': quantity,
+          'return_type': returnType,
+          'filled_item_code': filledItemCode,
+        };
+
+        if (returnType == 'Defective') {
+          newItem['serial_nos'] = <String>[];
+        }
+
+        _selectedItems.add(newItem);
+      });
+    });
+  }
+
+  void _removeEqualItem(String itemCode, String filledItemCode, StateSetter setPageState) {
+    setPageState(() {
+      setState(() {
+        _selectedItems.removeWhere(
+          (selected) => selected['item_code'] == itemCode && selected['filled_item_code'] == filledItemCode,
+        );
+      });
+    });
+  }
+
+  Future<void> _showDefectiveSerialDialog(
+    Map<String, dynamic> selectedItem,
+    Map<String, dynamic> itemOption,
+    StateSetter setPageState,
+  ) async {
+    final quantity = selectedItem['quantity'] ?? 1;
+    final itemCode = itemOption['item_code'];
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF0E5CA8)),
+      ),
+    );
+
+    try {
+      // Get user warehouse
+      final userWarehouse = await _apiService.getUserWarehouse();
+
+      // Fetch serial details
+      final response = await _apiService.getItemSerialDetails(
+        itemCode: itemCode,
+        warehouse: userWarehouse ?? _invoiceDetails?['warehouse'] ?? '',
+      );
+
+      Navigator.pop(context); // Close loading
+
+      if (response == null || response['success'] != true) {
+        throw Exception('Failed to load serial details');
+      }
+
+      final serials = List<Map<String, dynamic>>.from(response['serials'] ?? []);
+      final currentSerialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
+      List<String> tempSelectedSerials = List<String>.from(currentSerialNos);
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Select Serial Numbers'),
+                SizedBox(height: 4.h),
+                Text(
+                  'Select $quantity serial number(s)',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    itemOption['item_name'] ?? '',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.sp,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Code: ${itemOption['item_code'] ?? ''}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: tempSelectedSerials.length == quantity
+                          ? Colors.green.shade50
+                          : Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(6.r),
+                      border: Border.all(
+                        color: tempSelectedSerials.length == quantity
+                            ? Colors.green.shade200
+                            : Colors.orange.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          tempSelectedSerials.length == quantity
+                              ? Icons.check_circle
+                              : Icons.info_outline,
+                          size: 16.sp,
+                          color: tempSelectedSerials.length == quantity
+                              ? Colors.green
+                              : Colors.orange,
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          '${tempSelectedSerials.length} of $quantity selected',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: tempSelectedSerials.length == quantity
+                                ? Colors.green.shade700
+                                : Colors.orange.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  if (serials.isEmpty)
+                    const Text('No serial numbers available')
+                  else
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: serials.length,
+                        itemBuilder: (context, index) {
+                          final serial = serials[index];
+                          final serialNo = serial['serial_no'];
+                          final isSelected = tempSelectedSerials.contains(serialNo);
+                          final canSelect = tempSelectedSerials.length < quantity || isSelected;
+
+                          return CheckboxListTile(
+                            title: Text(
+                              serialNo,
+                              style: TextStyle(fontSize: 14.sp),
+                            ),
+                            subtitle: serial['custom_fault_type'] != null
+                                ? Text(
+                                    'Fault: ${serial['custom_fault_type']}',
+                                    style: TextStyle(
+                                      fontSize: 11.sp,
+                                      color: Colors.red[700],
+                                    ),
+                                  )
+                                : null,
+                            value: isSelected,
+                            enabled: canSelect,
+                            onChanged: canSelect
+                                ? (bool? value) {
+                                    setDialogState(() {
+                                      if (value == true && !isSelected) {
+                                        tempSelectedSerials.add(serialNo);
+                                      } else if (value == false && isSelected) {
+                                        tempSelectedSerials.remove(serialNo);
+                                      }
+                                    });
+                                  }
+                                : null,
+                            activeColor: const Color(0xFF0E5CA8),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: tempSelectedSerials.length == quantity
+                    ? () {
+                        _updateSerialNumbers(selectedItem, tempSelectedSerials, setPageState);
+                        Navigator.pop(context);
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: tempSelectedSerials.length == quantity
+                      ? const Color(0xFF0E5CA8)
+                      : Colors.grey,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Confirm'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context); // Close loading
+      if (mounted) {
+        context.showErrorSnackBar('Failed to load serial details: $e');
+      }
+    }
+  }
+
+  // Continue with Unequal mode methods...
   void _showItemSelectionDialog() {
     Navigator.push(
       context,
@@ -206,7 +1215,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Bucket Header
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -227,20 +1235,17 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                 ),
               ),
             ),
-
-            // Items in bucket
             ...items.map((item) {
               final isSelected = _selectedItems.any(
-                      (selected) => selected['item_code'] == item['item_code']
+                (selected) => selected['item_code'] == item['item_code']
               );
 
               final selectedItem = isSelected
                   ? _selectedItems.firstWhere(
                       (selected) => selected['item_code'] == item['item_code']
-              )
+                  )
                   : null;
 
-              // Get serial numbers count for defective items
               final serialNosCount = selectedItem?['serial_nos']?.length ?? 0;
 
               return Card(
@@ -315,14 +1320,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                                     ),
                                   ),
                                 ),
-                                if (item['item_group'] != null)
-                                  Text(
-                                    'Group: ${item['item_group']}',
-                                    style: TextStyle(
-                                      fontSize: 12.sp,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
@@ -391,7 +1388,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                                 ),
                               ],
                             ),
-                            // Show serial numbers button for defective items
                             if (bucketName == 'Defective' && isSelected) ...[
                               SizedBox(height: 8.h),
                               SizedBox(
@@ -423,7 +1419,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                 ),
               );
             }).toList(),
-
             SizedBox(height: 16.h),
           ],
         );
@@ -438,8 +1433,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     );
 
     int selectedQty = selectedItem['quantity'] ?? 1;
-    ///TODO here to change the available quantity from API
-    int maxQty = item['available_qty'] ?? 999; // Get available quantity limit
+    int maxQty = item['available_qty'] ?? 999;
     late TextEditingController quantityController;
     quantityController = TextEditingController(text: selectedQty.toString());
 
@@ -563,7 +1557,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                   _updateItemSelection(item, finalQty, bucketName, setPageState);
                   Navigator.pop(context);
                 } else {
-                  // Show snackbar for invalid quantity
                   context.showErrorSnackBar('Quantity must be between 1 and $maxQty');
                 }
               } : null,
@@ -584,12 +1577,10 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
   void _updateItemSelection(Map<String, dynamic> item, int quantity, String returnType, StateSetter setPageState) {
     setPageState(() {
       setState(() {
-        // Remove existing item if present
         _selectedItems.removeWhere(
                 (selected) => selected['item_code'] == item['item_code']
         );
 
-        // Add new item with updated quantity and return type
         final newItem = {
           'item_code': item['item_code'],
           'item_name': item['item_name'],
@@ -597,7 +1588,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
           'return_type': returnType,
         };
 
-        // If defective, initialize empty serial numbers list
         if (returnType == 'Defective') {
           newItem['serial_nos'] = <String>[];
         }
@@ -611,6 +1601,12 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     final int quantity = selectedItem['quantity'] ?? 1;
     final List<String> currentSerialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
     List<String> tempSelectedSerials = List<String>.from(currentSerialNos);
+
+    // Mock serial numbers for demo - in real implementation, fetch from API
+    final List<String> mockSerialNumbers = [
+      'SN001234', 'SN005678', 'SN009012', 'SN003456', 'SN007890',
+      'SN001122', 'SN003344', 'SN005566', 'SN007788', 'SN009900',
+    ];
 
     showDialog(
       context: context,
@@ -697,9 +1693,9 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                 Flexible(
                   child: ListView.builder(
                     shrinkWrap: true,
-                    itemCount: _mockSerialNumbers.length,
+                    itemCount: mockSerialNumbers.length,
                     itemBuilder: (context, index) {
-                      final serialNo = _mockSerialNumbers[index];
+                      final serialNo = mockSerialNumbers[index];
                       final isSelected = tempSelectedSerials.contains(serialNo);
                       final canSelect = tempSelectedSerials.length < quantity || isSelected;
 
@@ -740,7 +1736,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
             ElevatedButton(
               onPressed: tempSelectedSerials.length == quantity
                   ? () {
-                _updateSerialNumbers(item, tempSelectedSerials, setPageState);
+                _updateSerialNumbers(selectedItem, tempSelectedSerials, setPageState);
                 Navigator.pop(context);
               }
                   : null,
@@ -948,19 +1944,15 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
             'return_type': item['return_type'] ?? 'Empty',
           };
 
-          // Add serial number if it's a defective item with serial numbers
           if (item['return_type'] == 'Defective' &&
               item['serial_nos'] != null &&
               (item['serial_nos'] as List).isNotEmpty) {
-            // Join serial numbers with comma or send first one (adjust based on your API)
             itemData['serial_no'] = (item['serial_nos'] as List).join(',');
           }
 
           return itemData;
         }).toList(),
       };
-
-      print('Dispatch Payload: $payload'); // Debug print
 
       final response = await _apiService.submitDispatchVehicle(payload);
 
@@ -1037,7 +2029,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
               ),
               SizedBox(height: 16.h),
               ElevatedButton(
-                onPressed: _loadAvailableItems,
+                onPressed: _loadData,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0E5CA8),
                   foregroundColor: Colors.white,
@@ -1050,12 +2042,21 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
       )
           : Column(
         children: [
+          // Dispatch Mode Selector
+          _buildDispatchModeSelector(),
+
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 children: [
+                  // Show Invoice Details for Equal mode
+                  if (_dispatchMode == 'Equal')
+                    _buildEqualInvoiceDetails(),
+
                   // Invoice Items Section (from original invoice)
-                  _buildInvoiceItemsSection(),
+                  if (_dispatchMode == 'Unequal')
+                    _buildInvoiceItemsSection(),
+
                   // Items Section
                   Container(
                     margin: EdgeInsets.symmetric(horizontal: 16.w),
@@ -1087,7 +2088,9 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                               ),
                             ),
                             ElevatedButton.icon(
-                              onPressed: _showItemSelectionDialog,
+                              onPressed: _dispatchMode == 'Equal'
+                                  ? _showEqualItemSelectionDialog
+                                  : _showItemSelectionDialog,
                               icon: const Icon(Icons.add, size: 18),
                               label: const Text('Select Items'),
                               style: ElevatedButton.styleFrom(
@@ -1137,7 +2140,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                         else
                           Column(
                             children: _selectedItems.asMap().entries.map((entry) {
-                              final index = entry.key;
                               final item = entry.value;
                               final isDefective = item['return_type'] == 'Defective';
                               final serialNos = item['serial_nos'] as List?;
@@ -1221,7 +2223,11 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                                         SizedBox(width: 8.w),
                                         IconButton(
                                           onPressed: () {
-                                            _showItemSelectionDialog();
+                                            if (_dispatchMode == 'Equal') {
+                                              _showEqualItemSelectionDialog();
+                                            } else {
+                                              _showItemSelectionDialog();
+                                            }
                                           },
                                           icon: const Icon(
                                             Icons.edit,
@@ -1282,7 +2288,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 80.h), // Space for submit button
+                  SizedBox(height: 80.h),
                 ],
               ),
             ),
