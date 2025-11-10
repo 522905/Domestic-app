@@ -8,14 +8,14 @@ class DispatchVehicleScreen extends StatefulWidget {
   final String supplierGstin;
   final String supplierInvoiceDate;
   final String supplierInvoiceNumber;
-  final List<Map<String, dynamic>>? invoiceItems;
+  final String warehouse;
 
   const DispatchVehicleScreen({
     Key? key,
     required this.supplierGstin,
     required this.supplierInvoiceDate,
     required this.supplierInvoiceNumber,
-    this.invoiceItems,
+    required this.warehouse,
   }) : super(key: key);
 
   @override
@@ -26,19 +26,23 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
   late ApiServiceInterface _apiService;
 
   // Dispatch mode (Equal/Unequal)
-  String _dispatchMode = 'Unequal';
+  String _dispatchMode = 'Equal'; // Default to Equal
 
-  // State variables for Unequal mode
-  Map<String, List<Map<String, dynamic>>> _availableItems = {};
-  List<Map<String, dynamic>> _selectedItems = [];
-
-  // State variables for Equal mode
+  // State for Equal mode
   Map<String, dynamic>? _invoiceDetails;
   List<Map<String, dynamic>> _itemGroups = [];
 
+  // State for Unequal mode
+  Map<String, List<Map<String, dynamic>>> _availableItems = {};
+  List<Map<String, dynamic>> _selectedItems = [];
+
+  // State management
   bool _isLoading = true;
   bool _isSubmitting = false;
   String _errorMessage = '';
+
+  // Track expanded serial sections
+  Map<String, bool> _expandedSerials = {};
 
   @override
   void initState() {
@@ -48,12 +52,89 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
   }
 
   Future<void> _loadData() async {
-    if (_dispatchMode == 'Unequal') {
-      await _loadUnequalData();
-    } else {
+    if (_dispatchMode == 'Equal') {
       await _loadEqualData();
+    } else {
+      await _loadUnequalData();
     }
   }
+
+  // ============================================================
+  // EQUAL MODE - API & DATA LOADING
+  // ============================================================
+
+  Future<void> _loadEqualData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final response = await _apiService.getEqualERVCalculation(
+        supplierGstin: widget.supplierGstin,
+        supplierInvoiceDate: widget.supplierInvoiceDate,
+        supplierInvoiceNumber: widget.supplierInvoiceNumber,
+        warehouse: widget.warehouse,
+      );
+
+      if (response['success'] != true) {
+        throw Exception(response['message'] ?? 'Failed to load equal ERV data');
+      }
+
+      final data = response['data'];
+
+      setState(() {
+        _invoiceDetails = data['invoice_details'];
+        _itemGroups = List<Map<String, dynamic>>.from(data['item_groups'] ?? []);
+
+        // Initialize selected items with defaults (all auto-suggested serials pre-selected)
+        _selectedItems.clear();
+        for (var group in _itemGroups) {
+          final filledItemCode = group['filled_item_code'];
+          final defectiveData = group['calculated_split']?['defective'];
+          final emptyData = group['calculated_split']?['empty'];
+
+          // Add defective item with auto-suggested serials pre-selected
+          if (defectiveData != null) {
+            final autoSuggestedSerials = List<Map<String, dynamic>>.from(
+              defectiveData['auto_suggested_serials'] ?? [],
+            );
+
+            if (autoSuggestedSerials.isNotEmpty) {
+              _selectedItems.add({
+                'item_code': defectiveData['selected_item_code'],
+                'filled_item_code': filledItemCode,
+                'type': 'Defective',
+                'quantity': defectiveData['auto_suggested_qty'],
+                'serial_nos': autoSuggestedSerials.map((s) => s['serial_no'] as String).toList(),
+              });
+            }
+          }
+
+          // Add empty item
+          if (emptyData != null && emptyData['qty'] > 0) {
+            _selectedItems.add({
+              'item_code': emptyData['selected_item_code'],
+              'filled_item_code': filledItemCode,
+              'type': 'Empty',
+              'quantity': emptyData['qty'],
+            });
+          }
+        }
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load equal ERV data: ${e.toString()}';
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ============================================================
+  // UNEQUAL MODE - API & DATA LOADING
+  // ============================================================
 
   Future<void> _loadUnequalData() async {
     setState(() {
@@ -66,10 +147,6 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
 
       if (itemsData == null) {
         throw Exception('API returned null response');
-      }
-
-      if (itemsData is! Map<String, dynamic>) {
-        throw Exception('API response is not a valid Map');
       }
 
       final bucketsData = itemsData['buckets'];
@@ -101,59 +178,89 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     }
   }
 
-  Future<void> _loadEqualData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
+  // ============================================================
+  // UI - MAIN BUILD METHOD
+  // ============================================================
 
-    try {
-      // Note: Warehouse comes from the receive vehicle step
-      // For initial API call, we'll use a placeholder and get the actual warehouse from the response
-      final response = await _apiService.getEqualERVCalculation(
-        supplierGstin: widget.supplierGstin,
-        supplierInvoiceDate: widget.supplierInvoiceDate,
-        supplierInvoiceNumber: widget.supplierInvoiceNumber,
-        warehouse: 'Focal Point - AI', // TODO: Get from receive vehicle step
-      );
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dispatch Vehicle'),
+        backgroundColor: const Color(0xFF0E5CA8),
+        foregroundColor: Colors.white,
+      ),
+      body: Column(
+        children: [
+          // Equal/Unequal Mode Selector
+          _buildModeSelector(),
 
-      if (response == null || response['success'] != true) {
-        throw Exception('Failed to load equal ERV data');
-      }
-
-      final data = response['data'];
-
-      setState(() {
-        _invoiceDetails = data['invoice_details'];
-        _itemGroups = List<Map<String, dynamic>>.from(data['item_groups'] ?? []);
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load equal ERV data: ${e.toString()}';
-        _isLoading = false;
-      });
-    }
+          // Content Area
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0E5CA8)),
+                  )
+                : _errorMessage.isNotEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.w),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 48.sp, color: Colors.red),
+                              SizedBox(height: 16.h),
+                              Text(
+                                _errorMessage,
+                                style: TextStyle(fontSize: 14.sp, color: Colors.red),
+                                textAlign: TextAlign.center,
+                              ),
+                              SizedBox(height: 16.h),
+                              ElevatedButton.icon(
+                                onPressed: _loadData,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0E5CA8),
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _dispatchMode == 'Equal'
+                        ? _buildEqualContent()
+                        : _buildUnequalContent(),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _buildSubmitButton(),
+    );
   }
 
-  Widget _buildDispatchModeSelector() {
+  // ============================================================
+  // UI - MODE SELECTOR
+  // ============================================================
+
+  Widget _buildModeSelector() {
     return Container(
       margin: EdgeInsets.all(16.w),
       child: Row(
         children: [
           Expanded(
-            child: _buildModeRadio(
-              title: 'Unequal',
-              value: 'Unequal',
-              groupValue: _dispatchMode,
+            child: _buildModeTab(
+              title: 'Equal',
+              value: 'Equal',
+              isSelected: _dispatchMode == 'Equal',
             ),
           ),
           SizedBox(width: 16.w),
           Expanded(
-            child: _buildModeRadio(
-              title: 'Equal',
-              value: 'Equal',
-              groupValue: _dispatchMode,
+            child: _buildModeTab(
+              title: 'Unequal',
+              value: 'Unequal',
+              isSelected: _dispatchMode == 'Unequal',
             ),
           ),
         ],
@@ -161,829 +268,285 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     );
   }
 
-  Widget _buildModeRadio({
+  Widget _buildModeTab({
     required String title,
     required String value,
-    required String groupValue,
+    required bool isSelected,
   }) {
-    final isSelected = groupValue == value;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isSelected ? const Color(0xFF0E5CA8) : Colors.grey[300]!,
-          width: 2,
-        ),
-        borderRadius: BorderRadius.circular(12.r),
-        color: isSelected ? const Color(0xFF0E5CA8).withOpacity(0.1) : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: () {
+        if (_dispatchMode != value) {
+          setState(() {
+            _dispatchMode = value;
+            _selectedItems.clear();
+            _expandedSerials.clear();
+          });
+          _loadData();
+        }
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12.h),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0E5CA8) : Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0E5CA8) : Colors.grey[300]!,
+            width: 2,
           ),
-        ],
-      ),
-      child: RadioListTile<String>(
-        title: Text(
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF0E5CA8).withOpacity(0.3),
+                    spreadRadius: 1,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Text(
           title,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16.sp,
             fontWeight: FontWeight.bold,
-            color: isSelected ? const Color(0xFF0E5CA8) : Colors.grey[700],
+            color: isSelected ? Colors.white : Colors.grey[700],
           ),
         ),
-        value: value,
-        groupValue: groupValue,
-        onChanged: (value) {
-          if (value != null) {
-            setState(() {
-              _dispatchMode = value;
-              _selectedItems.clear();
-              _loadData();
-            });
-          }
-        },
-        activeColor: const Color(0xFF0E5CA8),
-        contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
       ),
     );
   }
 
-  Widget _buildEqualInvoiceDetails() {
-    if (_invoiceDetails == null) return const SizedBox.shrink();
+  // ============================================================
+  // UI - EQUAL MODE CONTENT
+  // ============================================================
 
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w),
+  Widget _buildEqualContent() {
+    return SingleChildScrollView(
       padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.description, color: const Color(0xFF0E5CA8), size: 20.sp),
-              SizedBox(width: 8.w),
-              Text(
-                'Invoice Details',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF333333),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          _buildInfoRow('Purchase Invoice', _invoiceDetails!['purchase_invoice']),
-          _buildInfoRow('Supplier', _invoiceDetails!['supplier_name']),
-          _buildInfoRow('Warehouse', _invoiceDetails!['warehouse']),
-          _buildInfoRow('Bill No', _invoiceDetails!['bill_no']),
-          _buildInfoRow('Bill Date', _invoiceDetails!['bill_date']),
-          _buildInfoRow('Grand Total', '₹${_invoiceDetails!['grand_total']}'),
+          // Invoice Details Card
+          _buildInvoiceDetailsCard(),
+          SizedBox(height: 16.h),
+
+          // Item Groups
+          ..._itemGroups.asMap().entries.map((entry) {
+            final index = entry.key;
+            final group = entry.value;
+            return Column(
+              children: [
+                _buildItemGroupCard(group),
+                if (index < _itemGroups.length - 1) SizedBox(height: 16.h),
+              ],
+            );
+          }).toList(),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, dynamic value) {
+  // Invoice Details Card
+  Widget _buildInvoiceDetailsCard() {
+    if (_invoiceDetails == null) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.receipt_long, color: const Color(0xFF0E5CA8), size: 24.sp),
+                SizedBox(width: 8.w),
+                Text(
+                  'Invoice Details',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0E5CA8),
+                  ),
+                ),
+              ],
+            ),
+            Divider(height: 24.h, thickness: 1),
+            _buildDetailRow('Purchase Invoice', _invoiceDetails!['purchase_invoice']),
+            _buildDetailRow('Supplier', _invoiceDetails!['supplier_name']),
+            _buildDetailRow('Warehouse', _invoiceDetails!['warehouse']),
+            _buildDetailRow('Grand Total', '₹${_invoiceDetails!['grand_total']}'),
+            _buildDetailRow('Posting Date', _invoiceDetails!['posting_date']),
+            _buildDetailRow('Bill No', _invoiceDetails!['bill_no']),
+            _buildDetailRow('Bill Date', _invoiceDetails!['bill_date']),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: EdgeInsets.only(bottom: 8.h),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.sp,
-                color: Colors.grey[600],
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value?.toString() ?? '-',
-              style: TextStyle(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF333333),
-              ),
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEqualItemSelectionDialog() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => _buildEqualItemSelectionPage(),
-      ),
-    );
-  }
-
-  Widget _buildEqualItemSelectionPage() {
-    return StatefulBuilder(
-      builder: (context, setPageState) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Select Items to Dispatch (Equal)'),
-            backgroundColor: const Color(0xFF0E5CA8),
-            foregroundColor: Colors.white,
-            actions: [
-              if (_selectedItems.isNotEmpty)
-                Padding(
-                  padding: EdgeInsets.only(right: 8.w),
-                  child: Center(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(15.r),
-                      ),
-                      child: Text(
-                        '${_selectedItems.length} items',
-                        style: TextStyle(
-                          color: const Color(0xFF0E5CA8),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          body: Column(
-            children: [
-              Expanded(
-                child: _buildEqualItemsList(setPageState),
-              ),
-              if (_selectedItems.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(16.w),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0E5CA8),
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                    ),
-                    child: Text(
-                      'Back to Dispatch Screen',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.sp,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEqualItemsList(StateSetter setPageState) {
-    if (_itemGroups.isEmpty) {
-      return const Center(
-        child: Text('No items available'),
-      );
-    }
-
-    return ListView(
-      padding: EdgeInsets.all(16.w),
-      children: _itemGroups.map((itemGroup) {
-        final filledItemCode = itemGroup['filled_item_code'];
-        final filledItemName = itemGroup['filled_item_name'];
-        final targetQty = itemGroup['target_qty']?.toDouble() ?? 0.0;
-        final receivedQtyCap = itemGroup['received_qty_cap']?.toDouble() ?? 0.0;
-        final calculatedSplit = itemGroup['calculated_split'];
-
-        final emptyData = calculatedSplit['empty'];
-        final defectiveData = calculatedSplit['defective'];
-
-        return Card(
-          margin: EdgeInsets.only(bottom: 16.h),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(16.w),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Filled Item Header
-                Row(
-                  children: [
-                    Container(
-                      width: 50.w,
-                      height: 50.w,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(25.r),
-                      ),
-                      child: Icon(
-                        Icons.propane_tank_rounded,
-                        color: const Color(0xFF0E5CA8),
-                        size: 24.sp,
-                      ),
-                    ),
-                    SizedBox(width: 12.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            filledItemName ?? '',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16.sp,
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          Text(
-                            'Code: $filledItemCode',
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(4.r),
-                            ),
-                            child: Text(
-                              'Target: ${targetQty.toInt()} | Received: ${receivedQtyCap.toInt()}',
-                              style: TextStyle(
-                                fontSize: 10.sp,
-                                color: Colors.blue.shade700,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 12.h),
-                Divider(height: 1, color: Colors.grey[300]),
-                SizedBox(height: 12.h),
-
-                // Empty Item Selection
-                _buildEqualItemTypeSection(
-                  'Empty',
-                  emptyData,
-                  filledItemCode,
-                  targetQty.toInt(),
-                  setPageState,
-                ),
-
-                SizedBox(height: 12.h),
-
-                // Defective Item Selection
-                _buildEqualItemTypeSection(
-                  'Defective',
-                  defectiveData,
-                  filledItemCode,
-                  targetQty.toInt(),
-                  setPageState,
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildEqualItemTypeSection(
-    String type,
-    Map<String, dynamic> data,
-    String filledItemCode,
-    int targetQty,
-    StateSetter setPageState,
-  ) {
-    final selectedItemCode = data['selected_item_code'];
-    final options = List<Map<String, dynamic>>.from(data['options'] ?? []);
-
-    if (options.isEmpty) return const SizedBox.shrink();
-
-    final primaryOption = options.firstWhere(
-      (opt) => opt['is_primary'] == true,
-      orElse: () => options.first,
-    );
-
-    final selectedItem = _selectedItems.firstWhere(
-      (item) => item['item_code'] == selectedItemCode && item['filled_item_code'] == filledItemCode,
-      orElse: () => <String, dynamic>{},
-    );
-
-    final isSelected = selectedItem.isNotEmpty;
-    final selectedQty = selectedItem['quantity'] ?? 0;
-    final availableQty = primaryOption['available_qty']?.toInt() ?? 0;
-
-    // Calculate maximum allowed quantity based on target and other selections
-    final otherType = type == 'Empty' ? 'Defective' : 'Empty';
-    final otherTypeData = type == 'Empty'
-        ? _getDefectiveDataForFilledItem(filledItemCode)
-        : _getEmptyDataForFilledItem(filledItemCode);
-
-    final otherTypeQty = _getSelectedQuantityForItemType(filledItemCode, otherType);
-    final maxAllowed = (targetQty - otherTypeQty).clamp(0, availableQty).toInt();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 30.w,
-              height: 30.w,
-              decoration: BoxDecoration(
-                color: type == 'Defective'
-                    ? Colors.red.withOpacity(0.1)
-                    : Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(15.r),
-              ),
-              child: Icon(
-                type == 'Defective' ? Icons.warning : Icons.inventory_2,
-                color: type == 'Defective' ? Colors.red : Colors.blue,
-                size: 16.sp,
-              ),
-            ),
-            SizedBox(width: 8.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    primaryOption['item_name'] ?? '',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                    ),
-                  ),
-                  Text(
-                    'Code: ${primaryOption['item_code']} | Available: $availableQty',
-                    style: TextStyle(
-                      fontSize: 11.sp,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        // Warning for is_capped (defective items)
-        if (type == 'Defective' && data['is_capped'] == true) ...[
-          SizedBox(height: 8.h),
-          Container(
-            padding: EdgeInsets.all(8.w),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(6.r),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.warning_amber, size: 16.sp, color: Colors.orange.shade700),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: Text(
-                    'Received quantity limit reached. Additional defectives exist but cannot be returned.',
-                    style: TextStyle(
-                      fontSize: 11.sp,
-                      color: Colors.orange.shade700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        // Error for insufficient_stock (empty items)
-        if (type == 'Empty' && data['insufficient_stock'] == true) ...[
-          SizedBox(height: 8.h),
-          Container(
-            padding: EdgeInsets.all(8.w),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(6.r),
-              border: Border.all(color: Colors.red.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, size: 16.sp, color: Colors.red.shade700),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: Text(
-                    'Insufficient stock. Need ${data['qty']} but only $availableQty available. Cannot submit.',
-                    style: TextStyle(
-                      fontSize: 11.sp,
-                      color: Colors.red.shade700,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        SizedBox(height: 8.h),
-        if (!isSelected)
           SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: availableQty > 0
-                  ? () => _showEqualQuantityDialog(
-                      primaryOption,
-                      type,
-                      filledItemCode,
-                      maxAllowed,
-                      availableQty,
-                      targetQty,
-                      setPageState,
-                    )
-                  : null,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: type == 'Defective' ? Colors.red : Colors.blue,
-                side: BorderSide(
-                  color: type == 'Defective' ? Colors.red : Colors.blue,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
+            width: 120.w,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 13.sp,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w600,
               ),
-              child: Text(availableQty > 0 ? 'Select' : 'Out of Stock'),
             ),
-          )
-        else
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => _showEqualQuantityDialog(
-                        primaryOption,
-                        type,
-                        filledItemCode,
-                        maxAllowed,
-                        availableQty,
-                        targetQty,
-                        setPageState,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF0E5CA8),
-                        side: const BorderSide(color: Color(0xFF0E5CA8)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                      ),
-                      child: Text('Qty: $selectedQty'),
-                    ),
-                  ),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _removeEqualItem(selectedItemCode, filledItemCode, setPageState),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                      ),
-                      child: const Text('Remove'),
-                    ),
-                  ),
-                ],
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13.sp,
+                color: Colors.black87,
               ),
-              // Show serial numbers button for defective items
-              if (type == 'Defective' && isSelected) ...[
-                SizedBox(height: 8.h),
-                _buildDefectiveSerialButton(
-                  selectedItem,
-                  primaryOption,
-                  filledItemCode,
-                  setPageState,
-                ),
-              ],
-            ],
+            ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildDefectiveSerialButton(
-    Map<String, dynamic> selectedItem,
-    Map<String, dynamic> itemOption,
-    String filledItemCode,
-    StateSetter setPageState,
-  ) {
-    final serialNosCount = selectedItem['serial_nos']?.length ?? 0;
-    final quantity = selectedItem['quantity'] ?? 0;
-
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () => _showDefectiveSerialDialog(
-          selectedItem,
-          itemOption,
-          filledItemCode,
-          setPageState,
-        ),
-        icon: Icon(Icons.qr_code_scanner, size: 18.sp),
-        label: Text(
-          serialNosCount > 0
-              ? 'Serial Nos: $serialNosCount/$quantity selected'
-              : 'Select Serial Numbers',
-        ),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: serialNosCount == quantity ? Colors.green : Colors.orange,
-          side: BorderSide(
-            color: serialNosCount == quantity ? Colors.green : Colors.orange,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.r),
-          ),
-        ),
+        ],
       ),
     );
   }
 
-  Map<String, dynamic> _getDefectiveDataForFilledItem(String filledItemCode) {
-    final itemGroup = _itemGroups.firstWhere(
-      (group) => group['filled_item_code'] == filledItemCode,
-      orElse: () => <String, dynamic>{},
-    );
-    return itemGroup['calculated_split']?['defective'] ?? {};
-  }
+  // Item Group Card
+  Widget _buildItemGroupCard(Map<String, dynamic> group) {
+    final filledItemCode = group['filled_item_code'];
+    final filledItemName = group['filled_item_name'];
+    final targetQty = group['target_qty'];
+    final receivedQtyCap = group['received_qty_cap'];
+    final calculatedSplit = group['calculated_split'];
 
-  Map<String, dynamic> _getEmptyDataForFilledItem(String filledItemCode) {
-    final itemGroup = _itemGroups.firstWhere(
-      (group) => group['filled_item_code'] == filledItemCode,
-      orElse: () => <String, dynamic>{},
-    );
-    return itemGroup['calculated_split']?['empty'] ?? {};
-  }
+    final defectiveData = calculatedSplit['defective'];
+    final emptyData = calculatedSplit['empty'];
 
-  int _getSelectedQuantityForItemType(String filledItemCode, String type) {
-    final typeData = type == 'Defective'
-        ? _getDefectiveDataForFilledItem(filledItemCode)
-        : _getEmptyDataForFilledItem(filledItemCode);
-
-    final selectedItemCode = typeData['selected_item_code'];
-    if (selectedItemCode == null) return 0;
-
-    final selectedItem = _selectedItems.firstWhere(
-      (item) => item['item_code'] == selectedItemCode && item['filled_item_code'] == filledItemCode,
-      orElse: () => <String, dynamic>{},
-    );
-
-    return selectedItem['quantity'] ?? 0;
-  }
-
-  void _showEqualQuantityDialog(
-    Map<String, dynamic> item,
-    String type,
-    String filledItemCode,
-    int maxAllowed,
-    int availableQty,
-    int targetQty,
-    StateSetter setPageState,
-  ) {
-    final selectedItem = _selectedItems.firstWhere(
-      (selected) => selected['item_code'] == item['item_code'] && selected['filled_item_code'] == filledItemCode,
-      orElse: () => <String, dynamic>{},
-    );
-
-    int selectedQty = selectedItem['quantity'] ?? 1;
-    late TextEditingController quantityController;
-    quantityController = TextEditingController(text: selectedQty.toString());
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Select Quantity'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                item['item_name'] ?? '',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16.sp,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                'Code: ${item['item_code'] ?? ''}',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14.sp,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                'Available: $availableQty | Max Allowed: $maxAllowed',
-                style: TextStyle(
-                  color: Colors.green[600],
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 16.h),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: selectedQty > 1 ? () {
-                      setDialogState(() {
-                        selectedQty--;
-                        quantityController.text = selectedQty.toString();
-                      });
-                    } : null,
-                  ),
-                  SizedBox(
-                    width: 80.w,
-                    child: TextField(
-                      controller: quantityController,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 8.h),
-                        errorText: selectedQty > maxAllowed ? 'Exceeds limit' : null,
-                      ),
-                      onChanged: (value) {
-                        final parsedValue = int.tryParse(value);
-                        if (parsedValue != null && parsedValue >= 1) {
-                          setDialogState(() {
-                            selectedQty = parsedValue;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: selectedQty < maxAllowed ? () {
-                      setDialogState(() {
-                        selectedQty++;
-                        quantityController.text = selectedQty.toString();
-                      });
-                    } : null,
-                  ),
-                ],
-              ),
-              if (selectedQty > maxAllowed) ...[
-                SizedBox(height: 8.h),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
                 Container(
                   padding: EdgeInsets.all(8.w),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(6.r),
-                    border: Border.all(color: Colors.red.shade200),
+                    color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
                   ),
-                  child: Row(
+                  child: Icon(
+                    Icons.propane_tank,
+                    color: const Color(0xFF0E5CA8),
+                    size: 24.sp,
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.warning, color: Colors.red, size: 16.sp),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Text(
-                          'Total cannot exceed target quantity of $targetQty',
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 12.sp,
-                          ),
+                      Text(
+                        filledItemName,
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Code: $filledItemCode',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey[600],
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: selectedQty >= 1 && selectedQty <= maxAllowed ? () {
-                final finalQty = int.tryParse(quantityController.text) ?? selectedQty;
-                if (finalQty >= 1 && finalQty <= maxAllowed) {
-                  _updateEqualItemSelection(item, finalQty, type, filledItemCode, setPageState);
-                  Navigator.pop(context);
-                } else {
-                  context.showErrorSnackBar('Quantity must be between 1 and $maxAllowed');
-                }
-              } : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: selectedQty >= 1 && selectedQty <= maxAllowed
-                    ? const Color(0xFF0E5CA8)
-                    : Colors.grey,
-                foregroundColor: Colors.white,
+            SizedBox(height: 12.h),
+
+            // Target Quantity Info
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: Colors.blue.shade200),
               ),
-              child: const Text('Confirm'),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildQtyInfo('Target', targetQty.toInt(), Colors.blue),
+                  Container(width: 1, height: 30.h, color: Colors.blue.shade200),
+                  _buildQtyInfo('Received Cap', receivedQtyCap.toInt(), Colors.orange),
+                ],
+              ),
             ),
+            SizedBox(height: 16.h),
+
+            // Defective Section
+            _buildDefectiveSection(filledItemCode, defectiveData, targetQty.toInt()),
+            SizedBox(height: 16.h),
+
+            // Empty Section
+            _buildEmptySection(filledItemCode, emptyData, targetQty.toInt()),
           ],
         ),
       ),
     );
   }
 
-  void _updateEqualItemSelection(
-    Map<String, dynamic> item,
-    int quantity,
-    String returnType,
+  Widget _buildQtyInfo(String label, int qty, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.sp,
+              color: color.withOpacity(0.7),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            qty.toString(),
+            style: TextStyle(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Defective Section
+  Widget _buildDefectiveSection(
     String filledItemCode,
-    StateSetter setPageState,
+    Map<String, dynamic> defectiveData,
+    int targetQty,
   ) {
-    setPageState(() {
-      setState(() {
-        _selectedItems.removeWhere(
-          (selected) => selected['item_code'] == item['item_code'] && selected['filled_item_code'] == filledItemCode,
-        );
+    final selectedItemCode = defectiveData['selected_item_code'];
+    final maxAllowed = defectiveData['max_allowed_qty'];
+    final autoSuggestedQty = defectiveData['auto_suggested_qty'];
+    final isCapped = defectiveData['is_capped'] ?? false;
+    final totalAvailable = defectiveData['total_available'];
 
-        final newItem = {
-          'item_code': item['item_code'],
-          'item_name': item['item_name'],
-          'quantity': quantity,
-          'return_type': returnType,
-          'filled_item_code': filledItemCode,
-        };
-
-        if (returnType == 'Defective') {
-          newItem['serial_nos'] = <String>[];
-        }
-
-        _selectedItems.add(newItem);
-      });
-    });
-  }
-
-  void _removeEqualItem(String itemCode, String filledItemCode, StateSetter setPageState) {
-    setPageState(() {
-      setState(() {
-        _selectedItems.removeWhere(
-          (selected) => selected['item_code'] == itemCode && selected['filled_item_code'] == filledItemCode,
-        );
-      });
-    });
-  }
-
-  Future<void> _showDefectiveSerialDialog(
-    Map<String, dynamic> selectedItem,
-    Map<String, dynamic> itemOption,
-    String filledItemCode,
-    StateSetter setPageState,
-  ) async {
-    final quantity = selectedItem['quantity'] ?? 1;
-    final itemCode = itemOption['item_code'];
-
-    // Get defective data from the item group (contains all serial arrays)
-    final defectiveData = _getDefectiveDataForFilledItem(filledItemCode);
-
-    // Get the three serial arrays from the API response
     final autoSuggestedSerials = List<Map<String, dynamic>>.from(
       defectiveData['auto_suggested_serials'] ?? [],
     );
@@ -994,1067 +557,553 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
       defectiveData['additional_serials'] ?? [],
     );
 
-    // Combine all available serials (auto-suggested + additional)
-    final allAvailableSerials = [...autoSuggestedSerials, ...additionalSerials];
-
-    // Get current selected serials or default to auto-suggested serial numbers
-    final currentSerialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
-    List<String> tempSelectedSerials;
-
-    if (currentSerialNos.isEmpty) {
-      // Pre-select auto-suggested serials
-      tempSelectedSerials = autoSuggestedSerials
-          .map((s) => s['serial_no'] as String)
-          .toList();
-    } else {
-      tempSelectedSerials = List<String>.from(currentSerialNos);
-    }
-
-    if (!mounted) return;
-
-      showDialog(
-        context: context,
-        builder: (context) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Select Serial Numbers'),
-                SizedBox(height: 4.h),
-                Text(
-                  'Select $quantity serial number(s)',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    itemOption['item_name'] ?? '',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14.sp,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    'Code: ${itemOption['item_code'] ?? ''}',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12.sp,
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                  // Selection counter
-                  Container(
-                    padding: EdgeInsets.all(8.w),
-                    decoration: BoxDecoration(
-                      color: tempSelectedSerials.length == quantity
-                          ? Colors.green.shade50
-                          : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(6.r),
-                      border: Border.all(
-                        color: tempSelectedSerials.length == quantity
-                            ? Colors.green.shade200
-                            : Colors.orange.shade200,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          tempSelectedSerials.length == quantity
-                              ? Icons.check_circle
-                              : Icons.info_outline,
-                          size: 16.sp,
-                          color: tempSelectedSerials.length == quantity
-                              ? Colors.green
-                              : Colors.orange,
-                        ),
-                        SizedBox(width: 8.w),
-                        Text(
-                          '${tempSelectedSerials.length} of $quantity selected',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w600,
-                            color: tempSelectedSerials.length == quantity
-                                ? Colors.green.shade700
-                                : Colors.orange.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Show unavailable serials info if any
-                  if (unavailableSerials.isNotEmpty) ...[
-                    SizedBox(height: 12.h),
-                    Container(
-                      padding: EdgeInsets.all(8.w),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(6.r),
-                        border: Border.all(color: Colors.amber.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 16.sp, color: Colors.amber.shade700),
-                          SizedBox(width: 8.w),
-                          Expanded(
-                            child: Text(
-                              '${unavailableSerials.length} serial(s) from inspection reports are no longer available',
-                              style: TextStyle(
-                                fontSize: 11.sp,
-                                color: Colors.amber.shade700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  SizedBox(height: 16.h),
-                  if (allAvailableSerials.isEmpty)
-                    const Text('No serial numbers available')
-                  else
-                    Flexible(
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: [
-                          // Auto-suggested serials section
-                          if (autoSuggestedSerials.isNotEmpty) ...[
-                            Padding(
-                              padding: EdgeInsets.only(bottom: 8.h),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.auto_awesome, size: 14.sp, color: Colors.blue),
-                                  SizedBox(width: 4.w),
-                                  Text(
-                                    'Auto-Suggested (from this PI)',
-                                    style: TextStyle(
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            ...autoSuggestedSerials.map((serial) {
-                              final serialNo = serial['serial_no'] as String;
-                              final isSelected = tempSelectedSerials.contains(serialNo);
-                              final canSelect = tempSelectedSerials.length < quantity || isSelected;
-
-                              return CheckboxListTile(
-                                title: Text(
-                                  serialNo,
-                                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: serial['custom_fault_type'] != null
-                                    ? Text(
-                                        'Fault: ${serial['custom_fault_type']} | Weight: ${serial['custom_net_weight_of_cylinder']} kg',
-                                        style: TextStyle(
-                                          fontSize: 11.sp,
-                                          color: Colors.red[700],
-                                        ),
-                                      )
-                                    : null,
-                                value: isSelected,
-                                enabled: canSelect,
-                                onChanged: canSelect
-                                    ? (bool? value) {
-                                        setDialogState(() {
-                                          if (value == true && !isSelected) {
-                                            tempSelectedSerials.add(serialNo);
-                                          } else if (value == false && isSelected) {
-                                            tempSelectedSerials.remove(serialNo);
-                                          }
-                                        });
-                                      }
-                                    : null,
-                                activeColor: Colors.blue,
-                                controlAffinity: ListTileControlAffinity.leading,
-                                contentPadding: EdgeInsets.zero,
-                                dense: true,
-                              );
-                            }).toList(),
-                          ],
-                          // Additional serials section
-                          if (additionalSerials.isNotEmpty) ...[
-                            SizedBox(height: 12.h),
-                            Padding(
-                              padding: EdgeInsets.only(bottom: 8.h),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.add_circle_outline, size: 14.sp, color: Colors.grey[700]),
-                                  SizedBox(width: 4.w),
-                                  Text(
-                                    'Additional Available Serials',
-                                    style: TextStyle(
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            ...additionalSerials.map((serial) {
-                              final serialNo = serial['serial_no'] as String;
-                              final isSelected = tempSelectedSerials.contains(serialNo);
-                              final canSelect = tempSelectedSerials.length < quantity || isSelected;
-
-                              return CheckboxListTile(
-                                title: Text(
-                                  serialNo,
-                                  style: TextStyle(fontSize: 14.sp),
-                                ),
-                                subtitle: serial['custom_fault_type'] != null
-                                    ? Text(
-                                        'Fault: ${serial['custom_fault_type']} | Weight: ${serial['custom_net_weight_of_cylinder']} kg',
-                                        style: TextStyle(
-                                          fontSize: 11.sp,
-                                          color: Colors.red[700],
-                                        ),
-                                      )
-                                    : null,
-                                value: isSelected,
-                                enabled: canSelect,
-                                onChanged: canSelect
-                                    ? (bool? value) {
-                                        setDialogState(() {
-                                          if (value == true && !isSelected) {
-                                            tempSelectedSerials.add(serialNo);
-                                          } else if (value == false && isSelected) {
-                                            tempSelectedSerials.remove(serialNo);
-                                          }
-                                        });
-                                      }
-                                    : null,
-                                activeColor: const Color(0xFF0E5CA8),
-                                controlAffinity: ListTileControlAffinity.leading,
-                                contentPadding: EdgeInsets.zero,
-                                dense: true,
-                              );
-                            }).toList(),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: tempSelectedSerials.length == quantity
-                    ? () {
-                        _updateSerialNumbers(selectedItem, tempSelectedSerials, setPageState);
-                        Navigator.pop(context);
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: tempSelectedSerials.length == quantity
-                      ? const Color(0xFF0E5CA8)
-                      : Colors.grey,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Confirm'),
-              ),
-            ],
-          ),
-        ),
-      );
-  }
-
-  // Continue with Unequal mode methods...
-  void _showItemSelectionDialog() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => _buildItemSelectionPage(),
-      ),
-    );
-  }
-
-  Widget _buildItemSelectionPage() {
-    return StatefulBuilder(
-      builder: (context, setPageState) {
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Select Items to Dispatch'),
-            backgroundColor: const Color(0xFF0E5CA8),
-            foregroundColor: Colors.white,
-            actions: [
-              if (_selectedItems.isNotEmpty)
-                Padding(
-                  padding: EdgeInsets.only(right: 8.w),
-                  child: Center(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(15.r),
-                      ),
-                      child: Text(
-                        '${_selectedItems.length} items',
-                        style: TextStyle(
-                          color: const Color(0xFF0E5CA8),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          body: Column(
-            children: [
-              Expanded(
-                child: _buildItemsList(setPageState),
-              ),
-              if (_selectedItems.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(16.w),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0E5CA8),
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                    ),
-                    child: Text(
-                      'Back to Dispatch Screen',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.sp,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildItemsList(StateSetter setPageState) {
-    if (_availableItems.isEmpty) {
-      return const Center(
-        child: Text('No items available'),
-      );
-    }
-
-    return ListView(
-      padding: EdgeInsets.all(16.w),
-      children: _availableItems.entries.map((bucketEntry) {
-        String bucketName = bucketEntry.key;
-        List<Map<String, dynamic>> items = bucketEntry.value;
-
-        if (items.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              margin: EdgeInsets.only(bottom: 8.h),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6.r),
-                border: Border.all(
-                  color: const Color(0xFF0E5CA8).withOpacity(0.3),
-                ),
-              ),
-              child: Text(
-                bucketName,
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF0E5CA8),
-                ),
-              ),
-            ),
-            ...items.map((item) {
-              final isSelected = _selectedItems.any(
-                (selected) => selected['item_code'] == item['item_code']
-              );
-
-              final selectedItem = isSelected
-                  ? _selectedItems.firstWhere(
-                      (selected) => selected['item_code'] == item['item_code']
-                  )
-                  : null;
-
-              final serialNosCount = selectedItem?['serial_nos']?.length ?? 0;
-
-              return Card(
-                margin: EdgeInsets.only(bottom: 12.h),
-                elevation: isSelected ? 4 : 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  side: BorderSide(
-                    color: isSelected ? const Color(0xFF0E5CA8) : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(16.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 50.w,
-                            height: 50.w,
-                            decoration: BoxDecoration(
-                              color: bucketName == 'Defective'
-                                  ? Colors.red.withOpacity(0.1)
-                                  : const Color(0xFF0E5CA8).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(25.r),
-                            ),
-                            child: Icon(
-                              bucketName == 'Defective' ? Icons.warning : Icons.inventory_2,
-                              color: bucketName == 'Defective' ? Colors.red : const Color(0xFF0E5CA8),
-                              size: 24.sp,
-                            ),
-                          ),
-                          SizedBox(width: 12.w),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item['item_name'] ?? '',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16.sp,
-                                  ),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  'Code: ${item['item_code'] ?? ''}',
-                                  style: TextStyle(
-                                    fontSize: 12.sp,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                Container(
-                                  margin: EdgeInsets.only(top: 4.h),
-                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                  decoration: BoxDecoration(
-                                    color: bucketName == 'Empty'
-                                        ? Colors.blue.shade100
-                                        : Colors.red.shade100,
-                                    borderRadius: BorderRadius.circular(4.r),
-                                  ),
-                                  child: Text(
-                                    bucketName,
-                                    style: TextStyle(
-                                      fontSize: 10.sp,
-                                      color: bucketName == 'Empty'
-                                          ? Colors.blue.shade700
-                                          : Colors.red.shade700,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (isSelected)
-                            Container(
-                              padding: EdgeInsets.all(6.w),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF0E5CA8),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 16.sp,
-                              ),
-                            ),
-                        ],
-                      ),
-                      SizedBox(height: 12.h),
-                      if (!isSelected)
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () => _showQuantityDialog(item, bucketName, setPageState),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0E5CA8),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8.r),
-                              ),
-                            ),
-                            child: const Text('Select'),
-                          ),
-                        )
-                      else
-                        Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => _showQuantityDialog(item, bucketName, setPageState),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: const Color(0xFF0E5CA8),
-                                      side: const BorderSide(color: Color(0xFF0E5CA8)),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8.r),
-                                      ),
-                                    ),
-                                    child: Text('Qty: ${selectedItem?['quantity'] ?? 0}'),
-                                  ),
-                                ),
-                                SizedBox(width: 8.w),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () => _removeItem(item, setPageState),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8.r),
-                                      ),
-                                    ),
-                                    child: const Text('Remove'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (bucketName == 'Defective' && isSelected) ...[
-                              SizedBox(height: 8.h),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _showSerialNumberDialog(item, selectedItem!, setPageState),
-                                  icon: Icon(Icons.qr_code_scanner, size: 18.sp),
-                                  label: Text(
-                                    serialNosCount > 0
-                                        ? 'Serial Nos: $serialNosCount selected'
-                                        : 'Select Serial Numbers',
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: serialNosCount > 0 ? Colors.green : Colors.orange,
-                                    side: BorderSide(
-                                      color: serialNosCount > 0 ? Colors.green : Colors.orange,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8.r),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-            SizedBox(height: 16.h),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  void _showQuantityDialog(Map<String, dynamic> item, String bucketName, StateSetter setPageState) {
+    // Get current selection
     final selectedItem = _selectedItems.firstWhere(
-          (selected) => selected['item_code'] == item['item_code'],
+      (item) => item['filled_item_code'] == filledItemCode && item['type'] == 'Defective',
       orElse: () => <String, dynamic>{},
     );
 
-    int selectedQty = selectedItem['quantity'] ?? 1;
-    int maxQty = item['available_qty'] ?? 999;
-    late TextEditingController quantityController;
-    quantityController = TextEditingController(text: selectedQty.toString());
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Select Quantity'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                item['item_name'] ?? '',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16.sp,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                'Code: ${item['item_code'] ?? ''}',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14.sp,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                'Available: $maxQty',
-                style: TextStyle(
-                  color: Colors.green[600],
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 16.h),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: selectedQty > 1 ? () {
-                      setDialogState(() {
-                        selectedQty--;
-                        quantityController.text = selectedQty.toString();
-                      });
-                    } : null,
-                  ),
-                  SizedBox(
-                    width: 80.w,
-                    child: TextField(
-                      controller: quantityController,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 8.h),
-                        errorText: selectedQty > maxQty ? 'Exceeds limit' : null,
-                      ),
-                      onChanged: (value) {
-                        final parsedValue = int.tryParse(value);
-                        if (parsedValue != null && parsedValue >= 1) {
-                          setDialogState(() {
-                            selectedQty = parsedValue;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: selectedQty < maxQty ? () {
-                      setDialogState(() {
-                        selectedQty++;
-                        quantityController.text = selectedQty.toString();
-                      });
-                    } : null,
-                  ),
-                ],
-              ),
-              if (selectedQty > maxQty) ...[
-                SizedBox(height: 8.h),
-                Container(
-                  padding: EdgeInsets.all(8.w),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(6.r),
-                    border: Border.all(color: Colors.red.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.red, size: 16.sp),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Text(
-                          'Quantity cannot exceed available limit of $maxQty',
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 12.sp,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: selectedQty >= 1 && selectedQty <= maxQty ? () {
-                final finalQty = int.tryParse(quantityController.text) ?? selectedQty;
-                if (finalQty >= 1 && finalQty <= maxQty) {
-                  _updateItemSelection(item, finalQty, bucketName, setPageState);
-                  Navigator.pop(context);
-                } else {
-                  context.showErrorSnackBar('Quantity must be between 1 and $maxQty');
-                }
-              } : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: selectedQty >= 1 && selectedQty <= maxQty
-                    ? const Color(0xFF0E5CA8)
-                    : Colors.grey,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _updateItemSelection(Map<String, dynamic> item, int quantity, String returnType, StateSetter setPageState) {
-    setPageState(() {
-      setState(() {
-        _selectedItems.removeWhere(
-                (selected) => selected['item_code'] == item['item_code']
-        );
-
-        final newItem = {
-          'item_code': item['item_code'],
-          'item_name': item['item_name'],
-          'quantity': quantity,
-          'return_type': returnType,
-        };
-
-        if (returnType == 'Defective') {
-          newItem['serial_nos'] = <String>[];
-        }
-
-        _selectedItems.add(newItem);
-      });
-    });
-  }
-
-  void _showSerialNumberDialog(Map<String, dynamic> item, Map<String, dynamic> selectedItem, StateSetter setPageState) {
-    final int quantity = selectedItem['quantity'] ?? 1;
-    final List<String> currentSerialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
-    List<String> tempSelectedSerials = List<String>.from(currentSerialNos);
-
-    // Mock serial numbers for demo - in real implementation, fetch from API
-    final List<String> mockSerialNumbers = [
-      'SN001234', 'SN005678', 'SN009012', 'SN003456', 'SN007890',
-      'SN001122', 'SN003344', 'SN005566', 'SN007788', 'SN009900',
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Select Serial Numbers'),
-              SizedBox(height: 4.h),
-              Text(
-                'Select $quantity serial number(s)',
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item['item_name'] ?? '',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14.sp,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  'Code: ${item['item_code'] ?? ''}',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12.sp,
-                  ),
-                ),
-                SizedBox(height: 16.h),
-                Container(
-                  padding: EdgeInsets.all(8.w),
-                  decoration: BoxDecoration(
-                    color: tempSelectedSerials.length == quantity
-                        ? Colors.green.shade50
-                        : Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(6.r),
-                    border: Border.all(
-                      color: tempSelectedSerials.length == quantity
-                          ? Colors.green.shade200
-                          : Colors.orange.shade200,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        tempSelectedSerials.length == quantity
-                            ? Icons.check_circle
-                            : Icons.info_outline,
-                        size: 16.sp,
-                        color: tempSelectedSerials.length == quantity
-                            ? Colors.green
-                            : Colors.orange,
-                      ),
-                      SizedBox(width: 8.w),
-                      Text(
-                        '${tempSelectedSerials.length} of $quantity selected',
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w600,
-                          color: tempSelectedSerials.length == quantity
-                              ? Colors.green.shade700
-                              : Colors.orange.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 16.h),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: mockSerialNumbers.length,
-                    itemBuilder: (context, index) {
-                      final serialNo = mockSerialNumbers[index];
-                      final isSelected = tempSelectedSerials.contains(serialNo);
-                      final canSelect = tempSelectedSerials.length < quantity || isSelected;
-
-                      return CheckboxListTile(
-                        title: Text(
-                          serialNo,
-                          style: TextStyle(fontSize: 14.sp),
-                        ),
-                        value: isSelected,
-                        enabled: canSelect,
-                        onChanged: canSelect
-                            ? (bool? value) {
-                          setDialogState(() {
-                            if (value == true && !isSelected) {
-                              tempSelectedSerials.add(serialNo);
-                            } else if (value == false && isSelected) {
-                              tempSelectedSerials.remove(serialNo);
-                            }
-                          });
-                        }
-                            : null,
-                        activeColor: const Color(0xFF0E5CA8),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: tempSelectedSerials.length == quantity
-                  ? () {
-                _updateSerialNumbers(selectedItem, tempSelectedSerials, setPageState);
-                Navigator.pop(context);
-              }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: tempSelectedSerials.length == quantity
-                    ? const Color(0xFF0E5CA8)
-                    : Colors.grey,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _updateSerialNumbers(Map<String, dynamic> item, List<String> serialNumbers, StateSetter setPageState) {
-    setPageState(() {
-      setState(() {
-        final index = _selectedItems.indexWhere(
-                (selected) => selected['item_code'] == item['item_code']
-        );
-
-        if (index != -1) {
-          _selectedItems[index]['serial_nos'] = serialNumbers;
-        }
-      });
-    });
-  }
-
-  void _removeItem(Map<String, dynamic> item, StateSetter setPageState) {
-    setPageState(() {
-      setState(() {
-        _selectedItems.removeWhere(
-                (selected) => selected['item_code'] == item['item_code']
-        );
-      });
-    });
-  }
-
-  Widget _buildInvoiceItemsSection() {
-    if (widget.invoiceItems == null || widget.invoiceItems!.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final selectedQty = selectedItem['quantity'] ?? 0;
+    final selectedSerialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
 
     return Container(
-      margin: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: Colors.red.shade200),
+        borderRadius: BorderRadius.circular(12.r),
+        color: Colors.red.shade50,
       ),
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
+              color: Colors.red.shade100,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12.r)),
+            ),
+            child: Row(
               children: [
-                Icon(
-                  Icons.inventory_2,
-                  color: const Color(0xFF0E5CA8),
-                  size: 20.sp,
-                ),
+                Icon(Icons.warning, color: Colors.red, size: 20.sp),
                 SizedBox(width: 8.w),
                 Text(
-                  'Invoice Items',
+                  'Defective Cylinders',
                   style: TextStyle(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF333333),
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade900,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$selectedQty / $maxAllowed',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade900,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 12.h),
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FA),
-                borderRadius: BorderRadius.circular(6.r),
-                border: Border.all(color: const Color(0xFFE9ECEF)),
-              ),
-              child: Column(
-                children: widget.invoiceItems!.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-                  final isLast = index == widget.invoiceItems!.length - 1;
+          ),
 
-                  return Container(
-                    padding: EdgeInsets.all(12.w),
+          Padding(
+            padding: EdgeInsets.all(12.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Warnings
+                if (isCapped) ...[
+                  Container(
+                    padding: EdgeInsets.all(8.w),
                     decoration: BoxDecoration(
-                      border: isLast ? null : const Border(
-                        bottom: BorderSide(color: Color(0xFFE9ECEF), width: 1),
-                      ),
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(6.r),
+                      border: Border.all(color: Colors.orange.shade300),
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 6.w,
-                          height: 6.h,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF0E5CA8),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
+                        Icon(Icons.warning_amber, size: 16.sp, color: Colors.orange.shade800),
+                        SizedBox(width: 8.w),
                         Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['item_name'] ?? '',
-                                style: TextStyle(
-                                  fontSize: 14.sp,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF333333),
-                                ),
-                              ),
-                              SizedBox(height: 2.h),
-                              Text(
-                                item['item_code'] ?? '',
-                                style: TextStyle(
-                                  fontSize: 12.sp,
-                                  color: const Color(0xFF666666),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
                           child: Text(
-                            'Qty: ${item['qty'] ?? '0'}',
+                            '$totalAvailable defectives exist but only $maxAllowed can be returned (received quantity limit)',
                             style: TextStyle(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF0E5CA8),
+                              fontSize: 11.sp,
+                              color: Colors.orange.shade800,
                             ),
                           ),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
+                  ),
+                  SizedBox(height: 8.h),
+                ],
+
+                if (unavailableSerials.isNotEmpty) ...[
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(6.r),
+                      border: Border.all(color: Colors.amber.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16.sp, color: Colors.amber.shade800),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(
+                            '${unavailableSerials.length} serial(s) from inspection reports are no longer in warehouse',
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: Colors.amber.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                ],
+
+                // Serial Selection - Inline Expandable
+                _buildSerialSelection(
+                  filledItemCode,
+                  autoSuggestedSerials,
+                  additionalSerials,
+                  selectedSerialNos,
+                  maxAllowed.toInt(),
+                  targetQty,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Serial Selection - Inline Expandable
+  Widget _buildSerialSelection(
+    String filledItemCode,
+    List<Map<String, dynamic>> autoSuggestedSerials,
+    List<Map<String, dynamic>> additionalSerials,
+    List<String> selectedSerialNos,
+    int maxAllowed,
+    int targetQty,
+  ) {
+    final expandKey = '${filledItemCode}_defective';
+    final isExpanded = _expandedSerials[expandKey] ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Toggle Button
+        InkWell(
+          onTap: () {
+            setState(() {
+              _expandedSerials[expandKey] = !isExpanded;
+            });
+          },
+          child: Container(
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(
+                color: selectedSerialNos.length == selectedSerialNos.length
+                    ? Colors.green.shade300
+                    : Colors.orange.shade300,
               ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.qr_code_scanner,
+                  size: 20.sp,
+                  color: const Color(0xFF0E5CA8),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Serial Numbers',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${selectedSerialNos.length} selected',
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 24.sp,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Expandable Serial List
+        if (isExpanded) ...[
+          SizedBox(height: 12.h),
+
+          // Auto-Suggested Serials Section
+          if (autoSuggestedSerials.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.only(bottom: 8.h),
+              child: Row(
+                children: [
+                  Icon(Icons.auto_awesome, size: 14.sp, color: Colors.blue),
+                  SizedBox(width: 4.w),
+                  Text(
+                    'Auto-Suggested (from this PI)',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...autoSuggestedSerials.map((serial) {
+              final serialNo = serial['serial_no'] as String;
+              final isSelected = selectedSerialNos.contains(serialNo);
+
+              return _buildSerialCard(
+                serial,
+                isSelected,
+                () => _toggleSerial(filledItemCode, serialNo, maxAllowed, targetQty),
+                isPrimary: true,
+              );
+            }).toList(),
+            SizedBox(height: 12.h),
+          ],
+
+          // Additional Serials Section
+          if (additionalSerials.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.only(bottom: 8.h),
+              child: Row(
+                children: [
+                  Icon(Icons.add_circle_outline, size: 14.sp, color: Colors.grey[700]),
+                  SizedBox(width: 4.w),
+                  Text(
+                    'Additional Available Serials',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...additionalSerials.map((serial) {
+              final serialNo = serial['serial_no'] as String;
+              final isSelected = selectedSerialNos.contains(serialNo);
+
+              return _buildSerialCard(
+                serial,
+                isSelected,
+                () => _toggleSerial(filledItemCode, serialNo, maxAllowed, targetQty),
+                isPrimary: false,
+              );
+            }).toList(),
+          ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSerialCard(
+    Map<String, dynamic> serial,
+    bool isSelected,
+    VoidCallback onTap,
+    {required bool isPrimary}
+  ) {
+    final serialNo = serial['serial_no'];
+    final netWeight = serial['custom_net_weight_of_cylinder'];
+    final faultType = serial['custom_fault_type'];
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 8.h),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? (isPrimary ? Colors.blue.shade50 : Colors.green.shade50)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(
+          color: isSelected
+              ? (isPrimary ? Colors.blue.shade300 : Colors.green.shade300)
+              : Colors.grey.shade300,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: CheckboxListTile(
+        value: isSelected,
+        onChanged: (_) => onTap(),
+        title: Text(
+          serialNo,
+          style: TextStyle(
+            fontSize: 13.sp,
+            fontWeight: isPrimary ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        subtitle: Text(
+          'Fault: $faultType | Weight: $netWeight kg',
+          style: TextStyle(
+            fontSize: 11.sp,
+            color: Colors.red[700],
+          ),
+        ),
+        activeColor: isPrimary ? Colors.blue : Colors.green,
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: EdgeInsets.symmetric(horizontal: 8.w),
+        dense: true,
+      ),
+    );
+  }
+
+  void _toggleSerial(String filledItemCode, String serialNo, int maxAllowed, int targetQty) {
+    setState(() {
+      final selectedItem = _selectedItems.firstWhere(
+        (item) => item['filled_item_code'] == filledItemCode && item['type'] == 'Defective',
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (selectedItem.isEmpty) {
+        // Create new defective item entry
+        _selectedItems.add({
+          'filled_item_code': filledItemCode,
+          'type': 'Defective',
+          'quantity': 1,
+          'serial_nos': [serialNo],
+        });
+      } else {
+        final serialNos = List<String>.from(selectedItem['serial_nos'] ?? []);
+
+        if (serialNos.contains(serialNo)) {
+          // Deselect
+          serialNos.remove(serialNo);
+          selectedItem['serial_nos'] = serialNos;
+          selectedItem['quantity'] = serialNos.length;
+        } else {
+          // Select (if under max allowed)
+          if (serialNos.length < maxAllowed) {
+            serialNos.add(serialNo);
+            selectedItem['serial_nos'] = serialNos;
+            selectedItem['quantity'] = serialNos.length;
+          }
+        }
+      }
+
+      // Recalculate empty quantity
+      _recalculateEmptyQty(filledItemCode, targetQty);
+    });
+  }
+
+  void _recalculateEmptyQty(String filledItemCode, int targetQty) {
+    // Get defective quantity
+    final defectiveItem = _selectedItems.firstWhere(
+      (item) => item['filled_item_code'] == filledItemCode && item['type'] == 'Defective',
+      orElse: () => <String, dynamic>{},
+    );
+
+    final defectiveQty = defectiveItem['quantity'] ?? 0;
+    final emptyQty = targetQty - defectiveQty;
+
+    // Update or create empty item
+    final emptyItem = _selectedItems.firstWhere(
+      (item) => item['filled_item_code'] == filledItemCode && item['type'] == 'Empty',
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (emptyItem.isEmpty) {
+      // Get empty data from item group
+      final group = _itemGroups.firstWhere(
+        (g) => g['filled_item_code'] == filledItemCode,
+        orElse: () => <String, dynamic>{},
+      );
+      final emptyData = group['calculated_split']?['empty'];
+
+      if (emptyData != null) {
+        _selectedItems.add({
+          'item_code': emptyData['selected_item_code'],
+          'filled_item_code': filledItemCode,
+          'type': 'Empty',
+          'quantity': emptyQty,
+        });
+      }
+    } else {
+      emptyItem['quantity'] = emptyQty;
+    }
+  }
+
+  // Empty Section
+  Widget _buildEmptySection(
+    String filledItemCode,
+    Map<String, dynamic> emptyData,
+    int targetQty,
+  ) {
+    final selectedItemCode = emptyData['selected_item_code'];
+    final qty = emptyData['qty'];
+    final insufficientStock = emptyData['insufficient_stock'] ?? false;
+    final options = List<Map<String, dynamic>>.from(emptyData['options'] ?? []);
+
+    final primaryOption = options.firstWhere(
+      (opt) => opt['is_primary'] == true,
+      orElse: () => options.isNotEmpty ? options.first : {},
+    );
+
+    // Get current selection
+    final selectedItem = _selectedItems.firstWhere(
+      (item) => item['filled_item_code'] == filledItemCode && item['type'] == 'Empty',
+      orElse: () => <String, dynamic>{},
+    );
+
+    final selectedQty = selectedItem['quantity'] ?? qty;
+    final availableQty = primaryOption['available_qty'] ?? 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blue.shade200),
+        borderRadius: BorderRadius.circular(12.r),
+        color: Colors.blue.shade50,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade100,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12.r)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.inventory_2, color: Colors.blue, size: 20.sp),
+                SizedBox(width: 8.w),
+                Text(
+                  'Empty Cylinders',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  selectedQty.toString(),
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: EdgeInsets.all(12.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Item Info
+                Text(
+                  primaryOption['item_name'] ?? '',
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'Code: ${primaryOption['item_code']} | Available: $availableQty',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    color: Colors.grey[600],
+                  ),
+                ),
+
+                // Insufficient Stock Warning
+                if (insufficientStock) ...[
+                  SizedBox(height: 8.h),
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(6.r),
+                      border: Border.all(color: Colors.red.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 16.sp, color: Colors.red.shade800),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(
+                            'Insufficient stock. Need $selectedQty but only $availableQty available. Cannot submit.',
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: Colors.red.shade800,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // UI - UNEQUAL MODE CONTENT
+  // ============================================================
+
+  Widget _buildUnequalContent() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.construction, size: 64.sp, color: Colors.grey),
+            SizedBox(height: 16.h),
+            Text(
+              'Unequal Mode',
+              style: TextStyle(
+                fontSize: 20.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Implementation pending. API structure ready.',
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -2062,452 +1111,148 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
     );
   }
 
-  Future<void> _submitDispatch() async {
-    if (_isSubmitting) return;
+  // ============================================================
+  // UI - SUBMIT BUTTON
+  // ============================================================
 
-    if (_selectedItems.isEmpty) {
-      context.showErrorSnackBar('Please select at least one item');
-      return;
+  Widget _buildSubmitButton() {
+    final canSubmit = _validateSubmission();
+
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: canSubmit && !_isSubmitting ? _submitDispatch : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0E5CA8),
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(vertical: 16.h),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            disabledBackgroundColor: Colors.grey[300],
+          ),
+          child: _isSubmitting
+              ? SizedBox(
+                  height: 20.h,
+                  width: 20.w,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(
+                  'Submit Dispatch',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // VALIDATION & SUBMISSION
+  // ============================================================
+
+  bool _validateSubmission() {
+    if (_dispatchMode == 'Unequal') {
+      return _selectedItems.isNotEmpty;
     }
 
-    // Validate defective items have serial numbers
-    for (var item in _selectedItems) {
-      if (item['return_type'] == 'Defective') {
-        final serialNos = item['serial_nos'] as List?;
-        final quantity = item['quantity'] as int;
-        if (serialNos == null || serialNos.isEmpty) {
-          context.showErrorSnackBar(
-              'Please select serial numbers for defective item: ${item['item_code']}');
-          return;
-        }
-        if (serialNos.length != quantity) {
-          context.showErrorSnackBar(
-              'Serial numbers (${serialNos.length}) must match quantity ($quantity) for: ${item['item_code']}');
-          return;
-        }
+    // Equal mode validation
+    for (var group in _itemGroups) {
+      final filledItemCode = group['filled_item_code'];
+      final targetQty = group['target_qty'].toInt();
+      final receivedQtyCap = group['received_qty_cap'].toInt();
+      final emptyData = group['calculated_split']['empty'];
+
+      // Get selected quantities
+      final defectiveItem = _selectedItems.firstWhere(
+        (item) => item['filled_item_code'] == filledItemCode && item['type'] == 'Defective',
+        orElse: () => <String, dynamic>{},
+      );
+      final emptyItem = _selectedItems.firstWhere(
+        (item) => item['filled_item_code'] == filledItemCode && item['type'] == 'Empty',
+        orElse: () => <String, dynamic>{},
+      );
+
+      final defectiveQty = defectiveItem['quantity'] ?? 0;
+      final emptyQty = emptyItem['quantity'] ?? 0;
+
+      // Rule 1: Total must equal target
+      if (defectiveQty + emptyQty != targetQty) {
+        return false;
+      }
+
+      // Rule 2: Defectives cannot exceed cap
+      if (defectiveQty > receivedQtyCap) {
+        return false;
+      }
+
+      // Rule 3: Check insufficient stock
+      if (emptyData['insufficient_stock'] == true) {
+        return false;
       }
     }
 
+    return true;
+  }
+
+  Future<void> _submitDispatch() async {
     setState(() {
       _isSubmitting = true;
     });
 
     try {
+      // Build payload (keeping existing structure as requested)
       final payload = {
         'supplier_gstin': widget.supplierGstin,
         'supplier_invoice_date': widget.supplierInvoiceDate,
         'supplier_invoice_number': widget.supplierInvoiceNumber,
-        'items_dispatched': _selectedItems.map((item) {
-          final itemData = {
-            'item_code': item['item_code'],
-            'quantity': item['quantity'].toString(),
-            'return_type': item['return_type'] ?? 'Empty',
-          };
-
-          if (item['return_type'] == 'Defective' &&
-              item['serial_nos'] != null &&
-              (item['serial_nos'] as List).isNotEmpty) {
-            itemData['serial_no'] = (item['serial_nos'] as List).join(',');
-          }
-
-          return itemData;
-        }).toList(),
+        'warehouse': widget.warehouse,
+        'dispatch_mode': _dispatchMode,
+        'items': _selectedItems,
       };
 
       final response = await _apiService.submitDispatchVehicle(payload);
 
       if (mounted) {
         if (response.success) {
-          context.showSuccessSnackBar(response.message ?? 'Dispatch submitted successfully');
+          context.showSuccessSnackBar(
+            response.message ?? 'Vehicle dispatched successfully',
+          );
           Navigator.pop(context);
         } else {
-          context.showErrorSnackBar(response.message ?? 'Failed to submit dispatch');
+          context.showErrorSnackBar(
+            response.message ?? 'Failed to dispatch vehicle',
+          );
         }
       }
     } catch (e) {
       if (mounted) {
-        context.showErrorSnackBar('Failed to submit dispatch: $e');
+        context.showErrorSnackBar('Error: ${e.toString()}');
       }
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        title: Text(
-          'Dispatch Vehicle',
-          style: TextStyle(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: const Color(0xFF0E5CA8),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF0E5CA8),
-        ),
-      )
-          : _errorMessage.isNotEmpty
-      ? Center(
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64.w,
-                color: const Color(0xFFF44336),
-              ),
-              SizedBox(height: 16.h),
-              Text(
-                'Error loading items',
-                style: TextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF333333),
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                _errorMessage,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14.sp,
-                  color: const Color(0xFF666666),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              ElevatedButton(
-                onPressed: _loadData,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E5CA8),
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      )
-          : Column(
-        children: [
-          // Dispatch Mode Selector
-          _buildDispatchModeSelector(),
-
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Show Invoice Details for Equal mode
-                  if (_dispatchMode == 'Equal')
-                    _buildEqualInvoiceDetails(),
-
-                  // Invoice Items Section (from original invoice)
-                  if (_dispatchMode == 'Unequal')
-                    _buildInvoiceItemsSection(),
-
-                  // Items Section
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 16.w),
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8.r),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          spreadRadius: 1,
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Items to Dispatch',
-                              style: TextStyle(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF333333),
-                              ),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: _dispatchMode == 'Equal'
-                                  ? _showEqualItemSelectionDialog
-                                  : _showItemSelectionDialog,
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('Select Items'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0E5CA8),
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12.w,
-                                  vertical: 8.h,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-
-                        // Selected Items List or Empty State
-                        if (_selectedItems.isEmpty)
-                          Center(
-                            child: Column(
-                              children: [
-                                SizedBox(height: 40.h),
-                                Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 48.w,
-                                  color: const Color(0xFF999999),
-                                ),
-                                SizedBox(height: 8.h),
-                                Text(
-                                  'No items selected',
-                                  style: TextStyle(
-                                    fontSize: 16.sp,
-                                    color: const Color(0xFF999999),
-                                  ),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  'Tap "Select Items" to get started',
-                                  style: TextStyle(
-                                    fontSize: 14.sp,
-                                    color: const Color(0xFF999999),
-                                  ),
-                                ),
-                                SizedBox(height: 40.h),
-                              ],
-                            ),
-                          )
-                        else
-                          Column(
-                            children: _selectedItems.asMap().entries.map((entry) {
-                              final item = entry.value;
-                              final isDefective = item['return_type'] == 'Defective';
-                              final serialNos = item['serial_nos'] as List?;
-                              final hasSerialNos = serialNos != null && serialNos.isNotEmpty;
-                              final quantity = item['quantity'] as int;
-                              final isSerialComplete = hasSerialNos && serialNos.length == quantity;
-
-                              return Container(
-                                margin: EdgeInsets.only(bottom: 8.h),
-                                padding: EdgeInsets.all(12.w),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: const Color(0xFF0E5CA8),
-                                    width: 1.5,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8.r),
-                                  color: const Color(0xFF0E5CA8).withOpacity(0.05),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                item['item_code'] ?? '',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14.sp,
-                                                ),
-                                              ),
-                                              SizedBox(height: 4.h),
-                                              Text(
-                                                item['item_name'] ?? '',
-                                                style: TextStyle(
-                                                  fontSize: 12.sp,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                              if (isDefective) ...[
-                                                SizedBox(height: 4.h),
-                                                Container(
-                                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.red.shade100,
-                                                    borderRadius: BorderRadius.circular(4.r),
-                                                  ),
-                                                  child: Text(
-                                                    'Defective',
-                                                    style: TextStyle(
-                                                      fontSize: 10.sp,
-                                                      color: Colors.red.shade700,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 8.w,
-                                            vertical: 4.h,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF0E5CA8),
-                                            borderRadius: BorderRadius.circular(12.r),
-                                          ),
-                                          child: Text(
-                                            'Qty: ${item['quantity']}',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12.sp,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 8.w),
-                                        IconButton(
-                                          onPressed: () {
-                                            if (_dispatchMode == 'Equal') {
-                                              _showEqualItemSelectionDialog();
-                                            } else {
-                                              _showItemSelectionDialog();
-                                            }
-                                          },
-                                          icon: const Icon(
-                                            Icons.edit,
-                                            color: Colors.green,
-                                          ),
-                                          iconSize: 20.sp,
-                                        ),
-                                      ],
-                                    ),
-                                    // Serial Numbers Section for Defective Items
-                                    if (isDefective) ...[
-                                      SizedBox(height: 8.h),
-                                      Container(
-                                        padding: EdgeInsets.all(8.w),
-                                        decoration: BoxDecoration(
-                                          color: isSerialComplete
-                                              ? Colors.green.shade50
-                                              : Colors.red.shade50,
-                                          borderRadius: BorderRadius.circular(6.r),
-                                          border: Border.all(
-                                            color: isSerialComplete
-                                                ? Colors.green.shade300
-                                                : Colors.red.shade300,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              isSerialComplete ? Icons.check_circle : Icons.warning,
-                                              size: 16.sp,
-                                              color: isSerialComplete ? Colors.green : Colors.red,
-                                            ),
-                                            SizedBox(width: 8.w),
-                                            Expanded(
-                                              child: Text(
-                                                isSerialComplete
-                                                    ? 'Serial Nos: ${serialNos!.join(', ')}'
-                                                    : 'Serial numbers missing!',
-                                                style: TextStyle(
-                                                  fontSize: 11.sp,
-                                                  color: isSerialComplete
-                                                      ? Colors.green.shade700
-                                                      : Colors.red.shade700,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  SizedBox(height: 80.h),
-                ],
-              ),
-            ),
-          ),
-
-          // Submit Button
-          Container(
-            width: double.infinity,
-            margin: EdgeInsets.all(16.w),
-            child: ElevatedButton(
-              onPressed: _selectedItems.isNotEmpty && !_isSubmitting
-                  ? _submitDispatch
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0E5CA8),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 16.h),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
-                elevation: 2,
-              ),
-              child: _isSubmitting
-                  ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 20.w,
-                    height: 20.h,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Text(
-                    'Dispatching...',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              )
-                  : Text(
-                'Dispatch Vehicle',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
