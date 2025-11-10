@@ -521,7 +521,7 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
         : _getEmptyDataForFilledItem(filledItemCode);
 
     final otherTypeQty = _getSelectedQuantityForItemType(filledItemCode, otherType);
-    final maxAllowed = (targetQty - otherTypeQty).clamp(0, availableQty);
+    final maxAllowed = (targetQty - otherTypeQty).clamp(0, availableQty).toInt();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1957,8 +1957,12 @@ class _DispatchVehicleScreenState extends State<DispatchVehicleScreen> {
       final response = await _apiService.submitDispatchVehicle(payload);
 
       if (mounted) {
-        context.showSuccessSnackBar('Dispatch submitted successfully');
-        Navigator.pop(context);
+        if (response.success) {
+          context.showSuccessSnackBar(response.message ?? 'Dispatch submitted successfully');
+          Navigator.pop(context);
+        } else {
+          context.showErrorSnackBar(response.message ?? 'Failed to submit dispatch');
+        }
       }
     } catch (e) {
       if (mounted) {
