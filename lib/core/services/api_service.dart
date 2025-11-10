@@ -810,37 +810,6 @@ class ApiService implements ApiServiceInterface {
     }
 
     @override
-    Future<Map<String, dynamic>> getItemSerialDetails({
-      required String itemCode,
-      required String warehouse,
-    }) async {
-      try {
-        final response = await apiClient.get(
-          '/procurement/item-serial-details',
-          queryParameters: {
-            'item_code': itemCode,
-            'warehouse': warehouse,
-          },
-        );
-        return response.data;
-      } catch (e) {
-        _handleError(e);
-        rethrow;
-      }
-    }
-
-    @override
-    Future<String?> getUserWarehouse() async {
-      try {
-        final profile = await getUserProfile();
-        return profile['warehouse'];
-      } catch (e) {
-        _handleError(e);
-        return null;
-      }
-    }
-
-    @override
     Future<Map<String, dynamic>> getMaterialRequestList() async {
       try {
         final response = await apiClient.get(
