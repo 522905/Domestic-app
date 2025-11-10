@@ -78,6 +78,23 @@ abstract class ApiServiceInterface {
   Future<Map<String, dynamic>> getMaterialRequestList();
   Future<Map<String, dynamic>> getPendingSaleOrderList();
 
+  // Procurement/Dispatch methods
+  Future<Map<String, dynamic>> getEqualERVCalculation({
+    required String supplierGstin,
+    required String supplierInvoiceDate,
+    required String supplierInvoiceNumber,
+    required String warehouse,
+  });
+
+  Future<Map<String, dynamic>> getItemSerialDetails({
+    required String itemCode,
+    required String warehouse,
+  });
+
+  Future<String?> getUserWarehouse();
+
+  Future<Map<String, dynamic>> submitDispatchVehicle(Map<String, dynamic> payload);
+
   Future<List<dynamic>> getVehiclesList();
 
   Future<Map<String, dynamic>> assignVehicle(

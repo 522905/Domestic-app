@@ -786,6 +786,75 @@ class ApiService implements ApiServiceInterface {
     }
 
     @override
+    Future<Map<String, dynamic>> getEqualERVCalculation({
+      required String supplierGstin,
+      required String supplierInvoiceDate,
+      required String supplierInvoiceNumber,
+      required String warehouse,
+    }) async {
+      try {
+        final response = await apiClient.get(
+          '/procurement/equal-erv-calculation/',
+          queryParameters: {
+            'supplier_gstin': supplierGstin,
+            'supplier_invoice_date': supplierInvoiceDate,
+            'supplier_invoice_number': supplierInvoiceNumber,
+            'warehouse': warehouse,
+          },
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+    @override
+    Future<Map<String, dynamic>> getItemSerialDetails({
+      required String itemCode,
+      required String warehouse,
+    }) async {
+      try {
+        final response = await apiClient.get(
+          '/procurement/item-serial-details',
+          queryParameters: {
+            'item_code': itemCode,
+            'warehouse': warehouse,
+          },
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+    @override
+    Future<String?> getUserWarehouse() async {
+      try {
+        final user = await User().getUser();
+        return user?['warehouse'];
+      } catch (e) {
+        _handleError(e);
+        return null;
+      }
+    }
+
+    @override
+    Future<Map<String, dynamic>> submitDispatchVehicle(Map<String, dynamic> payload) async {
+      try {
+        final response = await apiClient.post(
+          '/procurement/dispatch-vehicle',
+          data: payload,
+        );
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
+    @override
     Future<Map<String, dynamic>> getMaterialRequestList() async {
       try {
         final response = await apiClient.get(
