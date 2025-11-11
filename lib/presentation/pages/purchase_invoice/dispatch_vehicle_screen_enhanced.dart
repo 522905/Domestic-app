@@ -861,6 +861,25 @@ class _DispatchVehicleScreenEnhancedState
                   .map((entry) =>
                       _buildReturnItemRow(group, entry.value, entry.key))
                   .toList(),
+
+            // Add Return Item Button
+            SizedBox(height: 8.h),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showAddReturnItemDialog(group),
+                icon: Icon(Icons.add, size: 18.sp),
+                label: const Text('Add Return Item'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0E5CA8),
+                  side: const BorderSide(color: Color(0xFF0E5CA8)),
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1033,6 +1052,343 @@ class _DispatchVehicleScreenEnhancedState
         _consumedSerialNumbers.addAll(item.selectedSerials);
       });
     }
+  }
+
+  void _showAddReturnItemDialog(ItemGroupState group) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Return Item'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.warning, color: Colors.red),
+              title: const Text('Defective Cylinder'),
+              subtitle: const Text('Requires serial number selection'),
+              onTap: () {
+                Navigator.pop(context);
+                _showDefectiveItemSelection(group);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.inventory_2, color: const Color(0xFF0E5CA8)),
+              title: const Text('Empty Cylinder'),
+              subtitle: const Text('Non-serialized item'),
+              onTap: () {
+                Navigator.pop(context);
+                _showEmptyItemSelection(group);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDefectiveItemSelection(ItemGroupState group) {
+    // Get defective items
+    List<DefectiveItem> availableDefectiveItems;
+
+    if (group.isLinked) {
+      // For linked groups, only show items that map to this filled item
+      availableDefectiveItems = _ervResponse!.data.availableItems.defective
+          .where((item) => item.mapsToFilled == group.filledItemCode)
+          .toList();
+    } else {
+      // For unlinked groups, show all defective items
+      availableDefectiveItems = _ervResponse!.data.availableItems.defective;
+    }
+
+    if (availableDefectiveItems.isEmpty) {
+      context.showErrorSnackBar('No defective items available for this group');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Defective Item'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: availableDefectiveItems.length,
+            itemBuilder: (context, index) {
+              final item = availableDefectiveItems[index];
+              final availableSerials = item.serials
+                  .where((s) => !_consumedSerialNumbers.contains(s.serialNo))
+                  .length;
+
+              return ListTile(
+                title: Text(item.itemName),
+                subtitle: Text('${item.itemCode} • $availableSerials serials available'),
+                trailing: Icon(Icons.arrow_forward),
+                enabled: availableSerials > 0,
+                onTap: availableSerials > 0
+                    ? () {
+                        Navigator.pop(context);
+                        _showQuantityDialogForDefective(group, item);
+                      }
+                    : null,
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEmptyItemSelection(ItemGroupState group) {
+    // Get empty items
+    List<EmptyItem> availableEmptyItems;
+
+    if (group.isLinked) {
+      // For linked groups, only show items that map to this filled item
+      availableEmptyItems = _ervResponse!.data.availableItems.empty
+          .where((item) => item.mapsToFilled == group.filledItemCode)
+          .toList();
+    } else {
+      // For unlinked groups, show all empty items
+      availableEmptyItems = _ervResponse!.data.availableItems.empty;
+    }
+
+    if (availableEmptyItems.isEmpty) {
+      context.showErrorSnackBar('No empty items available for this group');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Empty Item'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: availableEmptyItems.length,
+            itemBuilder: (context, index) {
+              final item = availableEmptyItems[index];
+
+              return ListTile(
+                title: Text(item.itemName),
+                subtitle: Text('${item.itemCode} • ${item.availableQty.toInt()} available'),
+                trailing: Icon(Icons.arrow_forward),
+                enabled: item.availableQty > 0,
+                onTap: item.availableQty > 0
+                    ? () {
+                        Navigator.pop(context);
+                        _showQuantityDialogForEmpty(group, item);
+                      }
+                    : null,
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuantityDialogForDefective(ItemGroupState group, DefectiveItem item) {
+    final availableSerials = item.serials
+        .where((s) => !_consumedSerialNumbers.contains(s.serialNo))
+        .toList();
+    int quantity = 1;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Enter Quantity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(item.itemName),
+              SizedBox(height: 16.h),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove),
+                    onPressed: quantity > 1
+                        ? () => setState(() => quantity--)
+                        : null,
+                  ),
+                  SizedBox(
+                    width: 60.w,
+                    child: TextField(
+                      textAlign: TextAlign.center,
+                      controller: TextEditingController(text: quantity.toString()),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        final parsed = int.tryParse(value);
+                        if (parsed != null && parsed >= 1 && parsed <= availableSerials.length) {
+                          setState(() => quantity = parsed);
+                        }
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: quantity < availableSerials.length
+                        ? () => setState(() => quantity++)
+                        : null,
+                  ),
+                ],
+              ),
+              Text('Max: ${availableSerials.length}',
+                  style: TextStyle(fontSize: 12.sp, color: Colors.grey)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+
+                // Navigate to serial selection
+                final result = await Navigator.push<List<SerialDetail>>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SerialSelectionScreen(
+                      itemCode: item.itemCode,
+                      itemName: item.itemName,
+                      requiredQty: quantity,
+                      availableSerials: availableSerials,
+                      preselectedSerials: [],
+                    ),
+                  ),
+                );
+
+                if (result != null) {
+                  setState(() {
+                    final newItem = ReturnItemState(
+                      itemCode: item.itemCode,
+                      itemName: item.itemName,
+                      qty: result.length.toDouble(),
+                      returnType: 'Defective',
+                      selectedSerials: result.map((s) => s.serialNo).toList(),
+                      unlinkedItem: !group.isLinked,
+                    );
+                    group.returnItems.add(newItem);
+                    _consumedSerialNumbers.addAll(newItem.selectedSerials);
+                  });
+                  context.showSuccessSnackBar('Defective item added successfully');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5CA8),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Select Serials'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showQuantityDialogForEmpty(ItemGroupState group, EmptyItem item) {
+    int quantity = 1;
+    final maxQty = item.availableQty.toInt();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Enter Quantity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(item.itemName),
+              SizedBox(height: 16.h),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove),
+                    onPressed: quantity > 1
+                        ? () => setState(() => quantity--)
+                        : null,
+                  ),
+                  SizedBox(
+                    width: 60.w,
+                    child: TextField(
+                      textAlign: TextAlign.center,
+                      controller: TextEditingController(text: quantity.toString()),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        final parsed = int.tryParse(value);
+                        if (parsed != null && parsed >= 1 && parsed <= maxQty) {
+                          setState(() => quantity = parsed);
+                        }
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: quantity < maxQty
+                        ? () => setState(() => quantity++)
+                        : null,
+                  ),
+                ],
+              ),
+              Text('Max: $maxQty',
+                  style: TextStyle(fontSize: 12.sp, color: Colors.grey)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() {
+                  final newItem = ReturnItemState(
+                    itemCode: item.itemCode,
+                    itemName: item.itemName,
+                    qty: quantity.toDouble(),
+                    returnType: 'Empty',
+                    selectedSerials: [],
+                    unlinkedItem: !group.isLinked,
+                  );
+                  group.returnItems.add(newItem);
+                });
+                context.showSuccessSnackBar('Empty item added successfully');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5CA8),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildDeletedGroupsSection() {
