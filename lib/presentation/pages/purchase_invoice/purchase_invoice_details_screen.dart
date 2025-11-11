@@ -4,8 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/api_service_interface.dart';
+import 'dispatch_vehicle_screen_enhanced.dart';
 import 'receive_vehicle_screen.dart';
-import 'dispatch_vehicle_screen.dart';
 import 'vehicle_history_screen.dart';
 
 class PurchaseInvoiceDetailsScreen extends StatefulWidget {
@@ -238,11 +238,13 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => DispatchVehicleScreen(
+                builder: (context) => DispatchVehicleScreenEnhanced(
                   supplierGstin: widget.supplierGstin,
                   supplierInvoiceDate: widget.supplierInvoiceDate,
                   supplierInvoiceNumber: widget.supplierInvoiceNumber,
-                  invoiceItems: _getItemData(_invoiceDetails),
+                  // invoiceItems: _getItemData(_invoiceDetails),
+                  // warehouse: _getWarehouseName(_invoiceDetails),
+                  warehouse: 'Focal Point - AI',
                 ),
               ),
             ).then((_) => _loadInvoiceDetails());

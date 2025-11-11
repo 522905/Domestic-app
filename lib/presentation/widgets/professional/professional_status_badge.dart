@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/constants/app_colors_enhanced.dart';
+import '../../../core/constants/borders.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/constants/app_icons.dart';

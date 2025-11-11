@@ -41,6 +41,9 @@ class _DispatchVehicleScreenEnhancedState
   List<ItemGroupState> _currentGroups = [];
   List<ConversionRecord> _conversions = [];
   Set<String> _consumedSerialNumbers = {};
+  // Add after _consumedSerialNumbers
+  Map<String, double> _originalTargetQty = {};
+  Map<String, double> _originalReceivedQtyCap = {};
 
   @override
   void initState() {
@@ -84,6 +87,8 @@ class _DispatchVehicleScreenEnhancedState
 
   void _initializeCurrentGroups() {
     _currentGroups.clear();
+    _originalTargetQty.clear();
+    _originalReceivedQtyCap.clear();
 
     for (var group in _ervResponse!.data.requiredGroups) {
       final returnItems = <ReturnItemState>[];
@@ -96,7 +101,7 @@ class _DispatchVehicleScreenEnhancedState
           qty: group.preselections.defective.qty,
           returnType: 'Defective',
           selectedSerials:
-              group.preselections.defective.serials.map((s) => s.serialNo).toList(),
+          group.preselections.defective.serials.map((s) => s.serialNo).toList(),
           unlinkedItem: false,
         ));
       }
@@ -112,6 +117,10 @@ class _DispatchVehicleScreenEnhancedState
           unlinkedItem: false,
         ));
       }
+
+      // ✅ Store original values
+      _originalTargetQty[group.purchaseInvoiceItem] = group.targetQty;
+      _originalReceivedQtyCap[group.purchaseInvoiceItem] = group.receivedQtyCap;
 
       _currentGroups.add(ItemGroupState(
         purchaseInvoiceItem: group.purchaseInvoiceItem,
@@ -143,6 +152,67 @@ class _DispatchVehicleScreenEnhancedState
                       itemCode: itemCode, itemName: itemCode, availableQty: 0))
               .itemName;
     }
+  }
+
+  void _showAddUnlinkedGroupDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange, size: 24.sp),
+            SizedBox(width: 8.w),
+            const Text('Add Unlinked Item'),
+          ],
+        ),
+        content: const Text(
+          'Unlinked items are returns that don\'t correspond to any '
+              'received items in this Purchase Invoice.\n\n'
+              'These should only be used for special cases like:\n'
+              '• Wrong items received previously\n'
+              '• Dead stock returns\n'
+              '• Adjustments\n\n'
+              'Do you want to add an unlinked item?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _createUnlinkedGroup();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Add Unlinked Group'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _createUnlinkedGroup() {
+    // Create a new unlinked group
+    final unlinkedGroup = ItemGroupState(
+      purchaseInvoiceItem: null,
+      filledItemCode: null,
+      filledItemName: 'Unlinked Items',
+      targetQty: null,
+      receivedQtyCap: null,
+      isLinked: false,
+      isDeleted: false,
+      returnItems: [],
+    );
+
+    setState(() {
+      _currentGroups.add(unlinkedGroup);
+    });
+
+    context.showSuccessSnackBar('Unlinked group created. Add items to it now.');
   }
 
   void _calculateConsumedSerials() {
@@ -372,19 +442,66 @@ class _DispatchVehicleScreenEnhancedState
 
   void _revertAllConversions() {
     setState(() {
+      // ✅ Restore original target quantities
+      for (var group in _currentGroups) {
+        if (group.isLinked && group.purchaseInvoiceItem != null) {
+          final originalTarget = _originalTargetQty[group.purchaseInvoiceItem];
+          final originalCap = _originalReceivedQtyCap[group.purchaseInvoiceItem];
+
+          if (originalTarget != null) {
+            group.targetQty = originalTarget;
+          }
+          if (originalCap != null) {
+            group.receivedQtyCap = originalCap;
+          }
+        }
+      }
+
       _conversions.clear();
     });
-    context.showSuccessSnackBar('All conversions reverted');
+    context.showSuccessSnackBar('All conversions reverted. Target quantities restored.');
   }
 
   void _softDeleteGroup(ItemGroupState group) {
+    // Special handling for unlinked groups
+    if (!group.isLinked) {
+      if (group.returnItems.isEmpty) {
+        // Just remove it directly
+        setState(() {
+          _currentGroups.remove(group);
+        });
+        context.showSuccessSnackBar('Empty unlinked group removed');
+        return;
+      } else {
+        // Show warning that items need to be deleted first
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cannot Delete'),
+            content: const Text(
+              'Please remove all items from this unlinked group first.\n\n'
+                  'Once all items are removed, the group will be automatically deleted.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
+    // Normal linked group deletion
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Group?'),
         content: Text(
           'Delete group: ${group.filledItemName}?\n\n'
-          'You can restore it later if needed.',
+              'You can restore it later if needed.',
         ),
         actions: [
           TextButton(
@@ -401,7 +518,8 @@ class _DispatchVehicleScreenEnhancedState
                 }
               });
               Navigator.pop(context);
-              context.showSuccessSnackBar('Group deleted. You can restore it from the deleted groups section.');
+              context.showSuccessSnackBar(
+                  'Group deleted. You can restore it from the deleted groups section.');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -457,6 +575,7 @@ class _DispatchVehicleScreenEnhancedState
 
   void _applyConversion(ItemGroupState group, double qty) {
     setState(() {
+      // Add conversion record
       _conversions.add(ConversionRecord(
         purchaseInvoiceItem: group.purchaseInvoiceItem!,
         filledItemCode: group.filledItemCode!,
@@ -464,15 +583,28 @@ class _DispatchVehicleScreenEnhancedState
         originalLoadType: 'Refill',
         convertedTo: 'Oneway',
       ));
+
+      // ✅ Reduce the target quantity
+      final originalTarget = group.targetQty!;
+
+      // group.targetQty = originalTarget - qty;
+      group.targetQty = originalTarget - qty;  // ✅ Works now!
+
+      // ✅ Also reduce received_qty_cap proportionally for defective limit
+      if (group.receivedQtyCap != null && originalTarget > 0) {
+        final proportion = group.receivedQtyCap! / originalTarget;
+        group.receivedQtyCap = group.targetQty! * proportion;
+      }
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Conversion applied. Please adjust return quantities manually.\n'
-          'New available for return: ${group.targetQty! - qty}',
+          'Conversion applied!\n'
+              '${qty.toInt()} cylinders converted to one-way.\n'
+              'New target for returns: ${group.targetQty!.toInt()}',
         ),
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 4),
         backgroundColor: Colors.orange,
       ),
     );
@@ -730,8 +862,7 @@ class _DispatchVehicleScreenEnhancedState
   }
 
   Widget _buildActiveGroupsSection() {
-    final activeGroups =
-        _currentGroups.where((g) => !g.isDeleted).toList();
+    final activeGroups = _currentGroups.where((g) => !g.isDeleted).toList();
 
     if (activeGroups.isEmpty) {
       return Container(
@@ -761,17 +892,36 @@ class _DispatchVehicleScreenEnhancedState
                   color: const Color(0xFF0E5CA8), size: 18.sp),
               SizedBox(width: 8.w),
               Text(
-                _currentMode == 'equal'
-                    ? 'Required Groups'
-                    : 'Return Groups',
+                _currentMode == 'equal' ? 'Required Groups' : 'Return Groups',
                 style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600),
               ),
             ],
           ),
         ),
-        ...activeGroups
-            .map((group) => _buildGroupCard(group))
-            .toList(),
+        ...activeGroups.map((group) => _buildGroupCard(group)).toList(),
+
+        // Add Unlinked Item Button (Unequal mode only)
+        if (_currentMode == 'unequal') ...[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _showAddUnlinkedGroupDialog,
+                icon: Icon(Icons.add_circle_outline, size: 20.sp),
+                label: const Text('Add Unlinked Item Group'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange,
+                  side: BorderSide(color: Colors.orange.shade300, width: 2),
+                  padding: EdgeInsets.symmetric(vertical: 14.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -979,6 +1129,12 @@ class _DispatchVehicleScreenEnhancedState
                   setState(() {
                     _consumedSerialNumbers.removeAll(item.selectedSerials);
                     group.returnItems.removeAt(index);
+
+                    // ✅ Auto-remove unlinked groups if they become empty
+                    if (!group.isLinked && group.returnItems.isEmpty) {
+                      _currentGroups.remove(group);
+                      context.showSuccessSnackBar('Empty unlinked group removed automatically');
+                    }
                   });
                 },
                 padding: EdgeInsets.zero,
@@ -1211,182 +1367,92 @@ class _DispatchVehicleScreenEnhancedState
     final availableSerials = item.serials
         .where((s) => !_consumedSerialNumbers.contains(s.serialNo))
         .toList();
-    int quantity = 1;
+
+    var maxQty = availableSerials.length;
+
+    // In Equal mode, limit by remaining capacity
+    if (_currentMode == 'equal') {
+      final remaining = _getRemainingCapacity(group);
+      if (remaining <= 0) {
+        context.showErrorSnackBar('Target quantity already reached for this group');
+        return;
+      }
+      maxQty = maxQty.clamp(0, remaining);
+    }
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Enter Quantity'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(item.itemName),
-              SizedBox(height: 16.h),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove),
-                    onPressed: quantity > 1
-                        ? () => setState(() => quantity--)
-                        : null,
-                  ),
-                  SizedBox(
-                    width: 60.w,
-                    child: TextField(
-                      textAlign: TextAlign.center,
-                      controller: TextEditingController(text: quantity.toString()),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        final parsed = int.tryParse(value);
-                        if (parsed != null && parsed >= 1 && parsed <= availableSerials.length) {
-                          setState(() => quantity = parsed);
-                        }
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: quantity < availableSerials.length
-                        ? () => setState(() => quantity++)
-                        : null,
-                  ),
-                ],
+      builder: (context) => _QuantityDialogForDefective(
+        item: item,
+        maxQty: maxQty,
+        group: group,
+        onConfirm: (quantity) async {
+          final result = await Navigator.push<List<SerialDetail>>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SerialSelectionScreen(
+                itemCode: item.itemCode,
+                itemName: item.itemName,
+                requiredQty: quantity,
+                availableSerials: availableSerials,
+                preselectedSerials: [],
               ),
-              Text('Max: ${availableSerials.length}',
-                  style: TextStyle(fontSize: 12.sp, color: Colors.grey)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context);
+          );
 
-                // Navigate to serial selection
-                final result = await Navigator.push<List<SerialDetail>>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SerialSelectionScreen(
-                      itemCode: item.itemCode,
-                      itemName: item.itemName,
-                      requiredQty: quantity,
-                      availableSerials: availableSerials,
-                      preselectedSerials: [],
-                    ),
-                  ),
-                );
-
-                if (result != null) {
-                  setState(() {
-                    final newItem = ReturnItemState(
-                      itemCode: item.itemCode,
-                      itemName: item.itemName,
-                      qty: result.length.toDouble(),
-                      returnType: 'Defective',
-                      selectedSerials: result.map((s) => s.serialNo).toList(),
-                      unlinkedItem: !group.isLinked,
-                    );
-                    group.returnItems.add(newItem);
-                    _consumedSerialNumbers.addAll(newItem.selectedSerials);
-                  });
-                  context.showSuccessSnackBar('Defective item added successfully');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0E5CA8),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Select Serials'),
-            ),
-          ],
-        ),
+          if (result != null && mounted) {
+            setState(() {
+              final newItem = ReturnItemState(
+                itemCode: item.itemCode,
+                itemName: item.itemName,
+                qty: result.length.toDouble(),
+                returnType: 'Defective',
+                selectedSerials: result.map((s) => s.serialNo).toList(),
+                unlinkedItem: !group.isLinked,
+              );
+              group.returnItems.add(newItem);
+              _consumedSerialNumbers.addAll(newItem.selectedSerials);
+            });
+            context.showSuccessSnackBar('Defective item added successfully');
+          }
+        },
       ),
     );
   }
 
   void _showQuantityDialogForEmpty(ItemGroupState group, EmptyItem item) {
-    int quantity = 1;
-    final maxQty = item.availableQty.toInt();
+    final maxQty = _currentMode == 'equal'
+        ? _getRemainingCapacity(group).clamp(0, item.availableQty.toInt())
+        : item.availableQty.toInt();
+
+    if (maxQty <= 0) {
+      context.showErrorSnackBar('Target quantity already reached for this group');
+      return;
+    }
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Enter Quantity'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(item.itemName),
-              SizedBox(height: 16.h),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove),
-                    onPressed: quantity > 1
-                        ? () => setState(() => quantity--)
-                        : null,
-                  ),
-                  SizedBox(
-                    width: 60.w,
-                    child: TextField(
-                      textAlign: TextAlign.center,
-                      controller: TextEditingController(text: quantity.toString()),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        final parsed = int.tryParse(value);
-                        if (parsed != null && parsed >= 1 && parsed <= maxQty) {
-                          setState(() => quantity = parsed);
-                        }
-                      },
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: quantity < maxQty
-                        ? () => setState(() => quantity++)
-                        : null,
-                  ),
-                ],
-              ),
-              Text('Max: $maxQty',
-                  style: TextStyle(fontSize: 12.sp, color: Colors.grey)),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() {
-                  final newItem = ReturnItemState(
-                    itemCode: item.itemCode,
-                    itemName: item.itemName,
-                    qty: quantity.toDouble(),
-                    returnType: 'Empty',
-                    selectedSerials: [],
-                    unlinkedItem: !group.isLinked,
-                  );
-                  group.returnItems.add(newItem);
-                });
-                context.showSuccessSnackBar('Empty item added successfully');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0E5CA8),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Add'),
-            ),
-          ],
-        ),
+      builder: (context) => _QuantityDialogForEmpty(
+        item: item,
+        maxQty: maxQty,
+        group: group,
+        onConfirm: (quantity) {
+          setState(() {
+            final newItem = ReturnItemState(
+              itemCode: item.itemCode,
+              itemName: item.itemName,
+              qty: quantity.toDouble(),
+              returnType: 'Empty',
+              selectedSerials: [],
+              unlinkedItem: !group.isLinked,
+            );
+            group.returnItems.add(newItem);
+          });
+
+          if (mounted) {
+            context.showSuccessSnackBar('Empty item added successfully');
+          }
+        },
       ),
     );
   }
@@ -1466,8 +1532,14 @@ class _DispatchVehicleScreenEnhancedState
   }
 
   Future<void> _submitERV() async {
+    // First validate
     if (!_validateBeforeSubmit()) return;
 
+    // Show confirmation dialog
+    final confirmed = await _showSubmitConfirmationDialog();
+    if (confirmed != true) return;
+
+    // Proceed with submission
     setState(() => _isSubmitting = true);
 
     try {
@@ -1488,6 +1560,134 @@ class _DispatchVehicleScreenEnhancedState
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<bool?> _showSubmitConfirmationDialog() {
+    // Calculate summary
+    final totalGroups = _currentGroups.where((g) => !g.isDeleted && g.returnItems.isNotEmpty).length;
+    final totalDefectiveItems = _currentGroups
+        .where((g) => !g.isDeleted)
+        .expand((g) => g.returnItems)
+        .where((item) => item.returnType == 'Defective')
+        .fold<double>(0, (sum, item) => sum + item.qty);
+    final totalEmptyItems = _currentGroups
+        .where((g) => !g.isDeleted)
+        .expand((g) => g.returnItems)
+        .where((item) => item.returnType == 'Empty')
+        .fold<double>(0, (sum, item) => sum + item.qty);
+    final totalConversions = _conversions.fold<double>(0, (sum, c) => sum + c.qty);
+
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: const Color(0xFF0E5CA8), size: 24.sp),
+            SizedBox(width: 8.w),
+            const Text('Confirm ERV Submission'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'You are about to submit the Equipment Return Voucher:',
+                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
+              ),
+              SizedBox(height: 16.h),
+              _buildSummaryRow('Mode', _currentMode == 'equal' ? 'Equal ERV' : 'Unequal ERV'),
+              _buildSummaryRow('Purchase Invoice', _ervResponse!.data.invoiceDetails.purchaseInvoice),
+              _buildSummaryRow('Warehouse', _ervResponse!.data.invoiceDetails.warehouse),
+              SizedBox(height: 12.h),
+              Divider(),
+              SizedBox(height: 12.h),
+              Text(
+                'Return Summary:',
+                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+              ),
+              SizedBox(height: 8.h),
+              _buildSummaryRow('Return Groups', '$totalGroups'),
+              _buildSummaryRow('Defective Items', '${totalDefectiveItems.toInt()}'),
+              _buildSummaryRow('Empty Items', '${totalEmptyItems.toInt()}'),
+              if (_conversions.isNotEmpty)
+                _buildSummaryRow('Oneway Conversions', '${totalConversions.toInt()}'),
+              SizedBox(height: 16.h),
+              Container(
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8.r),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.blue.shade700, size: 20.sp),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: Text(
+                        'This action cannot be undone. Please verify all details before proceeding.',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5CA8),
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.send, size: 18),
+                SizedBox(width: 8.w),
+                const Text('Confirm & Submit'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140.w,
+            child: Text(
+              '$label:',
+              style: TextStyle(fontSize: 13.sp, color: Colors.grey[600]),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _validateBeforeSubmit() {
@@ -1581,6 +1781,14 @@ class _DispatchVehicleScreenEnhancedState
       'return_groups': returnGroups,
     };
   }
+
+  int _getRemainingCapacity(ItemGroupState group) {
+    if (_currentMode != 'equal') return 500; // Unlimited in unequal mode
+
+    final currentTotal =
+    group.returnItems.fold<double>(0, (sum, item) => sum + item.qty);
+    return (group.targetQty! - currentTotal).toInt();
+  }
 }
 
 // Helper Classes
@@ -1588,8 +1796,8 @@ class ItemGroupState {
   final String? purchaseInvoiceItem;
   final String? filledItemCode;
   final String filledItemName;
-  final double? targetQty;
-  final double? receivedQtyCap;
+  double? targetQty;  // ✅ Can be modified
+  double? receivedQtyCap;  // ✅ Can be modified
   final bool isLinked;
   bool isDeleted;
   final List<ReturnItemState> returnItems;
@@ -1654,6 +1862,352 @@ class _ConvertToOnewayDialog extends StatefulWidget {
   _ConvertToOnewayDialogState createState() => _ConvertToOnewayDialogState();
 }
 
+class _QuantityDialogForDefective extends StatefulWidget {
+  final DefectiveItem item;
+  final int maxQty;
+  final ItemGroupState group;
+  final Function(int qty) onConfirm;
+
+  const _QuantityDialogForDefective({
+    required this.item,
+    required this.maxQty,
+    required this.group,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_QuantityDialogForDefective> createState() =>
+      _QuantityDialogForDefectiveState();
+}
+
+class _QuantityDialogForDefectiveState
+    extends State<_QuantityDialogForDefective> {
+  late TextEditingController _qtyController;
+  int quantity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _qtyController = TextEditingController(text: '1');
+  }
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Enter Quantity'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.item.itemName,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove),
+                onPressed: quantity > 1
+                    ? () {
+                  setState(() {
+                    quantity--;
+                    _qtyController.text = quantity.toString();
+                    _qtyController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _qtyController.text.length),
+                    );
+                  });
+                }
+                    : null,
+              ),
+              SizedBox(
+                width: 100.w,
+                child: TextField(
+                  controller: _qtyController,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 12.h,
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    final parsed = int.tryParse(value);
+                    if (parsed != null) {
+                      setState(() {
+                        quantity = parsed;
+                      });
+                    } else if (value.isEmpty) {
+                      setState(() {
+                        quantity = 0;
+                      });
+                    }
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: quantity < widget.maxQty
+                    ? () {
+                  setState(() {
+                    quantity++;
+                    _qtyController.text = quantity.toString();
+                    _qtyController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _qtyController.text.length),
+                    );
+                  });
+                }
+                    : null,
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (quantity < 1 || quantity > widget.maxQty)
+                Icon(Icons.error, color: Colors.red, size: 16.sp)
+              else
+                Icon(Icons.check_circle, color: Colors.green, size: 16.sp),
+              SizedBox(width: 4.w),
+              Text(
+                quantity < 1
+                    ? 'Minimum: 1'
+                    : quantity > widget.maxQty
+                    ? 'Maximum: ${widget.maxQty}'
+                    : 'Valid quantity',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: (quantity < 1 || quantity > widget.maxQty)
+                      ? Colors.red
+                      : Colors.green,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (quantity >= 1 && quantity <= widget.maxQty)
+              ? () {
+            Navigator.pop(context);
+            widget.onConfirm(quantity);
+          }
+              : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0E5CA8),
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Select Serials'),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuantityDialogForEmpty extends StatefulWidget {
+  final EmptyItem item;
+  final int maxQty;
+  final ItemGroupState group;
+  final Function(int qty) onConfirm;
+
+  const _QuantityDialogForEmpty({
+    required this.item,
+    required this.maxQty,
+    required this.group,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_QuantityDialogForEmpty> createState() => _QuantityDialogForEmptyState();
+}
+
+class _QuantityDialogForEmptyState extends State<_QuantityDialogForEmpty> {
+  late TextEditingController _qtyController;
+  int quantity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _qtyController = TextEditingController(text: '1');
+  }
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Enter Quantity'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.item.itemName,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove),
+                onPressed: quantity > 1
+                    ? () {
+                  setState(() {
+                    quantity--;
+                    _qtyController.text = quantity.toString();
+                    _qtyController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _qtyController.text.length),
+                    );
+                  });
+                }
+                    : null,
+              ),
+              SizedBox(
+                width: 100.w,
+                child: TextField(
+                  controller: _qtyController,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 12.h,
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    final parsed = int.tryParse(value);
+                    if (parsed != null) {
+                      setState(() {
+                        quantity = parsed;
+                      });
+                    } else if (value.isEmpty) {
+                      setState(() {
+                        quantity = 0;
+                      });
+                    }
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: quantity < widget.maxQty
+                    ? () {
+                  setState(() {
+                    quantity++;
+                    _qtyController.text = quantity.toString();
+                    _qtyController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _qtyController.text.length),
+                    );
+                  });
+                }
+                    : null,
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (quantity < 1 || quantity > widget.maxQty)
+                Icon(Icons.error, color: Colors.red, size: 16.sp)
+              else
+                Icon(Icons.check_circle, color: Colors.green, size: 16.sp),
+              SizedBox(width: 4.w),
+              Text(
+                quantity < 1
+                    ? 'Minimum: 1'
+                    : quantity > widget.maxQty
+                    ? 'Maximum: ${widget.maxQty}'
+                    : 'Valid quantity',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: (quantity < 1 || quantity > widget.maxQty)
+                      ? Colors.red
+                      : Colors.green,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (quantity >= 1 && quantity <= widget.maxQty)
+              ? () {
+            Navigator.pop(context);
+            widget.onConfirm(quantity);
+          }
+              : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0E5CA8),
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
 class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
   late TextEditingController _qtyController;
   double convertQty = 0;
@@ -1674,7 +2228,8 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
   Widget build(BuildContext context) {
     final currentReturning = widget.group.returnItems
         .fold<double>(0, (sum, item) => sum + item.qty);
-    final remainingAfterConversion = widget.group.targetQty! - convertQty;
+    final newTarget = widget.group.targetQty! - convertQty;
+    final remainingAfterConversion = newTarget;
 
     return AlertDialog(
       title: Text('Convert ${widget.group.filledItemName} to One-Way'),
@@ -1683,8 +2238,32 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Total received: ${widget.group.targetQty!.toInt()}'),
-            Text('Currently returning: ${currentReturning.toInt()}'),
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Current State:',
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue.shade900,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text('Total received: ${widget.group.targetQty!.toInt()}',
+                      style: TextStyle(fontSize: 12.sp)),
+                  Text('Currently returning: ${currentReturning.toInt()}',
+                      style: TextStyle(fontSize: 12.sp)),
+                ],
+              ),
+            ),
             SizedBox(height: 16.h),
             TextField(
               controller: _qtyController,
@@ -1694,6 +2273,8 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.r),
                 ),
+                helperText: 'Enter number of cylinders to keep as one-way',
+                helperMaxLines: 2,
               ),
               keyboardType: TextInputType.number,
               onChanged: (value) {
@@ -1720,7 +2301,7 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
                             color: Colors.orange.shade700, size: 20.sp),
                         SizedBox(width: 8.w),
                         Text(
-                          'Warning',
+                          'Impact of Conversion',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.orange.shade900,
@@ -1730,13 +2311,18 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
                       ],
                     ),
                     SizedBox(height: 8.h),
+                    _buildImpactRow(
+                        '${convertQty.toInt()} cylinders', 'Kept as one-way (not returned)'),
+                    _buildImpactRow(
+                        'Target: ${widget.group.targetQty!.toInt()} → ${newTarget.toInt()}',
+                        'New return target reduced'),
+                    SizedBox(height: 8.h),
                     Text(
-                      'This will keep ${convertQty.toInt()} cylinders as one-way.\n'
-                      'Remaining to return: ${remainingAfterConversion.toInt()}\n\n'
-                      'Please adjust your return quantities manually after conversion.',
+                      'Please adjust your return quantities to match the new target of ${newTarget.toInt()}.',
                       style: TextStyle(
                         color: Colors.orange.shade900,
                         fontSize: 12.sp,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ],
@@ -1754,9 +2340,9 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
         ElevatedButton(
           onPressed: convertQty > 0 && convertQty <= widget.group.targetQty!
               ? () {
-                  Navigator.pop(context);
-                  widget.onConfirm(convertQty);
-                }
+            Navigator.pop(context);
+            widget.onConfirm(convertQty);
+          }
               : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF0E5CA8),
@@ -1767,4 +2353,35 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
       ],
     );
   }
+
+  Widget _buildImpactRow(String label, String description) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 2.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.arrow_right, color: Colors.orange.shade700, size: 16.sp),
+          SizedBox(width: 4.w),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  color: Colors.orange.shade900,
+                  fontSize: 12.sp,
+                ),
+                children: [
+                  TextSpan(
+                    text: '$label: ',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextSpan(text: description),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
