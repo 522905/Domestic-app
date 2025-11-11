@@ -123,4 +123,11 @@ class ApiEndpoints {
   String get ledgerData => '$tempUrl/reports/api/general-ledger/';
   String get availableAccounts => '$tempUrl/reports/api/available-accounts/';
   String voucherPDF(String voucherType, String voucherNo) => '$tempUrl/reports/voucher-pdf/?voucher_type=$voucherType&voucher_no=$voucherNo';
+
+  // DEFECT INSPECTION API'S
+  String get defectMasterData => '$tempUrl/api/defects/master-data/';
+  String get defectPurchaseInvoices => '$tempUrl/api/defects/purchase-invoices/';
+  String get defectInspectionReports => '$tempUrl/api/defects/inspection-reports/';
+  String get defectInspectionReportsList => '$tempUrl/api/defects/inspection-reports/list/';
+  String defectInspectionReportDetail(String name) => '$tempUrl/api/defects/inspection-reports/$name/';
 }
