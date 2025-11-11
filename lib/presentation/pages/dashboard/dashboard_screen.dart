@@ -580,6 +580,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onTap: () => _navigateToInventoryApprovals(),
           showViewAll: true,
         ),
+        SizedBox(height: 16.h),
+        _buildApprovalCard(
+          title: 'Defect Inspection',
+          subtitle: 'Manage defective cylinder reports',
+          count: 0,
+          icon: Icons.error_outline,
+          color: Colors.red,
+          onTap: () => _navigateToDefectInspection(),
+          showViewAll: true,
+        ),
         SizedBox(height: 12.h),
         // Warehouse stock card
         const WarehouseStockCard(),
@@ -1335,6 +1345,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         builder: (context) => const InventoryPage(), // Navigate to inventory approvals
       ),
     ).then((_) => _refreshDashboard());
+  }
+
+  void _navigateToDefectInspection() {
+    Navigator.pushNamed(context, '/defects/inspections').then((_) => _refreshDashboard());
   }
 
   void _navigateToCashApprovals() {

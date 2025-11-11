@@ -10,8 +10,13 @@ import '../pages/orders/forms/create_sale_order_page.dart';
 import '../pages/orders/order_details_page.dart'; // Add import
 import '../pages/cash/forms/cash_deposit_page.dart';
 import '../pages/inventory/inventory_detail_screen.dart'; // Add import
+import '../pages/defect_inspection/purchase_invoice_list_screen.dart';
+import '../pages/defect_inspection/dir_creation_screen.dart';
+import '../pages/defect_inspection/dir_list_screen.dart';
+import '../pages/defect_inspection/dir_detail_screen.dart';
 import '../blocs/orders/orders_bloc.dart';
 import '../blocs/inventory/inventory_bloc.dart';
+import '../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/User.dart';
 import '../widgets/professional_snackbar.dart';
@@ -25,6 +30,11 @@ class AppRoutes {
   static const String cashDeposit = 'cash/deposit';
   static const String ordersCreate = 'orders/create';
   static const String inventoryCreate = 'inventory/create';
+
+  // Defect Inspection routes
+  static const String defectsPurchaseInvoices = 'defects/purchase-invoices';
+  static const String defectsCreate = 'defects/create';
+  static const String defectsInspections = 'defects/inspections';
 
   // Company-aware navigation handler
   static Future<void> navigateWithCompanyCheck(
@@ -272,6 +282,55 @@ class AppRoutes {
               },
             ),
           );
+        }
+
+    // DEFECT INSPECTION
+      case 'defects':
+        if (segments.length == 1) {
+          // /defects → DIR List
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<DefectInspectionBloc>(context),
+              child: const DIRListScreen(),
+            ),
+          );
+        } else if (segments[1] == 'purchase-invoices') {
+          // /defects/purchase-invoices
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<DefectInspectionBloc>(context),
+              child: const PurchaseInvoiceListScreen(),
+            ),
+          );
+        } else if (segments[1] == 'create') {
+          // /defects/create
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<DefectInspectionBloc>(context),
+              child: const DIRCreationScreen(),
+            ),
+          );
+        } else if (segments[1] == 'inspections') {
+          if (segments.length == 2) {
+            // /defects/inspections → DIR List
+            return MaterialPageRoute(
+              builder: (context) => BlocProvider.value(
+                value: BlocProvider.of<DefectInspectionBloc>(context),
+                child: const DIRListScreen(),
+              ),
+            );
+          } else {
+            // /defects/inspections/DIR-REP-2025-00042 → DIR Detail
+            final dirName = segments.sublist(2).join('/');
+            return MaterialPageRoute(
+              builder: (context) => BlocProvider.value(
+                value: BlocProvider.of<DefectInspectionBloc>(context),
+                child: DIRDetailScreen(dirName: dirName),
+              ),
+            );
+          }
+        } else {
+          return _errorRoute();
         }
 
       default:

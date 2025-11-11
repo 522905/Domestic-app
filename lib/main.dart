@@ -13,8 +13,11 @@ import 'package:lpg_distribution_app/presentation/blocs/orders/orders_bloc.dart'
 import 'package:lpg_distribution_app/presentation/blocs/sdms/create/sdms_create_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/sdms/transaction/sdms_transaction_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/vehicle/vehicle_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/defect_inspection/defect_inspection_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/splash_screen.dart';
 import 'package:lpg_distribution_app/presentation/routes/app_routes.dart';
+import 'package:lpg_distribution_app/core/services/defect_service.dart';
+import 'package:lpg_distribution_app/core/network/api_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -151,6 +154,15 @@ void main() async {
               ),
               BlocProvider<SDMSCreateBloc>(
                 create: (context) => SDMSCreateBloc(apiService: context.read<ApiServiceInterface>()),
+              ),
+              BlocProvider<DefectInspectionBloc>(
+                create: (context) {
+                  final apiServiceInterface = context.read<ApiServiceInterface>();
+                  // Get ApiClient from ApiService
+                  final apiClient = (apiServiceInterface as ApiService).apiClient;
+                  final defectService = DefectService(apiClient);
+                  return DefectInspectionBloc(defectService: defectService);
+                },
               ),
             ],
             child: const MyApp(),
