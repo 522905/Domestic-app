@@ -104,8 +104,8 @@ class _PurchaseInvoiceListScreenState extends State<PurchaseInvoiceListScreen> {
                 if (_selectedWarehouse == null) {
                   return ProfessionalEmptyState(
                     icon: Icons.warehouse,
-                    title: 'Select Warehouse',
-                    message: 'Please select a warehouse to view purchase invoices.',
+                    message: 'Select Warehouse',
+                    description: 'Please select a warehouse to view purchase invoices.',
                   );
                 }
 
@@ -117,8 +117,8 @@ class _PurchaseInvoiceListScreenState extends State<PurchaseInvoiceListScreen> {
                   if (state.purchaseInvoices.isEmpty) {
                     return ProfessionalEmptyState(
                       icon: Icons.receipt_long_outlined,
-                      title: 'No Purchase Invoices',
-                      message: 'No purchase invoices found for the selected warehouse.',
+                      message: 'No Purchase Invoices',
+                      description: 'No purchase invoices found for the selected warehouse.',
                     );
                   }
 
