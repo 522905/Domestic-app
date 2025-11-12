@@ -106,9 +106,9 @@ class _DIRListScreenState extends State<DIRListScreen> {
                   if (reports.isEmpty) {
                     return ProfessionalEmptyState(
                       icon: Icons.description_outlined,
-                      title: 'No Reports Found',
-                      message: 'No inspection reports found for the selected criteria.',
-                      actionLabel: 'Create New Report',
+                      message: 'No Reports Found',
+                      description: 'No inspection reports found for the selected criteria.',
+                      actionText: 'Create New Report',
                       onAction: _navigateToCreateDIR,
                     );
                   }
