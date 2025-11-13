@@ -8,6 +8,7 @@ import '../../../core/models/defect_inspection/master_data.dart';
 import '../../../core/models/defect_inspection/purchase_invoice.dart';
 import '../../../core/models/defect_inspection/dir_item.dart';
 import '../../../core/services/User.dart';
+import '../../../core/services/api_service_interface.dart';
 import '../../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../../blocs/defect_inspection/defect_inspection_event.dart';
 import '../../blocs/defect_inspection/defect_inspection_state.dart';
@@ -94,19 +95,20 @@ class _DIRCreationScreenState extends State<DIRCreationScreen> {
 
   Future<void> _loadWarehouses() async {
     try {
-      // Use existing API to get warehouses
-      final response = await context.read<DefectInspectionBloc>().defectService.apiClient.get(
-        context.read<DefectInspectionBloc>().defectService.apiClient.endpoints.warehouseListApi,
-      );
+      // Use ApiService to get warehouses
+      final apiService = context.read<ApiServiceInterface>();
+      final warehousesData = await apiService.getWarehouses();
 
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        setState(() {
-          _warehouses = List<Map<String, dynamic>>.from(response.data['data'] ?? []);
-        });
-      }
+      setState(() {
+        _warehouses = List<Map<String, dynamic>>.from(warehousesData);
+      });
     } catch (e) {
       if (mounted) {
-        context.showErrorSnackBar('Failed to load warehouses');
+        context.showErrorDialog(
+          title: 'Failed to Load Warehouses',
+          error: e,
+          onRetry: _loadWarehouses,
+        );
       }
     }
   }

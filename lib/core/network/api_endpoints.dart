@@ -125,9 +125,9 @@ class ApiEndpoints {
   String voucherPDF(String voucherType, String voucherNo) => '$tempUrl/reports/voucher-pdf/?voucher_type=$voucherType&voucher_no=$voucherNo';
 
   // DEFECT INSPECTION API'S
-  String get defectMasterData => '$tempUrl/api/defects/master-data/';
-  String get defectPurchaseInvoices => '$tempUrl/api/defects/purchase-invoices/';
-  String get defectInspectionReports => '$tempUrl/api/defects/inspection-reports/';
-  String get defectInspectionReportsList => '$tempUrl/api/defects/inspection-reports/list/';
-  String defectInspectionReportDetail(String name) => '$tempUrl/api/defects/inspection-reports/$name/';
+  String get defectMasterData => '$tempUrl/defects/api/v1/master-data/';
+  String get defectPurchaseInvoices => '$tempUrl/defects/api/v1/purchase-invoices/';
+  String get defectInspectionReports => '$tempUrl/defects/api/v1/inspection-reports/';
+  String get defectInspectionReportsList => '$tempUrl/defects/api/v1/inspection-reports/list/';
+  String defectInspectionReportDetail(String name) => '$tempUrl/defects/api/v1/inspection-reports/$name/';
 }
