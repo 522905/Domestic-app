@@ -12,14 +12,12 @@ import '../../../core/services/api_service_interface.dart';
 import '../../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../../blocs/defect_inspection/defect_inspection_event.dart';
 import '../../blocs/defect_inspection/defect_inspection_state.dart';
-import '../../widgets/defect_inspection/filled_item_selector.dart';
-import '../../widgets/defect_inspection/defect_type_selector.dart';
-import '../../widgets/defect_inspection/weight_input_card.dart';
 import '../../widgets/defect_inspection/dir_item_row.dart';
 import '../../widgets/professional/professional_button.dart';
 import '../../widgets/professional_snackbar.dart';
 import '../../widgets/selectors/warehouse_selector_dialog.dart';
 import '../../widgets/error_dialog.dart';
+import 'add_defective_item_screen.dart';
 
 /// Screen for creating Defect Inspection Report
 class DIRCreationScreen extends StatefulWidget {
@@ -48,23 +46,8 @@ class _DIRCreationScreenState extends State<DIRCreationScreen> {
   MasterDataResponse? _masterData;
   List<Map<String, dynamic>> _warehouses = [];
 
-  // Current item form state
-  FilledItemMasterData? _selectedFilledItem;
-  DefectiveOption? _selectedDefectType;
-  final TextEditingController _cylinderController = TextEditingController();
-  final TextEditingController _tareController = TextEditingController();
-  final TextEditingController _grossController = TextEditingController();
-  final TextEditingController _faultController = TextEditingController();
-
-  // Form validation
-  String? _filledItemError;
-  String? _defectTypeError;
-  String? _cylinderError;
-  String? _tareError;
-  String? _grossError;
-
   // Items list
-  final List<DIRItem> _items = [];
+  List<DIRItem> _items = [];
 
   // Loading states
   bool _isLoadingMasterData = false;
@@ -129,10 +112,6 @@ class _DIRCreationScreenState extends State<DIRCreationScreen> {
 
   @override
   void dispose() {
-    _cylinderController.dispose();
-    _tareController.dispose();
-    _grossController.dispose();
-    _faultController.dispose();
     super.dispose();
   }
 
@@ -159,7 +138,7 @@ class _DIRCreationScreenState extends State<DIRCreationScreen> {
                     _buildHeaderSection(),
                     SizedBox(height: AppSpacing.xl.h),
                     if (_masterData != null) ...[
-                      _buildItemFormSection(),
+                      _buildAddItemButton(),
                       SizedBox(height: AppSpacing.xl.h),
                       _buildItemsList(),
                       SizedBox(height: AppSpacing.xl.h),
@@ -328,234 +307,32 @@ class _DIRCreationScreenState extends State<DIRCreationScreen> {
     }
   }
 
-  Widget _buildItemFormSection() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.r),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(AppSpacing.md.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.add_circle_outline,
-                  color: AppColorsEnhanced.brandBlue,
-                  size: 24.sp,
-                ),
-                SizedBox(width: AppSpacing.sm.w),
-                Text(
-                  'Add Defective Item',
-                  style: AppTextStyles.h2.copyWith(
-                    color: AppColorsEnhanced.darkGray,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: AppSpacing.lg.h),
+  Widget _buildAddItemButton() {
+    return ProfessionalButton(
+      text: 'Add Defective Item${_items.isNotEmpty ? 's' : ''}',
+      icon: Icons.add_circle_outline,
+      variant: ButtonVariant.primary,
+      onPressed: _navigateToAddItemsScreen,
+      fullWidth: true,
+    );
+  }
 
-            // Filled Item Selector
-            FilledItemSelector(
-              items: _masterData!.items,
-              selectedItem: _selectedFilledItem,
-              onChanged: _onFilledItemChanged,
-              errorText: _filledItemError,
-            ),
-            SizedBox(height: AppSpacing.md.h),
-
-            // Defect Type Selector
-            DefectTypeSelector(
-              options: _selectedFilledItem?.defectiveOptions ?? [],
-              selectedOption: _selectedDefectType,
-              onChanged: _onDefectTypeChanged,
-              errorText: _defectTypeError,
-              enabled: _selectedFilledItem != null,
-            ),
-            SizedBox(height: AppSpacing.md.h),
-
-            // Cylinder Serial Input
-            _buildTextField(
-              label: 'Cylinder Serial *',
-              controller: _cylinderController,
-              errorText: _cylinderError,
-              icon: Icons.qr_code,
-              hint: 'Enter cylinder serial number',
-            ),
-            SizedBox(height: AppSpacing.md.h),
-
-            // Weight Input Card
-            WeightInputCard(
-              tareController: _tareController,
-              grossController: _grossController,
-              tareError: _tareError,
-              grossError: _grossError,
-              onWeightChanged: _onWeightChanged,
-            ),
-            SizedBox(height: AppSpacing.md.h),
-
-            // Fault Description (Optional)
-            _buildTextField(
-              label: 'Fault Description (Optional)',
-              controller: _faultController,
-              icon: Icons.description,
-              hint: 'e.g., Valve leaking',
-              maxLines: 3,
-            ),
-            SizedBox(height: AppSpacing.lg.h),
-
-            // Add Item Button
-            ProfessionalButton(
-              text: 'Add Item to Report',
-              icon: Icons.add,
-              variant: ButtonVariant.secondary,
-              onPressed: _addItem,
-              fullWidth: true,
-            ),
-          ],
+  Future<void> _navigateToAddItemsScreen() async {
+    final result = await Navigator.push<List<DIRItem>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddDefectiveItemScreen(
+          masterData: _masterData!,
+          existingItems: _items,
         ),
       ),
     );
-  }
 
-  Widget _buildTextField({
-    required String label,
-    required TextEditingController controller,
-    required IconData icon,
-    required String hint,
-    String? errorText,
-    int maxLines = 1,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTextStyles.labelMedium.copyWith(
-            color: AppColorsEnhanced.darkGray,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        SizedBox(height: AppSpacing.sm.h),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: AppColorsEnhanced.brandBlue),
-            hintText: hint,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            errorText: errorText,
-          ),
-          style: AppTextStyles.bodyMedium,
-        ),
-      ],
-    );
-  }
-
-  void _onFilledItemChanged(FilledItemMasterData? item) {
-    setState(() {
-      _selectedFilledItem = item;
-      _selectedDefectType = null; // Reset defect type
-      _filledItemError = null;
-    });
-  }
-
-  void _onDefectTypeChanged(DefectiveOption? option) {
-    setState(() {
-      _selectedDefectType = option;
-      _defectTypeError = null;
-    });
-  }
-
-  void _onWeightChanged() {
-    setState(() {
-      _tareError = null;
-      _grossError = null;
-    });
-  }
-
-  void _addItem() {
-    // Validate current item
-    if (!_validateCurrentItem()) {
-      return;
+    if (result != null) {
+      setState(() {
+        _items = result;
+      });
     }
-
-    // Create DIR item
-    final item = DIRItem(
-      sourceItemCode: _selectedFilledItem!.sourceItemCode,
-      sourceItemName: _selectedFilledItem!.sourceItemName,
-      targetItemCode: _selectedDefectType!.itemCode,
-      targetItemName: _selectedDefectType!.itemName,
-      cylinderNumber: _cylinderController.text.trim(),
-      tareWeight: double.parse(_tareController.text),
-      grossWeight: double.parse(_grossController.text),
-      faultType: _faultController.text.trim().isEmpty ? null : _faultController.text.trim(),
-    );
-
-    setState(() {
-      _items.add(item);
-      _resetCurrentItem();
-    });
-
-    context.showSuccessSnackBar('Item added successfully');
-  }
-
-  bool _validateCurrentItem() {
-    bool isValid = true;
-
-    setState(() {
-      _filledItemError = null;
-      _defectTypeError = null;
-      _cylinderError = null;
-      _tareError = null;
-      _grossError = null;
-    });
-
-    if (_selectedFilledItem == null) {
-      setState(() => _filledItemError = 'Please select a filled item');
-      isValid = false;
-    }
-
-    if (_selectedDefectType == null) {
-      setState(() => _defectTypeError = 'Please select a defect type');
-      isValid = false;
-    }
-
-    if (_cylinderController.text.trim().isEmpty) {
-      setState(() => _cylinderError = 'Cylinder serial is required');
-      isValid = false;
-    }
-
-    final tare = double.tryParse(_tareController.text);
-    if (tare == null || tare <= 0) {
-      setState(() => _tareError = 'Tare weight must be greater than 0');
-      isValid = false;
-    }
-
-    final gross = double.tryParse(_grossController.text);
-    if (gross == null || gross <= 0) {
-      setState(() => _grossError = 'Gross weight must be greater than 0');
-      isValid = false;
-    } else if (tare != null && gross <= tare) {
-      setState(() => _grossError = 'Gross weight must be greater than tare weight');
-      isValid = false;
-    }
-
-    return isValid;
-  }
-
-  void _resetCurrentItem() {
-    _selectedFilledItem = null;
-    _selectedDefectType = null;
-    _cylinderController.clear();
-    _tareController.clear();
-    _grossController.clear();
-    _faultController.clear();
   }
 
   Widget _buildItemsList() {
