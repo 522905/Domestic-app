@@ -4,6 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/api_service_interface.dart';
+import '../../../core/models/defect_inspection/purchase_invoice.dart';
+import '../defect_inspection/dir_creation_screen.dart';
 import 'dispatch_vehicle_screen_enhanced.dart';
 import 'receive_vehicle_screen.dart';
 import 'vehicle_history_screen.dart';
@@ -214,58 +216,86 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
    Widget _buildActionButtons() {
     final status = _getWorkflowStatus(_invoiceDetails);
 
-    if (status != 'pending' && status != 'received') {
-      return const SizedBox.shrink();
-    }
-
     return Container(
       width: double.infinity,
       margin: EdgeInsets.all(16.w),
-      child: ElevatedButton(
-        onPressed: () {
-          if (status == 'pending') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ReceiveVehicleScreen(
-                  supplierGstin: widget.supplierGstin,
-                  supplierInvoiceDate: widget.supplierInvoiceDate,
-                  supplierInvoiceNumber: widget.supplierInvoiceNumber,
+      child: Column(
+        children: [
+          // Create Defect Report Button - Always visible
+          ElevatedButton.icon(
+            onPressed: () => _navigateToDIRCreation(),
+            icon: const Icon(Icons.error_outline),
+            label: Text(
+              'Create Defect Report',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF57C00), // Orange color for defect reports
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 16.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 2,
+              minimumSize: Size(double.infinity, 50.h),
+            ),
+          ),
+
+          // Only show Receive/Dispatch buttons if status is pending or received
+          if (status == 'pending' || status == 'received') ...[
+            SizedBox(height: 12.h),
+            ElevatedButton(
+              onPressed: () {
+                if (status == 'pending') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ReceiveVehicleScreen(
+                        supplierGstin: widget.supplierGstin,
+                        supplierInvoiceDate: widget.supplierInvoiceDate,
+                        supplierInvoiceNumber: widget.supplierInvoiceNumber,
+                      ),
+                    ),
+                  ).then((_) => _loadInvoiceDetails());
+                } else if (status == 'received') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DispatchVehicleScreenEnhanced(
+                        supplierGstin: widget.supplierGstin,
+                        supplierInvoiceDate: widget.supplierInvoiceDate,
+                        supplierInvoiceNumber: widget.supplierInvoiceNumber,
+                        // invoiceItems: _getItemData(_invoiceDetails),
+                        // warehouse: _getWarehouseName(_invoiceDetails),
+                        warehouse: 'Focal Point - AI',
+                      ),
+                    ),
+                  ).then((_) => _loadInvoiceDetails());
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5CA8),
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 16.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                elevation: 2,
+                minimumSize: Size(double.infinity, 50.h),
+              ),
+              child: Text(
+                status == 'pending' ? 'Receive Vehicle' : 'Dispatch Vehicle',
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ).then((_) => _loadInvoiceDetails());
-          } else if (status == 'received') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DispatchVehicleScreenEnhanced(
-                  supplierGstin: widget.supplierGstin,
-                  supplierInvoiceDate: widget.supplierInvoiceDate,
-                  supplierInvoiceNumber: widget.supplierInvoiceNumber,
-                  // invoiceItems: _getItemData(_invoiceDetails),
-                  // warehouse: _getWarehouseName(_invoiceDetails),
-                  warehouse: 'Focal Point - AI',
-                ),
-              ),
-            ).then((_) => _loadInvoiceDetails());
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF0E5CA8),
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(vertical: 16.h),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-          elevation: 2,
-        ),
-        child: Text(
-          status == 'pending' ? 'Receive Vehicle' : 'Dispatch Vehicle',
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -646,6 +676,46 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
         ],
       ),
     );
+  }
+
+  Future<void> _navigateToDIRCreation() async {
+    final supplierInvoiceNumber = _getSupplierInvoiceNumber(_invoiceDetails);
+    final warehouse = _getWarehouseName(_invoiceDetails);
+    final company = _getCompany(_invoiceDetails);
+
+    if (supplierInvoiceNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invoice details not loaded yet'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final prePopulated = DIRPrePopulated(
+      purchaseInvoice: supplierInvoiceNumber,
+      warehouse: warehouse.isNotEmpty ? warehouse : 'Focal Point - AI',
+      purpose: 'Same Load Defectives',
+      company: company.isNotEmpty ? company : 'ATSPL',
+    );
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DIRCreationScreen(prePopulated: prePopulated),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Defect report created successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _loadInvoiceDetails(); // Refresh invoice details
+    }
   }
 
   @override

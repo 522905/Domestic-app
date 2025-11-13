@@ -10,7 +10,6 @@ import '../pages/orders/forms/create_sale_order_page.dart';
 import '../pages/orders/order_details_page.dart'; // Add import
 import '../pages/cash/forms/cash_deposit_page.dart';
 import '../pages/inventory/inventory_detail_screen.dart'; // Add import
-import '../pages/defect_inspection/purchase_invoice_list_screen.dart';
 import '../pages/defect_inspection/dir_creation_screen.dart';
 import '../pages/defect_inspection/dir_list_screen.dart';
 import '../pages/defect_inspection/dir_detail_screen.dart';
@@ -292,14 +291,6 @@ class AppRoutes {
             builder: (context) => BlocProvider.value(
               value: BlocProvider.of<DefectInspectionBloc>(context),
               child: const DIRListScreen(),
-            ),
-          );
-        } else if (segments[1] == 'purchase-invoices') {
-          // /defects/purchase-invoices
-          return MaterialPageRoute(
-            builder: (context) => BlocProvider.value(
-              value: BlocProvider.of<DefectInspectionBloc>(context),
-              child: const PurchaseInvoiceListScreen(),
             ),
           );
         } else if (segments[1] == 'create') {
