@@ -1,5 +1,15 @@
 // lib/core/models/purchase_invoice/erv_models.dart
 
+/// Helper function to safely parse double values from dynamic types
+/// Handles String, int, double, and null values
+double _parseDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0.0;
+  return 0.0;
+}
+
 /// Represents a serial number with its details
 class SerialDetail {
   final String serialNo;
@@ -22,7 +32,7 @@ class SerialDetail {
     return SerialDetail(
       serialNo: json['serial_no'] ?? '',
       itemCode: json['item_code'] ?? '',
-      customNetWeightOfCylinder: (json['custom_net_weight_of_cylinder'] ?? 0).toDouble(),
+      customNetWeightOfCylinder: _parseDouble(json['custom_net_weight_of_cylinder']),
       customFaultType: json['custom_fault_type'] ?? '',
       fromThisPi: json['from_this_pi'] ?? false,
       isAvailable: json['is_available'] ?? true,
@@ -62,7 +72,7 @@ class DefectiveItem {
       itemCode: json['item_code'] ?? '',
       itemName: json['item_name'] ?? '',
       mapsToFilled: json['maps_to_filled'],
-      availableQty: (json['available_qty'] ?? 0).toDouble(),
+      availableQty: _parseDouble(json['available_qty']),
       serials: (json['serials'] as List<dynamic>?)
           ?.map((s) => SerialDetail.fromJson(s as Map<String, dynamic>))
           .toList() ?? [],
@@ -99,7 +109,7 @@ class EmptyItem {
       itemCode: json['item_code'] ?? '',
       itemName: json['item_name'] ?? '',
       mapsToFilled: json['maps_to_filled'],
-      availableQty: (json['available_qty'] ?? 0).toDouble(),
+      availableQty: _parseDouble(json['available_qty']),
     );
   }
 
@@ -128,7 +138,7 @@ class DefectivePreselection {
   factory DefectivePreselection.fromJson(Map<String, dynamic> json) {
     return DefectivePreselection(
       itemCode: json['item_code'] ?? '',
-      qty: (json['qty'] ?? 0).toDouble(),
+      qty: _parseDouble(json['qty']),
       serials: (json['serials'] as List<dynamic>?)
           ?.map((s) => SerialDetail.fromJson(s as Map<String, dynamic>))
           .toList() ?? [],
@@ -157,7 +167,7 @@ class EmptyPreselection {
   factory EmptyPreselection.fromJson(Map<String, dynamic> json) {
     return EmptyPreselection(
       itemCode: json['item_code'] ?? '',
-      qty: (json['qty'] ?? 0).toDouble(),
+      qty: _parseDouble(json['qty']),
     );
   }
 
@@ -217,8 +227,8 @@ class RequiredGroup {
       filledItemCode: json['filled_item_code'] ?? '',
       filledItemName: json['filled_item_name'] ?? '',
       purchaseInvoiceItem: json['purchase_invoice_item'] ?? '',
-      targetQty: (json['target_qty'] ?? 0).toDouble(),
-      receivedQtyCap: (json['received_qty_cap'] ?? 0).toDouble(),
+      targetQty: _parseDouble(json['target_qty']),
+      receivedQtyCap: _parseDouble(json['received_qty_cap']),
       preselections: Preselections.fromJson(json['preselections'] as Map<String, dynamic>),
     );
   }
@@ -263,7 +273,7 @@ class InvoiceDetails {
       supplier: json['supplier'] ?? '',
       supplierName: json['supplier_name'] ?? '',
       warehouse: json['warehouse'] ?? '',
-      grandTotal: (json['grand_total'] ?? 0).toDouble(),
+      grandTotal: _parseDouble(json['grand_total']),
       postingDate: json['posting_date'] ?? '',
       billNo: json['bill_no'] ?? '',
       billDate: json['bill_date'] ?? '',
