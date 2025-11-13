@@ -69,8 +69,8 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
 
       setState(() {
         _invoiceDetails = details;
-        _warehouse = details['inevent']['warehouse']['name'] ?? '';
-        _erpDataName = details['erp_data']['name'] ?? '';
+        _warehouse = details['workflow']?['inevent']?['warehouse']?['name'] ?? '';
+        _erpDataName = details['erp_data']?['name'] ?? '';
         _isLoading = false;
       });
     } catch (e) {
