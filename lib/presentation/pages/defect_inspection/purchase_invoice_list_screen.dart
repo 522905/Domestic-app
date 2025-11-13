@@ -25,19 +25,19 @@ class PurchaseInvoiceListScreen extends StatefulWidget {
 }
 
 class _PurchaseInvoiceListScreenState extends State<PurchaseInvoiceListScreen> {
+  late final ApiServiceInterface apiService;
   String? _selectedWarehouse;
   List<Map<String, dynamic>> _warehouses = [];
 
   @override
   void initState() {
     super.initState();
+    apiService = context.read<ApiServiceInterface>();
     _loadWarehouses();
   }
 
   Future<void> _loadWarehouses() async {
     try {
-      // Use ApiService to get warehouses
-      final apiService = context.read<ApiServiceInterface>();
       final warehousesData = await apiService.getWarehouses();
 
       final warehouses = List<Map<String, dynamic>>.from(warehousesData);

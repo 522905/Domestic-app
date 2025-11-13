@@ -25,12 +25,14 @@ class DIRListScreen extends StatefulWidget {
 }
 
 class _DIRListScreenState extends State<DIRListScreen> {
+  late final ApiServiceInterface apiService;
   String? _selectedWarehouse;
   List<Map<String, dynamic>> _warehouses = [];
 
   @override
   void initState() {
     super.initState();
+    apiService = context.read<ApiServiceInterface>();
     _loadInspectionReports();
     _loadWarehouses();
   }
@@ -43,8 +45,6 @@ class _DIRListScreenState extends State<DIRListScreen> {
 
   Future<void> _loadWarehouses() async {
     try {
-      // Use ApiService to get warehouses
-      final apiService = context.read<ApiServiceInterface>();
       final warehousesData = await apiService.getWarehouses();
 
       setState(() {

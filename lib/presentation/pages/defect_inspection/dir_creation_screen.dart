@@ -35,6 +35,8 @@ class DIRCreationScreen extends StatefulWidget {
 }
 
 class _DIRCreationScreenState extends State<DIRCreationScreen> {
+  late final ApiServiceInterface apiService;
+
   // Form state
   String? _selectedWarehouse;
   String? _selectedWarehouseId;
@@ -70,6 +72,7 @@ class _DIRCreationScreenState extends State<DIRCreationScreen> {
   @override
   void initState() {
     super.initState();
+    apiService = context.read<ApiServiceInterface>();
     _initializeForm();
   }
 
@@ -95,8 +98,6 @@ class _DIRCreationScreenState extends State<DIRCreationScreen> {
 
   Future<void> _loadWarehouses() async {
     try {
-      // Use ApiService to get warehouses
-      final apiService = context.read<ApiServiceInterface>();
       final warehousesData = await apiService.getWarehouses();
 
       setState(() {
