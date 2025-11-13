@@ -14,7 +14,7 @@ import '../../widgets/professional/professional_empty_state.dart';
 import '../../widgets/professional_snackbar.dart';
 import '../../widgets/selectors/warehouse_selector_dialog.dart';
 import '../../widgets/error_dialog.dart';
-import 'dir_creation_screen.dart';
+import 'purchase_invoice_detail_screen.dart';
 
 /// Screen for listing purchase invoices to create DIR from
 class PurchaseInvoiceListScreen extends StatefulWidget {
@@ -303,7 +303,7 @@ class _PurchaseInvoiceListScreenState extends State<PurchaseInvoiceListScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    'Tap to create defect report',
+                    'Tap to view details',
                     style: AppTextStyles.labelMedium.copyWith(
                       color: AppColorsEnhanced.brandBlue,
                       fontStyle: FontStyle.italic,
@@ -378,28 +378,16 @@ class _PurchaseInvoiceListScreenState extends State<PurchaseInvoiceListScreen> {
   }
 
   Future<void> _navigateToDIRCreation(PurchaseInvoice pi) async {
-    // Get company from user session
-    final userCompany = await User().getActiveCompany();
-
-    final prePopulated = DIRPrePopulated(
-      purchaseInvoice: pi.name,
-      warehouse: pi.setWarehouse,
-      purpose: 'Same Load Defectives',
-      company: userCompany?.name ?? pi.company,
-    );
-
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DIRCreationScreen(prePopulated: prePopulated),
+        builder: (context) => PurchaseInvoiceDetailScreen(purchaseInvoice: pi),
       ),
     );
 
-    // If DIR was created, you might want to navigate back or refresh
+    // If any action was taken, refresh the list
     if (result == true && mounted) {
-      context.showSuccessSnackBar('Defect report created successfully');
-      // Optionally navigate back to main screen
-      Navigator.pop(context);
+      _loadPurchaseInvoices();
     }
   }
 }

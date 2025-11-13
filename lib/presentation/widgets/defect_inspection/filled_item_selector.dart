@@ -69,21 +69,21 @@ class FilledItemSelector extends StatelessWidget {
             items: items.map((item) {
               return DropdownMenuItem<FilledItemMasterData>(
                 value: item,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Row(
                   children: [
-                    Text(
-                      item.sourceItemName,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColorsEnhanced.darkGray,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        item.sourceItemName,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColorsEnhanced.darkGray,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: 2.h),
+                    SizedBox(width: AppSpacing.xs.w),
                     Text(
-                      'Stock: ${item.availableStock.toStringAsFixed(0)} units',
+                      'Stock: ${item.availableStock.toStringAsFixed(0)}',
                       style: AppTextStyles.labelMedium.copyWith(
                         color: item.availableStock > 0
                             ? AppColorsEnhanced.successGreen
