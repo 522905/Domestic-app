@@ -6,6 +6,7 @@ import '../../../core/constants/text_styles.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/models/defect_inspection/purchase_invoice.dart';
 import '../../../core/services/User.dart';
+import '../../../core/services/api_service_interface.dart';
 import '../../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../../blocs/defect_inspection/defect_inspection_event.dart';
 import '../../blocs/defect_inspection/defect_inspection_state.dart';
@@ -24,45 +25,38 @@ class PurchaseInvoiceListScreen extends StatefulWidget {
 }
 
 class _PurchaseInvoiceListScreenState extends State<PurchaseInvoiceListScreen> {
+  late final ApiServiceInterface apiService;
   String? _selectedWarehouse;
   List<Map<String, dynamic>> _warehouses = [];
 
   @override
   void initState() {
     super.initState();
+    apiService = context.read<ApiServiceInterface>();
     _loadWarehouses();
   }
 
   Future<void> _loadWarehouses() async {
     try {
-      final response = await context
-          .read<DefectInspectionBloc>()
-          .defectService
-          .apiClient
-          .get(
-            context
-                .read<DefectInspectionBloc>()
-                .defectService
-                .apiClient
-                .endpoints
-                .warehouseListApi,
-          );
+      final warehousesData = await apiService.getWarehouses();
 
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        final warehouses = List<Map<String, dynamic>>.from(response.data['data'] ?? []);
-        setState(() {
-          _warehouses = warehouses;
+      final warehouses = List<Map<String, dynamic>>.from(warehousesData);
+      setState(() {
+        _warehouses = warehouses;
 
-          // Auto-select if single warehouse
-          if (_warehouses.length == 1) {
-            _selectedWarehouse = _warehouses[0]['name'];
-            _loadPurchaseInvoices();
-          }
-        });
-      }
+        // Auto-select if single warehouse
+        if (_warehouses.length == 1) {
+          _selectedWarehouse = _warehouses[0]['name'];
+          _loadPurchaseInvoices();
+        }
+      });
     } catch (e) {
       if (mounted) {
-        context.showErrorSnackBar('Failed to load warehouses');
+        context.showErrorDialog(
+          title: 'Failed to Load Warehouses',
+          error: e,
+          onRetry: _loadWarehouses,
+        );
       }
     }
   }

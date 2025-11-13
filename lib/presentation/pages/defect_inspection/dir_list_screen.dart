@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors_enhanced.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/constants/spacing.dart';
 import '../../../core/models/defect_inspection/defect_inspection_report.dart';
+import '../../../core/services/api_service_interface.dart';
 import '../../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../../blocs/defect_inspection/defect_inspection_event.dart';
 import '../../blocs/defect_inspection/defect_inspection_state.dart';
@@ -24,12 +25,14 @@ class DIRListScreen extends StatefulWidget {
 }
 
 class _DIRListScreenState extends State<DIRListScreen> {
+  late final ApiServiceInterface apiService;
   String? _selectedWarehouse;
   List<Map<String, dynamic>> _warehouses = [];
 
   @override
   void initState() {
     super.initState();
+    apiService = context.read<ApiServiceInterface>();
     _loadInspectionReports();
     _loadWarehouses();
   }
@@ -42,24 +45,11 @@ class _DIRListScreenState extends State<DIRListScreen> {
 
   Future<void> _loadWarehouses() async {
     try {
-      final response = await context
-          .read<DefectInspectionBloc>()
-          .defectService
-          .apiClient
-          .get(
-            context
-                .read<DefectInspectionBloc>()
-                .defectService
-                .apiClient
-                .endpoints
-                .warehouseListApi,
-          );
+      final warehousesData = await apiService.getWarehouses();
 
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        setState(() {
-          _warehouses = List<Map<String, dynamic>>.from(response.data['data'] ?? []);
-        });
-      }
+      setState(() {
+        _warehouses = List<Map<String, dynamic>>.from(warehousesData);
+      });
     } catch (e) {
       // Silently fail - warehouse filter is optional
     }
