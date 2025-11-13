@@ -106,6 +106,7 @@ class ApiEndpoints {
   String get receivedAPI => '$tempUrl/procurement/invoices/receive/';
   String get pendingInvoices => '$tempUrl/procurement/invoices/pending/';
   String get receivedInvoices => '$tempUrl/procurement/invoices/received/';
+
   String purchaseInvoiceDetails(String gstin, String invoiceDate, String invoiceNumber) => '$tempUrl/procurement/invoices/$gstin/$invoiceDate/$invoiceNumber/';
   String get ervCalculation => '$tempUrl/procurement/erv-calculation/';
   String get versionCheck => '$tempUrl/api/version/check/';

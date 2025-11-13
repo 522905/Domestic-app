@@ -33,6 +33,8 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
   bool _isLoading = true;
   String _errorMessage = '';
   bool _hasVehicleHistory = false;
+  String _warehouse = '' ;
+  String _erpDataName = '' ;
 
   @override
   void initState() {
@@ -67,6 +69,8 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
 
       setState(() {
         _invoiceDetails = details;
+        _warehouse = details['inevent']['warehouse']['name'] ?? '';
+        _erpDataName = details['erp_data']['name'] ?? '';
         _isLoading = false;
       });
     } catch (e) {
@@ -222,6 +226,7 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
       child: Column(
         children: [
           // Create Defect Report Button - Always visible
+        if(status == 'received' ) ... [
           ElevatedButton.icon(
             onPressed: () => _navigateToDIRCreation(),
             icon: const Icon(Icons.error_outline),
@@ -243,7 +248,7 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
               minimumSize: Size(double.infinity, 50.h),
             ),
           ),
-
+        ],
           // Only show Receive/Dispatch buttons if status is pending or received
           if (status == 'pending' || status == 'received') ...[
             SizedBox(height: 12.h),
@@ -269,8 +274,8 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
                         supplierInvoiceDate: widget.supplierInvoiceDate,
                         supplierInvoiceNumber: widget.supplierInvoiceNumber,
                         // invoiceItems: _getItemData(_invoiceDetails),
-                        // warehouse: _getWarehouseName(_invoiceDetails),
-                        warehouse: 'Focal Point - AI',
+                        warehouse: _warehouse,
+                        // warehouse: 'Focal Point - AI',
                       ),
                     ),
                   ).then((_) => _loadInvoiceDetails());
@@ -393,6 +398,7 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
                     color: const Color(0xFF333333),
                   ),
                 ),
+                if (_hasVehicleHistory)  // Add this condition
                   TextButton.icon(
                     onPressed: () {
                       Navigator.push(
@@ -680,7 +686,6 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
 
   Future<void> _navigateToDIRCreation() async {
     final supplierInvoiceNumber = _getSupplierInvoiceNumber(_invoiceDetails);
-    final warehouse = _getWarehouseName(_invoiceDetails);
     final company = _getCompany(_invoiceDetails);
 
     if (supplierInvoiceNumber.isEmpty) {
@@ -693,9 +698,10 @@ class _PurchaseInvoiceDetailsScreenState extends State<PurchaseInvoiceDetailsScr
       return;
     }
 
+
     final prePopulated = DIRPrePopulated(
-      purchaseInvoice: supplierInvoiceNumber,
-      warehouse: warehouse.isNotEmpty ? warehouse : 'Focal Point - AI',
+      purchaseInvoice: _erpDataName,
+      warehouse: _warehouse,
       purpose: 'Same Load Defectives',
       company: company.isNotEmpty ? company : 'ATSPL',
     );

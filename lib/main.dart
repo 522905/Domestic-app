@@ -22,6 +22,7 @@ import 'package:lpg_distribution_app/core/network/api_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/services/api_service.dart';
 import 'core/services/service_provider.dart';
 import 'core/services/api_service_interface.dart';
 import 'core/services/version_manager.dart';
