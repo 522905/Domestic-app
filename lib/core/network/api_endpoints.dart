@@ -22,6 +22,7 @@ class ApiEndpoints {
   String get orderReject => '$baseUrl/api/approvals/{order_id}/reject';
   String get autoRelease => '$tempUrl/api/orders/auto-release-sales-order/';
   String get finalizeOrder => '$tempUrl/api/orders/finalize-sales-order/';
+  String cancelOrder(String orderId) => '$tempUrl/api/orders/sales-orders/$orderId/cancel/';
   String get accountsList => '$tempUrl/api/users/users-list/';
   String get vehicles => '$tempUrl/api/users/api/masters/vehicles/';
 

@@ -64,6 +64,7 @@ class RequestOrderAction extends OrdersEvent {
 enum OrderActionType {
   requestApproval,
   finalize,
+  cancel,
 }
 
 // NEW EVENT FOR ORDER DETAILS

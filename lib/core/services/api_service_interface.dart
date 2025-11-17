@@ -26,6 +26,7 @@ abstract class ApiServiceInterface {
   // Future<Map<String, dynamic>> refreshCashData();
   Future<dynamic> requestOrderApproval(String orderId);
   Future<dynamic> requestFinalizeOrder(String orderId);
+  Future<dynamic> cancelOrder(String orderId);
 
   Future<List<dynamic>> getInventory({
     String? warehouseId,
