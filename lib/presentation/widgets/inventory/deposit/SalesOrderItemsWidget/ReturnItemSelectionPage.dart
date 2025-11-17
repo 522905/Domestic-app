@@ -448,6 +448,12 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
                       fontSize: 18.sp,
                       fontWeight: FontWeight.bold,
                     ),
+                    onTap: () {
+                      _quantityController.selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: _quantityController.text.length,
+                      );
+                    },
                     onChanged: _onQuantityChanged,
                   ),
                 ),
@@ -518,6 +524,12 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
                 prefixIcon: const Icon(Icons.badge),
                 counterText: '',
               ),
+              onTap: () {
+                _consumerIdController.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: _consumerIdController.text.length,
+                );
+              },
             ),
             SizedBox(height: 12.h),
 
@@ -619,6 +631,12 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
                         borderRadius: BorderRadius.circular(8.r),
                       ),
                     ),
+                    onTap: () {
+                      _tareWeightController.selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: _tareWeightController.text.length,
+                      );
+                    },
                   ),
                 ),
                 SizedBox(width: 12.w),
@@ -632,6 +650,12 @@ class _ReturnItemSelectionPageState extends State<ReturnItemSelectionPage> {
                         borderRadius: BorderRadius.circular(8.r),
                       ),
                     ),
+                    onTap: () {
+                      _grossWeightController.selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: _grossWeightController.text.length,
+                      );
+                    },
                   ),
                 ),
               ],

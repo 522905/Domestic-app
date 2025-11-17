@@ -380,6 +380,13 @@ class _ItemSelectorDialogState extends State<ItemSelectorDialog> {
                           ),
                           contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
                         ),
+                        onTap: () {
+                          final controller = TextEditingController(text: selectedQuantity.toString());
+                          controller.selection = TextSelection(
+                            baseOffset: 0,
+                            extentOffset: controller.text.length,
+                          );
+                        },
                         onChanged: (value) {
                           final parsedValue = int.tryParse(value) ?? 1;
                           setState(() {

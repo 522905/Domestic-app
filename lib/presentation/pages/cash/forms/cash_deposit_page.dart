@@ -216,6 +216,12 @@ class _CashDepositPageState extends State<CashDepositPage> {
                           prefixText: '₹ ',
                           suffixText: 'INR',
                         ),
+                        onTap: () {
+                          _amountController.selection = TextSelection(
+                            baseOffset: 0,
+                            extentOffset: _amountController.text.length,
+                          );
+                        },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Please enter an amount';

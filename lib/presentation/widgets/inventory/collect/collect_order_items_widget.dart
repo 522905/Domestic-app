@@ -705,6 +705,12 @@ class _CollectOrderItemsWidgetState extends State<CollectOrderItemsWidget> {
                         ),
                         contentPadding: EdgeInsets.symmetric(vertical: 8.h),
                       ),
+                      onTap: () {
+                        quantityController.selection = TextSelection(
+                          baseOffset: 0,
+                          extentOffset: quantityController.text.length,
+                        );
+                      },
                       onChanged: (value) {
                         final parsedValue = int.tryParse(value);
                         if (parsedValue != null && parsedValue >= 1 && parsedValue <= maxQty) {
