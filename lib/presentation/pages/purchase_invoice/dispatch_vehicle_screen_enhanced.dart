@@ -1960,6 +1960,12 @@ class _QuantityDialogForDefectiveState
                       borderSide: const BorderSide(color: Colors.red, width: 2),
                     ),
                   ),
+                  onTap: () {
+                    _qtyController.selection = TextSelection(
+                      baseOffset: 0,
+                      extentOffset: _qtyController.text.length,
+                    );
+                  },
                   onChanged: (value) {
                     final parsed = int.tryParse(value);
                     if (parsed != null) {
@@ -2132,6 +2138,12 @@ class _QuantityDialogForEmptyState extends State<_QuantityDialogForEmpty> {
                       borderSide: const BorderSide(color: Colors.red, width: 2),
                     ),
                   ),
+                  onTap: () {
+                    _qtyController.selection = TextSelection(
+                      baseOffset: 0,
+                      extentOffset: _qtyController.text.length,
+                    );
+                  },
                   onChanged: (value) {
                     final parsed = int.tryParse(value);
                     if (parsed != null) {
@@ -2281,6 +2293,12 @@ class _ConvertToOnewayDialogState extends State<_ConvertToOnewayDialog> {
                 helperMaxLines: 2,
               ),
               keyboardType: TextInputType.number,
+              onTap: () {
+                _qtyController.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: _qtyController.text.length,
+                );
+              },
               onChanged: (value) {
                 setState(() {
                   convertQty = double.tryParse(value) ?? 0;

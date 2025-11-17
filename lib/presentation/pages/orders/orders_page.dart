@@ -29,6 +29,8 @@ class _OrdersPageState extends State<OrdersPage> {
   String? _selectedWarehouse;
   String? _selectedStatus;
   String? _selectedDeliveryStatus = 'Not Delivered';
+  DateTime? _selectedStartDate;
+  DateTime? _selectedEndDate;
   bool _isInitialLoad = true;
   // Static delivery status options
   final List<String> _deliveryStatusOptions = [
@@ -96,6 +98,12 @@ class _OrdersPageState extends State<OrdersPage> {
     if (_selectedDeliveryStatus != null && _selectedDeliveryStatus!.isNotEmpty) {
       filters['delivery_status'] = _selectedDeliveryStatus!;
     }
+    if (_selectedStartDate != null) {
+      filters['creation_date_from'] = DateFormat('yyyy-MM-dd').format(_selectedStartDate!);
+    }
+    if (_selectedEndDate != null) {
+      filters['creation_date_to'] = DateFormat('yyyy-MM-dd').format(_selectedEndDate!);
+    }
 
     context.read<OrdersBloc>().add(ApplyFilters(filters));
   }
@@ -106,6 +114,8 @@ class _OrdersPageState extends State<OrdersPage> {
       _selectedWarehouse = null;
       _selectedStatus = null;
       _selectedDeliveryStatus = null;
+      _selectedStartDate = null;
+      _selectedEndDate = null;
       _searchController.clear();
     });
     context.read<OrdersBloc>().add(const ClearFilters());
@@ -328,19 +338,8 @@ class _OrdersPageState extends State<OrdersPage> {
 
             SizedBox(width: 8.w),
 
-            if (state.availableFilters.containsKey('delivery_status') &&
-                state.availableFilters['delivery_status']?.isNotEmpty == true)
-              _buildFilterChip(
-                label: 'Delivery Status',
-                value: _selectedDeliveryStatus,
-                options: state.availableFilters['delivery_status'] ?? [],
-                onSelected: (value) {
-                  setState(() {
-                    _selectedDeliveryStatus = value;
-                  });
-                  _applyFilters();
-                },
-              ),
+            // Date Range Filter
+            _buildDateRangeFilterChip(),
 
           ],
         ),
@@ -473,6 +472,58 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
+  Widget _buildDateRangeFilterChip() {
+    String dateLabel = 'Date Range';
+    if (_selectedStartDate != null && _selectedEndDate != null) {
+      dateLabel = '${DateFormat('MMM d').format(_selectedStartDate!)} - ${DateFormat('MMM d').format(_selectedEndDate!)}';
+    } else if (_selectedStartDate != null) {
+      dateLabel = 'From ${DateFormat('MMM d').format(_selectedStartDate!)}';
+    } else if (_selectedEndDate != null) {
+      dateLabel = 'To ${DateFormat('MMM d').format(_selectedEndDate!)}';
+    }
+
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            dateLabel,
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: (_selectedStartDate != null || _selectedEndDate != null) ? Colors.white : Colors.grey[800],
+            ),
+          ),
+          SizedBox(width: 4.w),
+          Icon(
+            Icons.calendar_today,
+            size: 14.sp,
+            color: (_selectedStartDate != null || _selectedEndDate != null) ? Colors.white : Colors.grey[800],
+          ),
+        ],
+      ),
+      selected: _selectedStartDate != null || _selectedEndDate != null,
+      selectedColor: const Color(0xFF0E5CA8),
+      backgroundColor: Colors.grey[200],
+      onSelected: (_) async {
+        final DateTimeRange? picked = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(2020),
+          lastDate: DateTime.now().add(const Duration(days: 365)),
+          initialDateRange: _selectedStartDate != null && _selectedEndDate != null
+              ? DateTimeRange(start: _selectedStartDate!, end: _selectedEndDate!)
+              : null,
+        );
+        if (picked != null) {
+          setState(() {
+            _selectedStartDate = picked.start;
+            _selectedEndDate = picked.end;
+          });
+          _applyFilters();
+        }
+      },
+    );
+  }
+
   Widget _buildAppliedFilters(OrdersLoaded state) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
@@ -551,8 +602,14 @@ class _OrdersPageState extends State<OrdersPage> {
           case 'status':
             _selectedStatus = null;
             break;
-          case 'delivery status':  // Now matches the formatted key
+          case 'delivery status':
             _selectedDeliveryStatus = null;
+            break;
+          case 'creation date from':
+            _selectedStartDate = null;
+            break;
+          case 'creation date to':
+            _selectedEndDate = null;
             break;
         }
       });

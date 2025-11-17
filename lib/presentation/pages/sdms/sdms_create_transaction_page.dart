@@ -503,6 +503,12 @@ class _SDMSCreateTransactionPageState extends State<SDMSCreateTransactionPage> {
                         vertical: 16.h,
                       ),
                     ),
+                    onTap: () {
+                      _orderIdController.selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: _orderIdController.text.length,
+                      );
+                    },
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Sales Order ID is required';
