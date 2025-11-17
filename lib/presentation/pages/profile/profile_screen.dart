@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lpg_distribution_app/presentation/pages/profile/pan_verification_screen.dart';
 import 'package:lpg_distribution_app/presentation/pages/profile/password_change_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 // import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/User.dart';
 import '../../../core/services/version_manager.dart';
@@ -13,6 +14,10 @@ import '../../../core/services/api_service_interface.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/localization/locale_notifier.dart';
 import '../../widgets/professional_snackbar.dart';
+import '../../blocs/vehicle/vehicle_bloc.dart';
+import '../../blocs/vehicle/vehicle_event.dart';
+import '../../blocs/orders/orders_bloc.dart';
+import '../../blocs/orders/orders_event.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -1036,6 +1041,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final apiService = Provider.of<ApiServiceInterface>(context, listen: false);
       await apiService.logout();
+
+      // Clear all BLoC caches to prevent data leakage between user sessions
+      if (mounted) {
+        context.read<VehicleBloc>().add(const ClearVehicleCache());
+        context.read<OrdersBloc>().add(const ClearOrdersCache());
+      }
 
        if (mounted) {
           try {
