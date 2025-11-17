@@ -553,80 +553,306 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Order Header Card
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.w),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                // Card(
+                //   elevation: 2,
+                //   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                //   child: Padding(
+                //     padding: EdgeInsets.all(16.w),
+                //     child: Column(
+                //       crossAxisAlignment: CrossAxisAlignment.start,
+                //       children: [
+                //         Row(
+                //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                //           children: [
+                //             Expanded(
+                //               child: Text(
+                //                 displayOrder.orderNumber,
+                //                 style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0E5CA8)),
+                //               ),
+                //             ),
+                //             Container(
+                //               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                //               decoration: BoxDecoration(
+                //                 color: statusColor.withOpacity(0.15),
+                //                 borderRadius: BorderRadius.circular(20.r),
+                //               ),
+                //               child: Text(
+                //                 displayOrder.status,
+                //                 style: TextStyle(color: statusColor, fontSize: 12.sp, fontWeight: FontWeight.w600),
+                //               ),
+                //             ),
+                //           ],
+                //         ),
+                //         SizedBox(height: 12.h),
+                //         Row(
+                //           children: [
+                //             Text(
+                //               displayOrder.customerName,
+                //               style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+                //             ),
+                //
+                //           ],
+                //         ),
+                //         SizedBox(height: 8.h),
+                //         if (displayOrder.connectionType.isNotEmpty) ...[
+                //           SizedBox(height: 8.h),
+                //           Row(
+                //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                //             children: [
+                //               Container(
+                //                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                //                 decoration: BoxDecoration(
+                //                   color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                //                   borderRadius: BorderRadius.circular(16.r),
+                //                 ),
+                //                 child: Text(
+                //                   displayOrder.connectionType,
+                //                   style: TextStyle(
+                //                     fontSize: 12.sp,
+                //                     color: const Color(0xFF0E5CA8),
+                //                     fontWeight: FontWeight.w600,
+                //                   ),
+                //                 ),
+                //               ),
+                //               // Right side: countdown / cancel / closed
+                //               Builder(
+                //                 builder: (_) {
+                //                   final diff = DateTime.now().difference(displayOrder.creationDate);
+                //                   final isOver90 = diff.inMinutes >= 90;
+                //                   final roles = userRole ?? const <String>[]; // avoid null crash
+                //
+                //                   // Only care about this logic for refill orders
+                //                   if (!_isRefillOrder(displayOrder)) {
+                //                     return const SizedBox.shrink();
+                //                   }
+                //
+                //                   // Within 90 minutes → show countdown
+                //                   if (!isOver90) {
+                //                     return Row(
+                //                       children: [
+                //                         SizedBox(width: 8.w),
+                //                         OrderCountdownTimer(
+                //                           createdAt: displayOrder.creationDate,
+                //                           limitMinutes: 90,
+                //                         ),
+                //                       ],
+                //                     );
+                //                   }
+                //
+                //                      // After 90 minutes
+                //                     if (roles.contains('Warehouse Manager') ) {
+                //                       return Row(
+                //                         children: [
+                //                           SizedBox(width: 8.w),
+                //                           TextButton.icon(
+                //                             onPressed: () {
+                //                               // TODO: call your cancel logic here
+                //                             },
+                //                             icon: const Icon(Icons.cancel, size: 16),
+                //                             label: const Text('Cancel'),
+                //                             style: TextButton.styleFrom(
+                //                               foregroundColor: Colors.red,
+                //                             ),
+                //                           ),
+                //                         ],
+                //                       );
+                //                     }
+                //
+                //                   if (roles.contains('Delivery Boy')) {
+                //                     return Row(
+                //                       children: [
+                //                         SizedBox(width: 8.w),
+                //                         Container(
+                //                           padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                //                           decoration: BoxDecoration(
+                //                             color: Colors.grey.shade300,
+                //                             borderRadius: BorderRadius.circular(12.r),
+                //                           ),
+                //                           child: Text(
+                //                             'Closed',
+                //                             style: TextStyle(
+                //                               fontSize: 12.sp,
+                //                               fontWeight: FontWeight.w600,
+                //                               color: Colors.grey.shade800,
+                //                             ),
+                //                           ),
+                //                         ),
+                //                       ],
+                //                     );
+                //                   }
+                //                   // Fallback for other roles / no role → nothing on the right
+                //                   return const SizedBox.shrink();
+                //                 },
+                //               ),
+                //             ],
+                //           ),
+                //         ],
+                //
+                //       ],
+                //     ),
+                //   ),
+                // ),
+              Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              child: Padding(
+                padding: EdgeInsets.all(16.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    /// Top: Order No + Status Pill
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                displayOrder.orderNumber,
-                                style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0E5CA8)),
-                              ),
+                        Expanded(
+                          child: Text(
+                            displayOrder.orderNumber,
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF0E5CA8),
                             ),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(20.r),
-                              ),
-                              child: Text(
-                                displayOrder.status,
-                                style: TextStyle(color: statusColor, fontSize: 12.sp, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 12.h),
-                        Text(
-                          displayOrder.customerName,
-                          style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600, color: Colors.grey[800]),
-                        ),
-                        if (displayOrder.connectionType.isNotEmpty) ...[
-                          SizedBox(height: 8.h),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(16.r),
-                                ),
-                                child: Text(
-                                  displayOrder.connectionType,
-                                  style: TextStyle(
-                                      fontSize: 12.sp,
-                                      color: const Color(0xFF0E5CA8),
-                                      fontWeight: FontWeight.w600
-                                  ),
-                                ),
-                              ),
-                              // Show countdown only for Refill orders
-                              if (_isRefillOrder(displayOrder)) ...[
-                                SizedBox(width: 8.w),
-                                OrderCountdownTimer(
-                                  createdAt: displayOrder.creationDate,
-                                  //TODO update this get from api simply
-                                  limitMinutes: 90,
-                                ),
-                              ],
-                            ],
                           ),
-                        ],
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20.r),
+                          ),
+                          child: Text(
+                            displayOrder.status,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
+
+                    SizedBox(height: 12.h),
+
+                    /// Customer Name + Right-side action
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        /// LEFT
+                        Expanded(
+                          child: Text(
+                            displayOrder.customerName,
+                            style: TextStyle(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                        ),
+
+                        /// RIGHT SIDE ACTION (Close Button / Countdown / Closed)
+                        Builder(
+                          builder: (_) {
+                            final diff = DateTime.now().difference(displayOrder.creationDate);
+                            final isOver90 = diff.inMinutes >= 90;
+                            final roles = userRole ?? const <String>[];
+
+                            // Not a refill order → No action
+                            if (!_isRefillOrder(displayOrder)) {
+                              return const SizedBox.shrink();
+                            }
+
+                            // Within 90 minutes → Countdown
+                            if (!isOver90) {
+                              return OrderCountdownTimer(
+                                createdAt: displayOrder.creationDate,
+                                limitMinutes: 90,
+                              );
+                            }
+
+                            // After 90 minutes → role-based UI
+                            if (roles.contains("Warehouse Manager")) {
+                              return Card(
+                                elevation: 1,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.r),
+                                  side: const BorderSide(color: Colors.red, width: 1),
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10.r),
+                                  onTap: () {
+                                    // TODO: cancel logic
+                                  },
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.close, size: 18, color: Colors.red),
+                                        SizedBox(width: 4.w),
+                                        Text(
+                                          " Cancel Order ",
+                                          style: TextStyle(
+                                            color: Colors.red,
+                                            fontSize: 14.sp,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            if (roles.contains("Delivery Boy")) {
+                              return Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade300,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                                child: Text(
+                                  "Closed",
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade800,
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: 12.h),
+
+                    /// Connection Type Pill
+                    if (displayOrder.connectionType.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E5CA8).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16.r),
+                        ),
+                        child: Text(
+                          displayOrder.connectionType,
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: const Color(0xFF0E5CA8),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-
-                SizedBox(height: 16.h),
-
+              ),
+            ),
+              SizedBox(height: 16.h),
                 // Order Information Card
                 Card(
                   elevation: 2,

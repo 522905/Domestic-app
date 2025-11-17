@@ -10,6 +10,7 @@ import '../../blocs/orders/orders_event.dart';
 import '../../blocs/orders/orders_state.dart';
 import '../../../domain/entities/order.dart';
 import 'forms/create_sale_order_page.dart';
+import 'forms/order_countdown_timmer.dart';
 import 'order_details_page.dart';
 import '../../widgets/professional_snackbar.dart';
 
@@ -265,6 +266,18 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
+  bool _isRefillOrder(Order order) {
+    final orderType = order.connectionType.toLowerCase();
+    return orderType.contains('refill') || orderType.contains('refil');
+  }
+
+  bool _shouldShowCountdown(Order order) {
+    if (!_isRefillOrder(order)) return false;
+    final diff = DateTime.now().difference(order.creationDate);
+    return diff.inMinutes < 90;
+  }
+
+
   Widget _buildFilters(OrdersLoaded state) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -272,7 +285,6 @@ class _OrdersPageState extends State<OrdersPage> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-
             _buildStaticFilterChip(
               label: 'Delivery Status',
               value: _selectedDeliveryStatus,
@@ -803,13 +815,25 @@ class _OrdersPageState extends State<OrdersPage> {
                 ],
               ),
               SizedBox(height: 2.h),
-              Text(
-                order.orderNumber,
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[800],
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    order.orderNumber,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  if (_shouldShowCountdown(order)) ...[
+                    SizedBox(width: 4.w),
+                    OrderCountdownTimer(
+                      createdAt: order.creationDate,
+                      limitMinutes: 90,
+                    ),
+                  ],
+                ],
               ),
               SizedBox(height: 4.h),
               Row(
