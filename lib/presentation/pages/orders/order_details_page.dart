@@ -782,7 +782,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(10.r),
                                   onTap: () {
-                                    // TODO: cancel logic
+                                    _requestOrderAction(context, displayOrder.id, OrderActionType.cancel);
                                   },
                                   child: Padding(
                                     padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),

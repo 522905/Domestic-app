@@ -1382,6 +1382,22 @@ class ApiService implements ApiServiceInterface {
       }
     }
 
+    @override
+    Future<dynamic> cancelOrder(String orderId) async {
+      try {
+        final response = await apiClient.post(
+          apiClient.endpoints.cancelOrder(orderId),
+        );
+        if (response.statusCode != 200) {
+          throw Exception('Failed to cancel order');
+        }
+        return response.data;
+      } catch (e) {
+        _handleError(e);
+        rethrow;
+      }
+    }
+
   @override
   Future<InventoryRequest> updateInventoryRequestObject(String id, InventoryRequest request) {
     // TODO: implement updateInventoryRequestObject

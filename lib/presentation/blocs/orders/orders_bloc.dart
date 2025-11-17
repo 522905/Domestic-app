@@ -163,6 +163,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final response = switch (event.actionType) {
         OrderActionType.requestApproval => await apiService.requestOrderApproval(event.orderId),
         OrderActionType.finalize => await apiService.requestFinalizeOrder(event.orderId),
+        OrderActionType.cancel => await apiService.cancelOrder(event.orderId),
       };
 
       emit(OrdersLoadedWithResponse(
