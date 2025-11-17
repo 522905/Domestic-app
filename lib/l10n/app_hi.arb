@@ -107,7 +107,7 @@
     "dashboardRoleWithCompany": "{roles} ({company})",
     "dashboardPendingApprovalSingle": "{count} लंबित स्वीकृति",
     "dashboardPendingApprovalsMultiple": "{count} लंबित स्वीकृतियाँ",
-    "dashboardQuickActionsTitle": "त्वरित क्रियाएँ",
+    "dashboardQuickActionsTitle": "विकल्प सूची",
     "dashboardCreateOrderTitle": "ऑर्डर बनाएँ",
     "dashboardCreateOrderSubtitle": "नया बिक्री ऑर्डर",
     "dashboardCashDepositTitle": "कैश जमा",

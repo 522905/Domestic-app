@@ -32,12 +32,11 @@ class SelectableDepositItem {
     if (metadata['sales_order'] != null) {
       payload["sales_order_ref"] = metadata['sales_order'];
     }
-    //TODO verify keys with material request
     if (metadata['material_request'] != null) {
-      payload["material_request"] = metadata['material_request'];
+      payload["material_request_ref"] = metadata['material_request'];
     }
     if (metadata['item_row_name'] != null) {
-      payload["item_row_name"] = metadata['item_row_name'];
+      payload["material_request_detail_ref"] = metadata['item_row_name'];
     }
     return payload;
   }

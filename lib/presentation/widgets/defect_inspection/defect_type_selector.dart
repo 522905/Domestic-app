@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:path/path.dart';
 import '../../../core/constants/app_colors_enhanced.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/constants/spacing.dart';
@@ -46,56 +47,59 @@ class DefectTypeSelector extends StatelessWidget {
               width: 1.5,
             ),
           ),
-          child: DropdownButtonFormField<DefectiveOption>(
-            value: selectedOption,
-            decoration: InputDecoration(
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: AppSpacing.md.w,
-                vertical: AppSpacing.sm.h,
-              ),
-              border: InputBorder.none,
-              hintText: options.isEmpty ? 'Select filled item first' : 'Select defect type',
-              hintStyle: AppTextStyles.bodyMedium.copyWith(
-                color: AppColorsEnhanced.darkGray.withOpacity(0.5),
-              ),
-            ),
-            dropdownColor: Colors.white,
-            icon: Icon(
-              Icons.arrow_drop_down,
-              color: AppColorsEnhanced.brandBlue,
-              size: 28.sp,
-            ),
-            isExpanded: true,
-            items: options.map((option) {
-              return DropdownMenuItem<DefectiveOption>(
-                value: option,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      option.itemName,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColorsEnhanced.darkGray,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (option.description.isNotEmpty) ...[
-                      SizedBox(height: 2.h),
-                      Text(
-                        option.description,
-                        style: AppTextStyles.labelMedium.copyWith(
-                          color: AppColorsEnhanced.darkGray.withOpacity(0.6),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: DropdownButtonFormField<DefectiveOption>(
+              value: selectedOption,
+              decoration: InputDecoration(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md.w,
+                  vertical: AppSpacing.sm.h,
                 ),
-              );
-            }).toList(),
-            onChanged: enabled && options.isNotEmpty ? onChanged : null,
+                border: InputBorder.none,
+                hintText: options.isEmpty ? 'Select filled item first' : 'Select defect type',
+                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColorsEnhanced.darkGray.withOpacity(0.5),
+                ),
+              ),
+              dropdownColor: Colors.white,
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: AppColorsEnhanced.brandBlue,
+                size: 28.sp,
+              ),
+              isExpanded: true,
+              items: options.map((option) {
+                return DropdownMenuItem<DefectiveOption>(
+                  value: option,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Text(
+                      //   option.itemName,
+                      //   style: AppTextStyles.bodyMedium.copyWith(
+                      //     color: AppColorsEnhanced.darkGray,
+                      //     fontWeight: FontWeight.w500,
+                      //   ),
+                      //   overflow: TextOverflow.ellipsis,
+                      // ),
+                      if (option.description.isNotEmpty) ...[
+                        SizedBox(height: 2.h),
+                        Text(
+                          option.description,
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColorsEnhanced.darkGray,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: enabled && options.isNotEmpty ? onChanged : null,
+            ),
           ),
         ),
         if (errorText != null) ...[

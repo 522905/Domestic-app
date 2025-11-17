@@ -1550,6 +1550,7 @@ class _DispatchVehicleScreenEnhancedState
       if (mounted) {
         context.showSuccessSnackBar('ERV submitted successfully');
         Navigator.pop(context, true);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -1755,7 +1756,7 @@ class _DispatchVehicleScreenEnhancedState
             'item_code': item.itemCode,
             'qty': item.qty,
             'return_type': item.returnType,
-            'serial_no': item.selectedSerials.join(','),
+            'serial_no': item.selectedSerials.length >0  ? item.selectedSerials.join(',') : null ,
             'unlinked_item': item.unlinkedItem ? 1 : 0,
           };
         }).toList(),
@@ -1773,6 +1774,9 @@ class _DispatchVehicleScreenEnhancedState
     }).toList();
 
     return {
+      'supplier_gstin': widget.supplierGstin,
+      'supplier_invoice_date': widget.supplierInvoiceDate,
+      'supplier_invoice_number': widget.supplierInvoiceNumber,
       'purchase_invoice':
           _ervResponse!.data.invoiceDetails.purchaseInvoice,
       'warehouse': _ervResponse!.data.invoiceDetails.warehouse,

@@ -32,6 +32,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
   void initState() {
     super.initState();
     _availableItems = widget.orderData.getSelectableItems();
+    _selectedAvailabilityFilter = 'Available';
   }
 
   @override
@@ -208,6 +209,17 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
       return const SizedBox.shrink();
     }
 
+    // Split availability filters into "Available" and others
+    final availableFilters = availabilityFilters
+        .where((filter) =>
+    filter['value']?.toString().toLowerCase() == 'available')
+        .toList();
+
+    final otherAvailabilityFilters = availabilityFilters
+        .where((filter) =>
+    filter['value']?.toString().toLowerCase() != 'available')
+        .toList();
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       child: Column(
@@ -226,20 +238,33 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
+                // 1) All
                 _buildFilterChip('All', null, FilterType.all, Colors.grey),
                 SizedBox(width: 8.w),
 
-                // Bucket filters (Show first as they're most important)
+                // 2) Available (forced to second position if it exists)
+                if (availableFilters.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(right: 8.w),
+                    child: _buildFilterChip(
+                      '${availableFilters.first['value']} (${availableFilters.first['count']})',
+                      availableFilters.first['value'],
+                      FilterType.availability,
+                      _getAvailabilityColor(availableFilters.first['value']),
+                    ),
+                  ),
+
+                // Bucket filters
                 ...bucketFilters.map((filter) =>
                     Padding(
                       padding: EdgeInsets.only(right: 8.w),
                       child: _buildFilterChip(
-                          '${filter['value']} (${filter['count']})',
-                          filter['value'],
-                          FilterType.bucket,
-                          Colors.blue
+                        '${filter['value']} (${filter['count']})',
+                        filter['value'],
+                        FilterType.bucket,
+                        Colors.blue,
                       ),
-                    )
+                    ),
                 ),
 
                 // Item Group filters
@@ -247,25 +272,25 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                     Padding(
                       padding: EdgeInsets.only(right: 8.w),
                       child: _buildFilterChip(
-                          '${filter['value']} (${filter['count']})',
-                          filter['value'],
-                          FilterType.itemGroup,
-                          Colors.green
+                        '${filter['value']} (${filter['count']})',
+                        filter['value'],
+                        FilterType.itemGroup,
+                        Colors.green,
                       ),
-                    )
+                    ),
                 ),
 
-                // Availability filters
-                ...availabilityFilters.map((filter) =>
+                // Remaining availability filters (Filled, Filled Cylinder, Out of Stock, etc.)
+                ...otherAvailabilityFilters.map((filter) =>
                     Padding(
                       padding: EdgeInsets.only(right: 8.w),
                       child: _buildFilterChip(
-                          '${filter['value']} (${filter['count']})',
-                          filter['value'],
-                          FilterType.availability,
-                          _getAvailabilityColor(filter['value'])
+                        '${filter['value']} (${filter['count']})',
+                        filter['value'],
+                        FilterType.availability,
+                        _getAvailabilityColor(filter['value']),
                       ),
-                    )
+                    ),
                 ),
               ],
             ),
@@ -395,7 +420,13 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
     final isSelected = _isItemSelected(item);
     final selectedItem = _getSelectedItem(item);
     final orderType = widget.orderData.orderType;
-    final color = orderType == 'Refill' ? Colors.blue : Colors.orange;
+
+    // base color from orderType
+    final baseColor = orderType == 'Refill' ? Colors.blue : Colors.orange;
+
+    // final color based on itemCode override
+    final color = _getItemColor(item.itemCode, baseColor);
+
     final isOutOfStock = item.isOutOfStock;
 
     return Card(
@@ -425,8 +456,8 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                       borderRadius: BorderRadius.circular(25.r),
                     ),
                     child: Icon(
-                      orderType == 'Refill' ? Icons.inventory_2 : Icons.inventory,
-                      color: color,
+                      orderType == 'Refill' ? Icons.propane_tank : Icons.propane_tank_outlined,
+                      color: color,        // <- will now be red/blue per itemCode
                       size: 24.sp,
                     ),
                   ),
@@ -591,6 +622,18 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
     }
   }
 
+  Color _getItemColor(String itemCode, Color defaultColor) {
+    switch (itemCode) {
+      case 'M00087':
+      case 'M00104':
+        return Colors.red;
+      case 'M00218':
+        return Colors.blue;
+      default:
+        return defaultColor;
+    }
+  }
+
   void _showQuantityDialog(SelectableOrderItem item) {
     final selectedItem = _getSelectedItem(item);
     int selectedQty = selectedItem?.metadata['selected_qty'] ?? 1;
@@ -727,6 +770,12 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                           ),
                           contentPadding: EdgeInsets.symmetric(vertical: 12.h),
                         ),
+                        onTap: () {
+                          quantityController.selection = TextSelection(
+                            baseOffset: 0,
+                            extentOffset: quantityController.text.length,
+                          );
+                        },
                         onChanged: (value) {
                           final parsedValue = int.tryParse(value);
                           if (parsedValue != null && parsedValue >= 1 && parsedValue <= maxQty) {
@@ -853,7 +902,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
 
 enum FilterType {
   all,
-  itemGroup,
   availability,
+  itemGroup,
   bucket,
 }

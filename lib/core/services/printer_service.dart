@@ -232,11 +232,12 @@ class PrinterService {
       }
 
       bytes.addAll('------------------------------------------------'.codeUnits);
-      bytes.addAll([10, 10, 10]); // 3 line feeds for signature space
+      bytes.addAll([10, 10]); // 2 line feeds for signature space
 
       // Signature section (Center)
       bytes.addAll([27, 97, 1]); // Center align
-      bytes.addAll('Authorized Signature'.codeUnits);
+      bytes.addAll("Computer-generated challan (no signature needed)".codeUnits);
+      bytes.addAll("Delivery boy/receiver has checked leakage, bung, weight & seal.".codeUnits);
       bytes.addAll([10, 10]); // 2 line feeds
       bytes.addAll('___________________'.codeUnits);
       bytes.addAll([10, 10, 10, 10]); // 4 line feeds
@@ -326,7 +327,7 @@ class PrinterService {
       bytes.addAll('------------------------------------------------'.codeUnits);
       bytes.addAll([10]);
       bytes.addAll([27, 69, 1]); // Bold ON
-      bytes.addAll('Sr | Item Code    | Qty | Sales Order'.codeUnits);
+      bytes.addAll('Sr | Item Code    | Qty | Amount'.codeUnits);
       bytes.addAll([27, 69, 0]); // Bold OFF
       bytes.addAll([10]);
       bytes.addAll('------------------------------------------------'.codeUnits);
@@ -355,7 +356,6 @@ class PrinterService {
 
       bytes.addAll('------------------------------------------------'.codeUnits);
       bytes.addAll([10]);
-
       final totalQty = _getTotalQuantity(request.items);
       bytes.addAll([27, 69, 1]); // Bold ON
       bytes.addAll('Total Cylinders: $totalQty'.codeUnits);

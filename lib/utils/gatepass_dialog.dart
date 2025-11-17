@@ -231,82 +231,170 @@ class _GatepassDialogState extends State<GatepassDialog> {
     }
   }
 
+  // void _showPrinterDialog() {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => StatefulBuilder(
+  //       builder: (context, setDialogState) {
+  //         return AlertDialog(
+  //           title: const Text('Select Printer'),
+  //           content: ConstrainedBox(
+  //             constraints: BoxConstraints(
+  //               maxHeight: MediaQuery.of(context).size.height * 0.6,
+  //               maxWidth: double.infinity,
+  //             ),
+  //             child: SingleChildScrollView(
+  //               child: Column(
+  //                 mainAxisSize: MainAxisSize.min,
+  //                 children: [
+  //                 if (_isScanning)
+  //                   Center(
+  //                     child: Column(
+  //                       mainAxisAlignment: MainAxisAlignment.center,
+  //                       children: [
+  //                         const CircularProgressIndicator(),
+  //                         SizedBox(height: 16.h),
+  //                         const Text('Scanning for printers...'),
+  //                       ],
+  //                     ),
+  //                   )
+  //                 else if (_printers.isEmpty)
+  //                   const Expanded(
+  //                     child: Center(
+  //                       child: Text('No printers found.\nTap Scan to search.'),
+  //                     ),
+  //                   )
+  //                 else
+  //                   Expanded(
+  //                     child: ListView.builder(
+  //                       shrinkWrap: true,
+  //                       itemCount: _printers.length,
+  //                       itemBuilder: (context, index) {
+  //                         final printer = _printers[index];
+  //                         return Card(
+  //                           child: ListTile(
+  //                             leading: const Icon(Icons.print, color: Colors.blue),
+  //                             title: Text(
+  //                               printer.platformName.isNotEmpty
+  //                                   ? printer.platformName
+  //                                   : 'Unknown Printer',
+  //                               style: const TextStyle(fontWeight: FontWeight.bold),
+  //                             ),
+  //                             subtitle: Text(
+  //                               printer.remoteId.str,
+  //                               style: TextStyle(fontSize: 11.sp),
+  //                             ),
+  //                             trailing: const Icon(Icons.chevron_right),
+  //                             onTap: () => _connectToPrinter(printer),
+  //                           ),
+  //                         );
+  //                       },
+  //                     ),
+  //                   ),
+  //               ],
+  //               ),
+  //             ),
+  //           ),
+  //           actions: [
+  //             TextButton.icon(
+  //               icon: Icon(_isScanning ? Icons.stop : Icons.bluetooth_searching),
+  //               label: Text(_isScanning ? 'Stop' : 'Scan'),
+  //               onPressed: _isScanning
+  //                   ? () async {
+  //                   await FlutterBluePlus.stopScan();
+  //                   if (mounted) {
+  //                     setState(() => _isScanning = false);
+  //                   }
+  //                   setDialogState(() {});
+  //                 }
+  //                   : () {
+  //                 _scanForPrinters(dialogSetState: setDialogState);
+  //               },
+  //             ),
+  //             TextButton(
+  //               onPressed: () => Navigator.pop(context),
+  //               child: const Text('Cancel'),
+  //             ),
+  //           ],
+  //         );
+  //       },
+  //     ),
+  //   );
+  // }
+
   void _showPrinterDialog() {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final size = MediaQuery.of(context).size;
+
           return AlertDialog(
             title: const Text('Select Printer'),
-            content: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.6,
-                maxWidth: double.infinity,
-              ),
-              child: SingleChildScrollView(
+            // IMPORTANT: use SizedBox with explicit width & height
+            content: SizedBox(
+              width: size.width * 0.8,          // fixed width
+              height: size.height * 0.5,        // fixed height
+              child: _isScanning
+                  ? Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                  if (_isScanning)
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator(),
-                          SizedBox(height: 16.h),
-                          const Text('Scanning for printers...'),
-                        ],
-                      ),
-                    )
-                  else if (_printers.isEmpty)
-                    const Expanded(
-                      child: Center(
-                        child: Text('No printers found.\nTap Scan to search.'),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _printers.length,
-                        itemBuilder: (context, index) {
-                          final printer = _printers[index];
-                          return Card(
-                            child: ListTile(
-                              leading: const Icon(Icons.print, color: Colors.blue),
-                              title: Text(
-                                printer.platformName.isNotEmpty
-                                    ? printer.platformName
-                                    : 'Unknown Printer',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                printer.remoteId.str,
-                                style: TextStyle(fontSize: 11.sp),
-                              ),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () => _connectToPrinter(printer),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                ],
+                    const CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    const Text('Scanning for printers...'),
+                  ],
                 ),
+              )
+                  : _printers.isEmpty
+                  ? const Center(
+                child: Text('No printers found.\nTap Scan to search.'),
+              )
+                  : ListView.builder(
+                // VERY IMPORTANT: no shrinkWrap here
+                // shrinkWrap: true,  // <- REMOVE THIS
+                itemCount: _printers.length,
+                itemBuilder: (context, index) {
+                  final printer = _printers[index];
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.print,
+                        color: Colors.blue,
+                      ),
+                      title: Text(
+                        printer.platformName.isNotEmpty
+                            ? printer.platformName
+                            : 'Unknown Printer',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        printer.remoteId.str,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _connectToPrinter(printer),
+                    ),
+                  );
+                },
               ),
             ),
             actions: [
               TextButton.icon(
-                icon: Icon(_isScanning ? Icons.stop : Icons.bluetooth_searching),
+                icon: Icon(
+                  _isScanning ? Icons.stop : Icons.bluetooth_searching,
+                ),
                 label: Text(_isScanning ? 'Stop' : 'Scan'),
                 onPressed: _isScanning
                     ? () async {
-                    await FlutterBluePlus.stopScan();
-                    if (mounted) {
-                      setState(() => _isScanning = false);
-                    }
-                    setDialogState(() {});
+                  await FlutterBluePlus.stopScan();
+                  if (mounted) {
+                    setState(() => _isScanning = false);
                   }
+                  setDialogState(() {});
+                }
                     : () {
                   _scanForPrinters(dialogSetState: setDialogState);
                 },
@@ -338,178 +426,176 @@ class _GatepassDialogState extends State<GatepassDialog> {
     final formattedDate = _getFormattedDate();
     final vehicleId = _getVehicleId();
     final driverName = widget.request.requestedBy;
-    return Container(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                      Icon(
-                          Icons.print,
-                          size: 20.sp,
-                          color: const Color(0xFF0E5CA8),
-                    ),
-                    SizedBox(width: 8.w),
-                        Text(
-                            'Print Gatepass',
-                            style: TextStyle(
-                              fontSize: 18.sp,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF0E5CA8),
-                            ),
-                        ),
-                    ],
-              ),
-              SizedBox(height: 10.h),
-              Container(
-                padding: EdgeInsets.all(6.w),
-                decoration: BoxDecoration(
-                  color: _isConnected ? Colors.green.shade50 : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(
-                    color: _isConnected ? Colors.green.shade200 : Colors.grey.shade300,
-                  ),
-                ),
-                child: Row(
-                  children: [
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
                     Icon(
-                      _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                      size: 20.sp,
-                      color: _isConnected ? Colors.green : Colors.grey,
-                    ),
-                    SizedBox(width: 8.w),
-                    Expanded(
-                      child: Text(
-                        _isConnected
-                            ? 'Connected to ${_connectedDevice?.platformName ?? "Printer"}'
-                            : 'Printer not connected',
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          color: _isConnected ? Colors.green.shade700 : Colors.grey.shade700,
-                        ),
+                        Icons.print,
+                        size: 20.sp,
+                        color: const Color(0xFF0E5CA8),
+                  ),
+                  SizedBox(width: 8.w),
+                      Text(
+                          'Print Gatepass',
+                          style: TextStyle(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0E5CA8),
+                          ),
                       ),
-                    ),
-                    OutlinedButton(
-                      onPressed: _isConnected ? _disconnectPrinter : _showPrinterDialog,
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                      ),
-                      child: Text(
-                        _isConnected ? 'Disconnect' : 'Connect',
-                        style: TextStyle(fontSize: 11.sp),
-                      ),
-                    ),
                   ],
+            ),
+            SizedBox(height: 10.h),
+            Container(
+              padding: EdgeInsets.all(6.w),
+              decoration: BoxDecoration(
+                color: _isConnected ? Colors.green.shade50 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(
+                  color: _isConnected ? Colors.green.shade200 : Colors.grey.shade300,
                 ),
               ),
-              SizedBox(height: 16.h),
-              Row(
+              child: Row(
                 children: [
+                  Icon(
+                    _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                    size: 20.sp,
+                    color: _isConnected ? Colors.green : Colors.grey,
+                  ),
+                  SizedBox(width: 8.w),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
-                          ? () async {
-                        setState(() => _isSlipPrinting = true);
-                        try {
-                          final success = await _printerService.printSlip(
-                            widget.request,
-                            formattedDate,
-                            vehicleId,
-                            driverName,
-                            company: _companyType, // Use dynamic value
-                          );
-
-                          if (mounted) {
-                            if (success) {
-                              context.showSuccessSnackBar('Slip printed successfully');
-                            } else {
-                              context.showErrorSnackBar('Failed to print slip');
-                            }
-                          }
-                        } finally {
-                          if (mounted) setState(() => _isSlipPrinting = false);
-                        }
-                      }
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E5CA8),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24.r),
-                        ),
+                    child: Text(
+                      _isConnected
+                          ? 'Connected to ${_connectedDevice?.platformName ?? "Printer"}'
+                          : 'Printer not connected',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: _isConnected ? Colors.green.shade700 : Colors.grey.shade700,
                       ),
-                      child: _isSlipPrinting
-                        ? SizedBox(
-                        height: 20.h,
-                        width: 20.w,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.w,
-                        ),
-                      )
-                          : Text('PRINT SLIP', style: TextStyle(fontSize: 14.sp)),
                     ),
                   ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
-                          ? () async {
-                        setState(() => _isChallanPrinting = true);
-                        try {
-                          final success = await _printerService.printGatepass(
-                            widget.request,
-                            formattedDate,
-                            vehicleId,
-                            driverName,
-                            company: _companyType, // Use dynamic value
-                          );
-
-                          if (mounted) {
-                            if (success) {
-                              context.showSuccessSnackBar('Challan printed successfully');
-                            } else {
-                              context.showErrorSnackBar('Failed to print challan');
-                            }
-                          }
-                        } finally {
-                          if (mounted) setState(() => _isChallanPrinting = false);
-                        }
-                      }
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E5CA8),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24.r),
-                        ),
+                  OutlinedButton(
+                    onPressed: _isConnected ? _disconnectPrinter : _showPrinterDialog,
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16.r),
                       ),
-                      child: _isChallanPrinting
-                          ? SizedBox(
-                        height: 20.h,
-                        width: 20.w,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.w,
-                        ),
-                      )
-                          : Text('PRINT CHALLAN', style: TextStyle(fontSize: 14.sp)),
+                    ),
+                    child: Text(
+                      _isConnected ? 'Disconnect' : 'Connect',
+                      style: TextStyle(fontSize: 11.sp),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            SizedBox(height: 16.h),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
+                        ? () async {
+                      setState(() => _isSlipPrinting = true);
+                      try {
+                        final success = await _printerService.printSlip(
+                          widget.request,
+                          formattedDate,
+                          vehicleId,
+                          driverName,
+                          company: _companyType, // Use dynamic value
+                        );
+
+                        if (mounted) {
+                          if (success) {
+                            context.showSuccessSnackBar('Slip printed successfully');
+                          } else {
+                            context.showErrorSnackBar('Failed to print slip');
+                          }
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isSlipPrinting = false);
+                      }
+                    }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E5CA8),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24.r),
+                      ),
+                    ),
+                    child: _isSlipPrinting
+                      ? SizedBox(
+                      height: 20.h,
+                      width: 20.w,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.w,
+                      ),
+                    )
+                        : Text('PRINT SLIP', style: TextStyle(fontSize: 14.sp)),
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
+                        ? () async {
+                      setState(() => _isChallanPrinting = true);
+                      try {
+                        final success = await _printerService.printGatepass(
+                          widget.request,
+                          formattedDate,
+                          vehicleId,
+                          driverName,
+                          company: _companyType, // Use dynamic value
+                        );
+
+                        if (mounted) {
+                          if (success) {
+                            context.showSuccessSnackBar('Challan printed successfully');
+                          } else {
+                            context.showErrorSnackBar('Failed to print challan');
+                          }
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isChallanPrinting = false);
+                      }
+                    }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E5CA8),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24.r),
+                      ),
+                    ),
+                    child: _isChallanPrinting
+                        ? SizedBox(
+                      height: 20.h,
+                      width: 20.w,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.w,
+                      ),
+                    )
+                        : Text('PRINT CHALLAN', style: TextStyle(fontSize: 14.sp)),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

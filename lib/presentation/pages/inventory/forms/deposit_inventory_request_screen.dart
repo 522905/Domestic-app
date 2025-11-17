@@ -373,7 +373,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Confirm $_depositTypeDisplayName Deposit',
+                      '$_depositTypeDisplayName Deposit',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,

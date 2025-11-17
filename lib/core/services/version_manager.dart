@@ -126,8 +126,8 @@ class VersionManager {
       final token = await user.getToken();
 
       final response = await _dio.get(
-        'http://192.168.171.49:9900/app-config',
-        // 'https://lpg.ops.arungas.com/app-config',
+        // 'http://192.168.171.49:9900/app-config',
+        'https://lpg.ops.arungas.com/app-config',
         options: Options(
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
