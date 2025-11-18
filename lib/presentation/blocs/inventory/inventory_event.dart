@@ -90,3 +90,7 @@ class RejectInventoryRequest extends InventoryEvent {
   @override
   List<Object> get props => [requestId, reason, requestType];
 }
+
+class ClearInventoryCache extends InventoryEvent {
+  const ClearInventoryCache();
+}

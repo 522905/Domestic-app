@@ -10,3 +10,7 @@ class RefreshVehicles extends VehicleEvent {
   const RefreshVehicles();
 }
 
+class ClearVehicleCache extends VehicleEvent {
+  const ClearVehicleCache();
+}
+

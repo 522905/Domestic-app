@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/profile/pan_verification_screen.dart';
 import 'package:lpg_distribution_app/presentation/pages/profile/password_change_screen.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +14,12 @@ import '../../../core/services/api_service_interface.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/localization/locale_notifier.dart';
 import '../../widgets/professional_snackbar.dart';
+import '../../blocs/vehicle/vehicle_bloc.dart';
+import '../../blocs/vehicle/vehicle_event.dart';
+import '../../blocs/orders/orders_bloc.dart';
+import '../../blocs/orders/orders_event.dart';
+import '../../blocs/inventory/inventory_bloc.dart';
+import '../../blocs/inventory/inventory_event.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -1034,6 +1041,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
+      // Clear all BLoC caches first
+      context.read<VehicleBloc>().add(const ClearVehicleCache());
+      context.read<OrdersBloc>().add(const ClearOrdersCache());
+      context.read<InventoryBloc>().add(const ClearInventoryCache());
+
+      // Clear all cached data from secure storage
       final apiService = Provider.of<ApiServiceInterface>(context, listen: false);
       await apiService.logout();
 

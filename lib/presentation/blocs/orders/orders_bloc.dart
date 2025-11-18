@@ -18,6 +18,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     on<SearchOrders>(_onSearchOrders);
     on<RequestOrderAction>(_onRequestOrderAction);
     on<LoadOrderDetails>(_onLoadOrderDetails);
+    on<ClearOrdersCache>(_onClearOrdersCache);
   }
 
   Future<void> _onLoadOrders(LoadOrders event, Emitter<OrdersState> emit) async {
@@ -361,6 +362,11 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final updatedOrders = currentState.orders.where((order) => order.id != orderId).toList();
       emit(currentState.copyWith(orders: updatedOrders));
     }
+  }
+
+  void _onClearOrdersCache(ClearOrdersCache event, Emitter<OrdersState> emit) {
+    _allOrders = [];
+    emit(const OrdersInitial());
   }
 
   @override
