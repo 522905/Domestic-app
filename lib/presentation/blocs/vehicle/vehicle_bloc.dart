@@ -10,6 +10,7 @@ class VehicleBloc extends Bloc<VehicleEvent, VehicleState> {
   VehicleBloc({required this.apiService}) : super(const VehicleInitial()) {
     on<LoadVehicles>(_onLoadVehicles);
     on<RefreshVehicles>(_onRefreshVehicles);
+    on<ClearVehicleCache>(_onClearVehicleCache);
   }
 
   Future<void> _onLoadVehicles(LoadVehicles event, Emitter<VehicleState> emit) async {
@@ -38,5 +39,10 @@ class VehicleBloc extends Bloc<VehicleEvent, VehicleState> {
     } catch (e) {
       emit(VehicleError(message: e.toString()));
     }
+  }
+
+  void _onClearVehicleCache(ClearVehicleCache event, Emitter<VehicleState> emit) {
+    _cachedVehicles = [];
+    emit(const VehicleInitial());
   }
 }

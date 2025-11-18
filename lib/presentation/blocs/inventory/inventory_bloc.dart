@@ -25,6 +25,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     on<UpdateInventoryRequest>(_onUpdateInventoryRequest);
     on<ApproveInventoryRequest>(_onApproveInventoryRequest);
     on<RejectInventoryRequest>(_onRejectInventoryRequest);
+    on<ClearInventoryCache>(_onClearInventoryCache);
   }
 
   Future<void> _onLoadInventoryRequestDetail(
@@ -258,5 +259,10 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     } catch (e) {
       emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
+  }
+
+  void _onClearInventoryCache(ClearInventoryCache event, Emitter<InventoryState> emit) {
+    _allRequests = [];
+    emit(InventoryInitial());
   }
 }

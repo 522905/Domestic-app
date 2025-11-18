@@ -76,3 +76,7 @@ class LoadOrderDetails extends OrdersEvent {
   @override
   List<Object> get props => [id];
 }
+
+class ClearOrdersCache extends OrdersEvent {
+  const ClearOrdersCache();
+}

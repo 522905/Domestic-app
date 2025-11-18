@@ -1,11 +1,18 @@
 // Updated GlobalDrawer with proper SDMS navigation
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../presentation/pages/profile/profile_screen.dart';
 import '../../presentation/pages/purchase_invoice/purchase_invoice_screen.dart';
 import '../../presentation/pages/reports/reports_screen.dart';
 import '../../presentation/pages/sdms/sdms_transaction_list_page.dart';
 import '../../presentation/widgets/professional_snackbar.dart';
 import '../../core/services/api_service.dart';
+import '../../presentation/blocs/vehicle/vehicle_bloc.dart';
+import '../../presentation/blocs/vehicle/vehicle_event.dart';
+import '../../presentation/blocs/orders/orders_bloc.dart';
+import '../../presentation/blocs/orders/orders_event.dart';
+import '../../presentation/blocs/inventory/inventory_bloc.dart';
+import '../../presentation/blocs/inventory/inventory_event.dart';
 
 class GlobalDrawer {
   static ApiService? _apiService;
@@ -124,7 +131,12 @@ class GlobalDrawer {
 
   static Future<void> _logout(BuildContext context) async {
     try {
-      // Clear all cached data before navigating to login
+      // Clear all BLoC caches first
+      context.read<VehicleBloc>().add(const ClearVehicleCache());
+      context.read<OrdersBloc>().add(const ClearOrdersCache());
+      context.read<InventoryBloc>().add(const ClearInventoryCache());
+
+      // Clear all cached data from secure storage
       if (_apiService != null) {
         await _apiService!.logout();
       }
