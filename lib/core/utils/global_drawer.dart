@@ -124,6 +124,12 @@ class GlobalDrawer {
 
   static Future<void> _logout(BuildContext context) async {
     try {
+      // Clear all cached data before navigating to login
+      if (_apiService != null) {
+        await _apiService!.logout();
+      }
+
+      // Navigate to login and remove all previous routes
       Navigator.pushNamedAndRemoveUntil(
         context,
         'login',
