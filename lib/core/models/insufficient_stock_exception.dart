@@ -8,6 +8,8 @@ class StockError {
   final int availableQty;
   final int totalStock;
   final int reservedStock;
+  final List<String> warehousesChecked;
+  final String message;
 
   StockError({
     required this.itemCode,
@@ -16,6 +18,8 @@ class StockError {
     required this.availableQty,
     required this.totalStock,
     required this.reservedStock,
+    this.warehousesChecked = const [],
+    this.message = '',
   });
 
   /// Whether this item has any available stock
@@ -25,13 +29,27 @@ class StockError {
   int get shortage => requestedQty - availableQty;
 
   factory StockError.fromJson(Map<String, dynamic> json) {
+    // Parse warehouses_checked list
+    List<String> warehouses = [];
+    if (json['warehouses_checked'] is List) {
+      warehouses = (json['warehouses_checked'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
+
     return StockError(
       itemCode: json['item_code']?.toString() ?? '',
+      // Use item_code as item_name if item_name not provided
       itemName: json['item_name']?.toString() ?? json['item_code']?.toString() ?? '',
-      requestedQty: _safeToInt(json['requested_qty']),
+      // API uses required_qty, not requested_qty
+      requestedQty: _safeToInt(json['required_qty'] ?? json['requested_qty']),
       availableQty: _safeToInt(json['available_qty']),
-      totalStock: _safeToInt(json['total_stock']),
-      reservedStock: _safeToInt(json['reserved_stock']),
+      // API uses actual_qty for total stock
+      totalStock: _safeToInt(json['actual_qty'] ?? json['total_stock']),
+      // API uses reserved_qty, not reserved_stock
+      reservedStock: _safeToInt(json['reserved_qty'] ?? json['reserved_stock']),
+      warehousesChecked: warehouses,
+      message: json['message']?.toString() ?? '',
     );
   }
 
