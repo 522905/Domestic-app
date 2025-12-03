@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/User.dart';
 import '../../../../core/models/api_validation_exception.dart';
+import '../../../../core/models/insufficient_stock_exception.dart';
 import '../../../../core/services/validation_error_dialog.dart';
 import '../../../blocs/orders/orders_event.dart';
 import '../../../widgets/orders/order_items_widget.dart';
@@ -18,6 +19,7 @@ import '../../../blocs/orders/orders_bloc.dart';
 import '../../../widgets/selectors/vehicle_selector_dialog.dart';
 import '../../../widgets/selectors/warehouse_selector_dialog.dart';
 import '../../../widgets/error_dialog.dart';
+import '../../../widgets/insufficient_stock_dialog.dart';
 
 class CreateSaleOrderScreen extends StatefulWidget {
   const CreateSaleOrderScreen({Key? key}) : super(key: key);
@@ -445,8 +447,8 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
         context: context,
         barrierDismissible: false,
         builder: (BuildContext dialogContext) {
-          return WillPopScope(
-            onWillPop: () async => false,
+          return PopScope(
+            canPop: false,
             child: Dialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
@@ -505,6 +507,21 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
           );
         },
       );
+    } on InsufficientStockException catch (e) {
+      setState(() {
+        _isSubmitting = false;
+      });
+
+      if (mounted) {
+        InsufficientStockDialog.show(
+          context,
+          e,
+          onUseAvailable: () => _updateQuantitiesAndResubmit(e),
+          onCancel: () {
+            // User cancelled, do nothing
+          },
+        );
+      }
     } on ApiValidationException catch (e) {
       setState(() {
         _isSubmitting = false;
@@ -530,6 +547,52 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
         );
       }
     }
+  }
+
+  /// Updates item quantities to available amounts and resubmits the order
+  void _updateQuantitiesAndResubmit(InsufficientStockException exception) {
+    final availableQuantities = exception.availableQuantities;
+
+    // Update quantities in selected items or remove items with zero stock
+    final updatedItems = <SelectableOrderItem>[];
+
+    for (var item in _selectedItems) {
+      final availableQty = availableQuantities[item.itemCode];
+
+      if (availableQty != null) {
+        // This item had insufficient stock
+        if (availableQty > 0) {
+          // Update quantity to available amount
+          final updatedMetadata = Map<String, dynamic>.from(item.metadata);
+          updatedMetadata['selected_qty'] = availableQty;
+
+          updatedItems.add(item.copyWith(metadata: updatedMetadata));
+        }
+        // If availableQty is 0, don't add the item (remove from order)
+      } else {
+        // This item was not affected, keep as is
+        updatedItems.add(item);
+      }
+    }
+
+    // Update state with modified items
+    setState(() {
+      _selectedItems.clear();
+      _selectedItems.addAll(updatedItems);
+    });
+
+    // Show a brief visual feedback before resubmitting
+    if (_selectedItems.isEmpty) {
+      context.showWarningSnackBar('No items with available stock. Order cancelled.');
+      return;
+    }
+
+    // Small delay to show the visual update before resubmitting
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _submitOrder();
+      }
+    });
   }
 
   Map<String, int> _calculateOrderSummary() {
