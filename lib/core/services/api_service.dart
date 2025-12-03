@@ -13,6 +13,7 @@ import '../models/purchase_invoice/purchase_invoice.dart';
 import '../network/api_client.dart';
 import 'api_service_interface.dart';
 import '../models/api_validation_exception.dart';
+import '../models/insufficient_stock_exception.dart';
 
 class ApiService implements ApiServiceInterface {
   late String baseUrl;
@@ -95,6 +96,13 @@ class ApiService implements ApiServiceInterface {
               );
             }
           }
+        }
+
+        // Check for INSUFFICIENT_STOCK error code
+        if (data is Map<String, dynamic> &&
+            data.containsKey('error_code') &&
+            data['error_code'] == 'INSUFFICIENT_STOCK') {
+          throw InsufficientStockException.fromApiResponse(data);
         }
       } else {
         debugPrint('UNKNOWN ERROR: ${error.message}');
