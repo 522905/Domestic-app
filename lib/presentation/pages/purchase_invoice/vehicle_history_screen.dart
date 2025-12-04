@@ -1,5 +1,6 @@
 // lib/presentation/pages/purchase_invoice/vehicle_history_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -43,7 +44,8 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
       // Convert response to list of maps
       List<Map<String, dynamic>> history;
       if (response is List) {
-        history = List<Map<String, dynamic>>.from(response);
+        history = List<Map<String
+        , dynamic>>.from(response);
       } else {
         history = [response as Map<String, dynamic>];
       }
@@ -146,27 +148,32 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                         color: const Color(0xFF333333),
                       ),
                     ),
-                    SizedBox(height: 4.h),
+                    SizedBox(height: 2.h),
 
-                    // Phone Number
                     Row(
                       children: [
-                        Icon(
-                          Icons.phone,
-                          size: 14.w,
-                          color: const Color(0xFF666666),
-                        ),
-                        SizedBox(width: 4.w),
-                        Text(
-                          driver['phone_number'] ?? 'N/A',
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: const Color(0xFF666666),
+                        Icon(Icons.phone, size: 14.w, color: Color(0xFF666666)),
+                        SizedBox(width: 2.w),
+                        Expanded(
+                          child: Text(
+                            driver['phone_number'] ?? 'N/A',
+                            style: TextStyle(fontSize: 14.sp, color: Color(0xFF666666)),
                           ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.copy, size: 16.w),
+                          onPressed: () {
+                            final number = driver['phone_number'] ?? 'N/A';
+                            Clipboard.setData(ClipboardData(text: number));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Copied")),
+                            );
+                          },
                         ),
                       ],
                     ),
-                    SizedBox(height: 4.h),
+
+                    SizedBox(height: 1.h),
 
                     // Latest Visit
                     Row(
