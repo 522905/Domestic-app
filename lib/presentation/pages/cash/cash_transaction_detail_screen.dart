@@ -9,7 +9,7 @@ import '../../../core/services/User.dart';
 import '../../../domain/entities/cash/cash_transaction.dart';
 import '../../blocs/cash/cash_bloc.dart';
 import '../../../utils/swipeButton.dart';
-import '../../../utils/cash_receipt_dialog.dart';
+import '../../../utils/cash_thermal_print_dialog.dart';
 import '../../widgets/professional_snackbar.dart';
 
 class TransactionDetailScreen extends StatefulWidget {
@@ -446,9 +446,9 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
               SizedBox(height: 16.h),
             ],
 
-            // Print Receipt Button - Only visible for Cashier role
+            // Print Buttons - Only visible for Cashier role
             if (_userRole.contains('Cashier')) ...[
-              CashReceiptDialog(transaction: transaction),
+              CashThermalPrintDialog(transaction: transaction),
               SizedBox(height: 16.h),
             ],
 
@@ -744,9 +744,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
     context.read<CashManagementBloc>().add(
         ApproveTransaction(transactionId: transaction.id)
     );
-    // The WillPopScope callback will handle the refresh
-
-    Navigator.pop(context);
+    // Stay on the page - the BlocConsumer listener will handle the refresh
   }
 
   void _showRejectionReasonSheet(CashTransaction transaction) {
@@ -858,8 +856,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                                 )
                             );
 
-                            // The WillPopScope callback will handle the refresh
-                            Navigator.pop(context); // Go back to cash_page
+                            // Stay on the page - the BlocConsumer listener will handle the refresh
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,

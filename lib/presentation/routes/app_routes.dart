@@ -13,6 +13,8 @@ import '../pages/inventory/inventory_detail_screen.dart'; // Add import
 import '../pages/defect_inspection/dir_creation_screen.dart';
 import '../pages/defect_inspection/dir_list_screen.dart';
 import '../pages/defect_inspection/dir_detail_screen.dart';
+import '../pages/purchase_invoice/purchase_invoice_details_screen.dart';
+import '../pages/purchase_invoice/purchase_invoice_screen.dart';
 import '../blocs/orders/orders_bloc.dart';
 import '../blocs/inventory/inventory_bloc.dart';
 import '../blocs/defect_inspection/defect_inspection_bloc.dart';
@@ -34,6 +36,9 @@ class AppRoutes {
   static const String defectsPurchaseInvoices = 'defects/purchase-invoices';
   static const String defectsCreate = 'defects/create';
   static const String defectsInspections = 'defects/inspections';
+
+  // Procurement/Purchase Invoice routes
+  static const String procurementInvoiceDetail = 'procurement-invoice';
 
   // Company-aware navigation handler
   static Future<void> navigateWithCompanyCheck(
@@ -318,11 +323,19 @@ class AppRoutes {
                 value: BlocProvider.of<DefectInspectionBloc>(context),
                 child: DIRDetailScreen(dirName: dirName),
               ),
+
             );
           }
         } else {
           return _errorRoute();
         }
+
+    // PROCUREMENT/PURCHASE INVOICE
+      case 'procurement':
+        // /procurement → Opens Purchase Invoice List Screen
+        return MaterialPageRoute(
+          builder: (_) => const PurchaseInvoiceScreen(),
+        );
 
       default:
         return _errorRoute();

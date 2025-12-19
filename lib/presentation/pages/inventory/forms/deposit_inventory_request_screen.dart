@@ -460,7 +460,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
     );
   }
 
-  void _submitDeposit() {
+  Future<void> _submitDeposit() async {
     if (_isSubmitting) return;
 
     setState(() {
@@ -468,9 +468,6 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
     });
 
     try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final requestId = 'DP-$timestamp';
-
       List<Map<String, dynamic>> itemsForApi;
 
       if (widget.depositType == DepositData.salesOrder) {
@@ -516,10 +513,24 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
         items: itemsForApi,
       );
 
-      context.read<InventoryBloc>().add(
-          AddInventoryRequest(request: newRequest)
-      );
+      print('🚀 Submitting deposit request to API...');
 
+      // Call API directly to catch exceptions properly
+      final createdRequest = await context.read<InventoryBloc>().apiService.createInventoryRequest(newRequest);
+
+      print('✅ Deposit request created successfully: ${createdRequest.id}');
+
+      // Reset submitting state and check if still mounted
+      if (!mounted) return;
+
+      setState(() {
+        _isSubmitting = false;
+      });
+
+      // Reload inventory list
+      context.read<InventoryBloc>().add(LoadInventoryRequests());
+
+      // Show success dialog
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -556,7 +567,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Request ID: $requestId',
+                      'Request ID: ${createdRequest.id}',
                       style: const TextStyle(color: Colors.grey),
                     ),
                     const SizedBox(height: 24),
@@ -564,7 +575,6 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          context.read<InventoryBloc>().add(LoadInventoryRequests());
                           Navigator.pop(dialogContext);
                           Navigator.pop(context);
                         },
@@ -589,6 +599,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
       });
 
       if (mounted) {
+        print('❌ Error caught: ${e.runtimeType} - $e');
         context.showErrorDialog(
           title: 'Submission Failed',
           error: e,

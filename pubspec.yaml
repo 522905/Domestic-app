@@ -1,7 +1,7 @@
 name: lpg_distribution_app
 description: A digital platform for domestic LPG distribution business.
 
-version: 1.0.2
+version: 1.0.4
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

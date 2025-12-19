@@ -14,6 +14,7 @@ import '../main_container.dart';
 import '../profile/pan_verification_screen.dart';
 import 'forgot_password_screen.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../main.dart' show updateDeviceToken;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -237,6 +238,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
       await _saveUsername(_usernameController.text.trim());
       await _secureStorage.write(key: 'isLoggedIn', value: 'true');
+
+      // Register device FCM token after successful login
+      try {
+        await updateDeviceToken(context);
+        if (kDebugMode) {
+          print('FCM token registered successfully after login');
+        }
+      } catch (tokenError) {
+        if (kDebugMode) {
+          print('Error registering FCM token: $tokenError');
+        }
+        // Continue with login even if token registration fails
+      }
 
       // Check app version after successful login
       final versionStatus = await _versionManager.checkVersionViaAPI();

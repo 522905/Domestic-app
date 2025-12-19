@@ -99,6 +99,15 @@ abstract class ApiServiceInterface {
   // Gatepass methods
   Future<Map<String, dynamic>> generateGatepass(String transactionId);
   Future<Map<String, dynamic>> printGatepass(String gatepassId);
+  Future<List<int>> thermalPrintStockRequest(
+    String requestId,
+    String formatType,
+    String deviceMacAddress,
+  );
+  Future<List<int>> thermalPrintPaymentRequest(
+    String transactionId,
+    String deviceMacAddress,
+  );
 
   // Document methods
   Future<String> uploadDocument(
@@ -134,6 +143,8 @@ abstract class ApiServiceInterface {
     required String reason,
     required String requestType,
   });
+
+  Future<InventoryRequest> cancelInventoryRequest(String requestId);
 
   Future<List<InventoryRequest>> getInventoryRequests();
   Future<InventoryRequest> createInventoryRequest(InventoryRequest request);

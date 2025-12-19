@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/models/purchase_invoice/purchase_invoice.dart';
 import '../../../core/services/api_service_interface.dart';
+import '../../../core/services/User.dart';
 import 'purchase_invoice_details_screen.dart';
 
 class PurchaseInvoiceScreen extends StatefulWidget {
@@ -69,10 +70,17 @@ class _PurchaseInvoiceScreenState extends State<PurchaseInvoiceScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PurchaseInvoiceDetailsScreen(
-          supplierInvoiceNumber: invoice.supplierInvoiceNumber,
-          supplierGstin: invoice.supplierGstin,
-          supplierInvoiceDate: invoice.supplierInvoiceDate,
+        builder: (context) => FutureBuilder<List<String>>(
+          future: User().getUserRoles().then((roles) => roles.map((r) => r.role).toList()),
+          builder: (context, snapshot) {
+            final userRoles = snapshot.data ?? [];
+            return PurchaseInvoiceDetailsScreen(
+              supplierInvoiceNumber: invoice.supplierInvoiceNumber,
+              supplierGstin: invoice.supplierGstin,
+              supplierInvoiceDate: invoice.supplierInvoiceDate,
+              userRoles: userRoles,
+            );
+          },
         ),
       ),
     ).then((_) {

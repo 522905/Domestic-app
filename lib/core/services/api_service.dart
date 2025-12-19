@@ -12,8 +12,11 @@ import '../models/purchase_invoice/api_response.dart';
 import '../models/purchase_invoice/purchase_invoice.dart';
 import '../network/api_client.dart';
 import 'api_service_interface.dart';
+
 import '../models/api_validation_exception.dart';
 import '../models/insufficient_stock_exception.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class ApiService implements ApiServiceInterface {
   late String baseUrl;
@@ -278,21 +281,44 @@ class ApiService implements ApiServiceInterface {
         } else {
           throw Exception('Invalid response format');
         }
+      } else if (response.statusCode == 400) {
+        // Handle 400 errors - including duplicate requests
+        final errorMsg = ErrorHandler.handleError(
+            DioException(
+              requestOptions: response.requestOptions,
+              response: response,
+              type: DioExceptionType.badResponse,
+            )
+        );
+        throw Exception(errorMsg);
       } else {
-        // Extract error message from response for 400 errors
-        if (response.statusCode == 400 && response.data != null) {
-          final errorMsg = ErrorHandler.handleError(
-              DioException(
-                requestOptions: response.requestOptions,
-                response: response,
-                type: DioExceptionType.badResponse,
-              )
-          );
-          throw Exception(errorMsg);
-        }
         throw Exception(
           'Failed to create inventory request: ${response.statusCode} - ${response.statusMessage}',
         );
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<InventoryRequest> cancelInventoryRequest(String requestId) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.cancelInventoryRequest(requestId),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is Map<String, dynamic>) {
+          // Return the updated request from the API response
+          final requestData = response.data['stock_request'] ?? response.data;
+          return InventoryRequest.fromJson(requestData);
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        throw Exception('Failed to cancel request: ${response.statusCode}');
       }
     } catch (e) {
       _handleError(e);
@@ -588,6 +614,28 @@ class ApiService implements ApiServiceInterface {
   @override
   Future<void> logout() async {
     try {
+      // Get FCM token and device ID
+      String? fcmToken;
+      String? deviceId;
+      try {
+        fcmToken = await FirebaseMessaging.instance.getToken();
+        final deviceInfo = DeviceInfoPlugin();
+        final androidInfo = await deviceInfo.androidInfo;
+        deviceId = androidInfo.id;
+      } catch (e) {
+        debugPrint('Error getting FCM token or device ID: $e');
+      }
+
+      // First call the logout API with token and platform
+      await apiClient.post(
+        apiClient.endpoints.logout,
+        data: {
+          'token': fcmToken ?? '',
+          'device_id': deviceId ?? '',
+          'platform': 'fcm',
+        },
+      );
+      // Then call the client's logout method
       await apiClient.logout();
     } catch (e) {
       _handleError(e);
@@ -1770,6 +1818,110 @@ class ApiService implements ApiServiceInterface {
       );
 
       return response.data;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<int>> thermalPrintStockRequest(
+    String requestId,
+    String formatType,
+    String deviceMacAddress,
+  ) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.thermalPrintStockRequest(requestId),
+        data: {
+          'format_type': formatType,
+          'device_mac_address': deviceMacAddress,
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) {
+            return status != null && status < 500;
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is List<int>) {
+          return response.data as List<int>;
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        // For error responses, try to parse as JSON to get error message
+        String errorMessage = 'Failed to get thermal print data: ${response.statusCode}';
+        try {
+          if (response.data is List<int>) {
+            final jsonString = String.fromCharCodes(response.data as List<int>);
+            final errorData = json.decode(jsonString);
+            if (errorData is Map && errorData.containsKey('error')) {
+              errorMessage = errorData['error'].toString();
+            } else if (errorData is Map && errorData.containsKey('message')) {
+              errorMessage = errorData['message'].toString();
+            } else if (errorData is Map && errorData.containsKey('detail')) {
+              errorMessage = errorData['detail'].toString();
+            }
+          }
+        } catch (parseError) {
+          debugPrint('Error parsing error response: $parseError');
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<int>> thermalPrintPaymentRequest(
+    String transactionId,
+    String deviceMacAddress,
+  ) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.thermalPrintPaymentRequest(transactionId),
+        data: {
+          'device_mac_address': deviceMacAddress,
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) {
+            return status != null && status < 500;
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is List<int>) {
+          return response.data as List<int>;
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        // For error responses, try to parse as JSON to get error message
+        String errorMessage = 'Failed to get thermal print data: ${response.statusCode}';
+        try {
+          if (response.data is List<int>) {
+            final jsonString = String.fromCharCodes(response.data as List<int>);
+            final errorData = json.decode(jsonString);
+            if (errorData is Map && errorData.containsKey('error')) {
+              errorMessage = errorData['error'].toString();
+            } else if (errorData is Map && errorData.containsKey('message')) {
+              errorMessage = errorData['message'].toString();
+            } else if (errorData is Map && errorData.containsKey('detail')) {
+              errorMessage = errorData['detail'].toString();
+            }
+          }
+        } catch (parseError) {
+          debugPrint('Error parsing error response: $parseError');
+        }
+        throw Exception(errorMessage);
+      }
     } catch (e) {
       _handleError(e);
       rethrow;

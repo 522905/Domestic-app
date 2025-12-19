@@ -91,6 +91,49 @@ class RejectInventoryRequest extends InventoryEvent {
   List<Object> get props => [requestId, reason, requestType];
 }
 
+class CancelInventoryRequest extends InventoryEvent {
+  final String requestId;
+
+  const CancelInventoryRequest({required this.requestId});
+
+  @override
+  List<Object> get props => [requestId];
+}
+
+// Filter by request type only
+class FilterInventoryRequestsByType extends InventoryEvent {
+  final String requestType; // 'COLLECT' or 'DEPOSIT'
+
+  const FilterInventoryRequestsByType({required this.requestType});
+
+  @override
+  List<Object?> get props => [requestType];
+}
+
+// Filter by status and optionally exclude transfers
+class FilterInventoryRequestsByStatusAndType extends InventoryEvent {
+  final String status;
+  final bool excludeTransfer;
+
+  const FilterInventoryRequestsByStatusAndType({
+    required this.status,
+    this.excludeTransfer = false,
+  });
+
+  @override
+  List<Object?> get props => [status, excludeTransfer];
+}
+
 class ClearInventoryCache extends InventoryEvent {
   const ClearInventoryCache();
+}
+
+// Event to reload details after approval/rejection
+class LoadInventoryDetails extends InventoryEvent {
+  final String requestId;
+
+  const LoadInventoryDetails({required this.requestId});
+
+  @override
+  List<Object> get props => [requestId];
 }

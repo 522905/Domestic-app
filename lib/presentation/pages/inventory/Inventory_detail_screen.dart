@@ -10,6 +10,8 @@ import '../../../../utils/swipeButton.dart';
 import '../../../utils/gatepass_dialog.dart';
 import '../../blocs/inventory/inventory_bloc.dart';
 import '../../widgets/professional_snackbar.dart';
+import '../../widgets/cancel_request_dialog.dart';
+import '../../../core/services/User.dart';
 
 class InventoryDetailScreen extends StatefulWidget {
   final String requestId;
@@ -31,6 +33,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   final _commentController = TextEditingController();
   bool _isProcessing = false;
   String? _selectedRejectionReason;
+  String? _currentUserName;
 
   final Map<String, List<String>> _rejectionReasons = {
     'DEPOSIT': [
@@ -59,6 +62,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<InventoryBloc>().add(
@@ -66,6 +70,15 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         );
       }
     });
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final userName = await User().getUserName();
+    if (mounted) {
+      setState(() {
+        _currentUserName = userName;
+      });
+    }
   }
 
   @override
@@ -108,20 +121,37 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         body: BlocConsumer<InventoryBloc, InventoryState>(
           listener: (context, state) {
             // Handle approval/rejection success
-            if (state is InventoryLoaded && _isProcessing) {
+            if (state is InventoryActionSuccess) {
               if (mounted) {
-                setState(() => _isProcessing = false);
-                // Show success message and navigate back
-                context.showSuccessSnackBar('Request processed successfully');
-                Navigator.pop(context, true); // Return true to indicate success
+                // Show success message
+                if (state.action == 'approve') {
+                  context.showSuccessSnackBar(state.message);
+                } else {
+                  context.showInfoSnackBar(state.message);
+                }
+
+                // Don't navigate away - let the detail refresh happen
+                setState(() {
+                  _isProcessing = false;
+                });
+              }
+            }
+
+            // Handle detail loaded after approval
+            if (state is InventoryDetailLoaded && !_isProcessing) {
+              if (mounted) {
+                // Detail refreshed successfully, update UI
+                setState(() {
+                  // Force rebuild to show new status
+                });
               }
             }
 
             // Handle errors
-            if (state is InventoryError && _isProcessing) {
+            if (state is InventoryError) {
               if (mounted) {
                 setState(() => _isProcessing = false);
-                context.showErrorSnackBar('Error: ${state.message}');
+                context.showErrorSnackBar(state.message);
               }
             }
           },
@@ -168,7 +198,8 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                       SizedBox(height: 2.h),
                       _buildCommentSection(),
                       SizedBox(height: 2.h),
-                      if (request.requestType.toUpperCase() == 'COLLECT')
+                      if (request.requestType.toUpperCase() == 'COLLECT' ||
+                          request.requestType.toUpperCase() == 'DEPOSIT')
                         GatepassDialog(request: request),
                       SizedBox(height: 3.h),
                       _buildActionButtons(request),
@@ -177,11 +208,17 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                     else ...[
                       _buildStatusIndicator(request),
                       SizedBox(height: 2.h),
-                        if ( widget.userRole.contains('Warehouse Manager')) ...[
-                            if (request.requestType.toUpperCase() == 'COLLECT')
-                              GatepassDialog(request: request),
-                            SizedBox(height: 3.h),
-                        ]
+                      // Show cancel button if user is the requester and status is PENDING
+                      if (_shouldShowCancelButton(request)) ...[
+                        _buildCancelButton(request),
+                        SizedBox(height: 2.h),
+                      ],
+                      if ( widget.userRole.contains('Warehouse Manager')) ...[
+                        if (request.requestType.toUpperCase() == 'COLLECT' ||
+                            request.requestType.toUpperCase() == 'DEPOSIT')
+                          GatepassDialog(request: request),
+                        SizedBox(height: 3.h),
+                      ]
                     ]
                   ],
                 ),
@@ -1091,6 +1128,73 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
       if (mounted) {
         setState(() => _isProcessing = false);
         context.showErrorSnackBar('Failed to reject: $e');
+      }
+    }
+  }
+
+  bool _shouldShowCancelButton(InventoryRequest request) {
+    return request.status.toUpperCase() == 'PENDING';
+  }
+
+  Widget _buildCancelButton(InventoryRequest request) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: InkWell(
+        onTap: () => _handleCancelRequest(request),
+        borderRadius: BorderRadius.circular(12.r),
+        child: Container(
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+            gradient: LinearGradient(
+              colors: [Colors.red.shade400, Colors.red.shade600],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.cancel_outlined,
+                color: Colors.white,
+                size: 24.sp,
+              ),
+              SizedBox(width: 12.w),
+              Text(
+                'Cancel Request',
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleCancelRequest(InventoryRequest request) async {
+    final confirmed = await CancelRequestDialog.show(context, request.id);
+
+    if (confirmed == true && mounted) {
+      setState(() => _isProcessing = true);
+
+      try {
+        context.read<InventoryBloc>().add(
+          CancelInventoryRequest(requestId: request.id),
+        );
+        // Don't navigate here - let the BlocConsumer handle it
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          context.showErrorSnackBar('Failed to cancel request: $e');
+        }
       }
     }
   }

@@ -7,6 +7,8 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
 
 import '../core/services/User.dart';
+import '../core/services/api_service_interface.dart';
+import '../core/services/service_provider.dart';
 import '../presentation/widgets/professional_snackbar.dart';
 
 class GatepassDialog extends StatefulWidget {
@@ -23,34 +25,26 @@ class GatepassDialog extends StatefulWidget {
 
 class _GatepassDialogState extends State<GatepassDialog> {
   final PrinterService _printerService = PrinterService();
-  bool _isSlipPrinting = false;
-  bool _isChallanPrinting = false;
+  bool _isThermalPrintingChallan = false;
+  bool _isThermalPrintingSlip = false;
+  late ApiServiceInterface _apiService;
   bool _isScanning = false;
   bool _isConnected = false;
   List<BluetoothDevice> _printers = [];
   BluetoothDevice? _connectedDevice;
   StreamSubscription<List<ScanResult>>? _scanSubscription;
   StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
-  String _companyType = 'arungas';
 
   @override
   void initState() {
     super.initState();
     _checkConnectionStatus();
     _listenToAdapterState();
-    _loadCompany();
+    _initApiService();
   }
 
-  Future<void> _loadCompany() async {
-    final shortCode = await User().getActiveCompanyShortCode();
-    final trimmedCode = shortCode?.trim() ?? '';
-
-    debugPrint('Short Code: "$trimmedCode"'); // Check for whitespace
-
-    setState(() {
-      _companyType = shortCode?.trim().toUpperCase() == 'AG' ? 'arungas' : 'arunindane';
-    });
-
+  Future<void> _initApiService() async {
+    _apiService = await ServiceProvider.getApiService();
   }
 
   @override
@@ -76,17 +70,6 @@ class _GatepassDialogState extends State<GatepassDialog> {
     setState(() {
       _isConnected = _printerService.isConnected;
     });
-  }
-
-  String _getFormattedDate() {
-    final now = DateTime.now();
-    final DateFormat formatter = DateFormat('MMM d, yyyy h:mm a');
-    return formatter.format(now);
-  }
-
-  String _getVehicleId() {
-    // Use actual vehicle data from request if available
-    return widget.request.vehicle ?? 'N/A';
   }
 
   Future<void> _scanForPrinters({StateSetter? dialogSetState}) async {
@@ -145,15 +128,9 @@ class _GatepassDialogState extends State<GatepassDialog> {
           if (mounted) {
             setState(() {
               _printers = foundPrinters;
-              if (foundPrinters.isNotEmpty) {
-                _isScanning = false;
-              }
+              // Don't stop scanning - let it continue to find all printers
             });
             refreshDialog();
-          }
-
-          if (foundPrinters.isNotEmpty) {
-            unawaited(FlutterBluePlus.stopScan());
           }
         },
         onError: (error) {
@@ -189,6 +166,12 @@ class _GatepassDialogState extends State<GatepassDialog> {
 
   Future<void> _connectToPrinter(BluetoothDevice device) async {
     try {
+      // Stop scanning when user selects a printer
+      await FlutterBluePlus.stopScan();
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
+
       // Show loading
       showDialog(
         context: context,
@@ -230,97 +213,6 @@ class _GatepassDialogState extends State<GatepassDialog> {
       }
     }
   }
-
-  // void _showPrinterDialog() {
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) => StatefulBuilder(
-  //       builder: (context, setDialogState) {
-  //         return AlertDialog(
-  //           title: const Text('Select Printer'),
-  //           content: ConstrainedBox(
-  //             constraints: BoxConstraints(
-  //               maxHeight: MediaQuery.of(context).size.height * 0.6,
-  //               maxWidth: double.infinity,
-  //             ),
-  //             child: SingleChildScrollView(
-  //               child: Column(
-  //                 mainAxisSize: MainAxisSize.min,
-  //                 children: [
-  //                 if (_isScanning)
-  //                   Center(
-  //                     child: Column(
-  //                       mainAxisAlignment: MainAxisAlignment.center,
-  //                       children: [
-  //                         const CircularProgressIndicator(),
-  //                         SizedBox(height: 16.h),
-  //                         const Text('Scanning for printers...'),
-  //                       ],
-  //                     ),
-  //                   )
-  //                 else if (_printers.isEmpty)
-  //                   const Expanded(
-  //                     child: Center(
-  //                       child: Text('No printers found.\nTap Scan to search.'),
-  //                     ),
-  //                   )
-  //                 else
-  //                   Expanded(
-  //                     child: ListView.builder(
-  //                       shrinkWrap: true,
-  //                       itemCount: _printers.length,
-  //                       itemBuilder: (context, index) {
-  //                         final printer = _printers[index];
-  //                         return Card(
-  //                           child: ListTile(
-  //                             leading: const Icon(Icons.print, color: Colors.blue),
-  //                             title: Text(
-  //                               printer.platformName.isNotEmpty
-  //                                   ? printer.platformName
-  //                                   : 'Unknown Printer',
-  //                               style: const TextStyle(fontWeight: FontWeight.bold),
-  //                             ),
-  //                             subtitle: Text(
-  //                               printer.remoteId.str,
-  //                               style: TextStyle(fontSize: 11.sp),
-  //                             ),
-  //                             trailing: const Icon(Icons.chevron_right),
-  //                             onTap: () => _connectToPrinter(printer),
-  //                           ),
-  //                         );
-  //                       },
-  //                     ),
-  //                   ),
-  //               ],
-  //               ),
-  //             ),
-  //           ),
-  //           actions: [
-  //             TextButton.icon(
-  //               icon: Icon(_isScanning ? Icons.stop : Icons.bluetooth_searching),
-  //               label: Text(_isScanning ? 'Stop' : 'Scan'),
-  //               onPressed: _isScanning
-  //                   ? () async {
-  //                   await FlutterBluePlus.stopScan();
-  //                   if (mounted) {
-  //                     setState(() => _isScanning = false);
-  //                   }
-  //                   setDialogState(() {});
-  //                 }
-  //                   : () {
-  //                 _scanForPrinters(dialogSetState: setDialogState);
-  //               },
-  //             ),
-  //             TextButton(
-  //               onPressed: () => Navigator.pop(context),
-  //               child: const Text('Cancel'),
-  //             ),
-  //           ],
-  //         );
-  //       },
-  //     ),
-  //   );
-  // }
 
   void _showPrinterDialog() {
     showDialog(
@@ -421,11 +313,128 @@ class _GatepassDialogState extends State<GatepassDialog> {
     }
   }
 
+  Future<void> _handleThermalPrintChallan() async {
+    // Check approval status first
+    if (widget.request.status.toUpperCase() != 'APPROVED') {
+      if (mounted) {
+        context.showWarningSnackBar('Request must be approved before printing');
+      }
+      return;
+    }
+
+    // Check printer connection
+    if (!_printerService.isConnected) {
+      if (mounted) {
+        context.showErrorSnackBar('Please connect to printer first');
+      }
+      return;
+    }
+
+    final macAddress = _printerService.connectedDeviceMacAddress;
+    if (macAddress == null) {
+      if (mounted) {
+        context.showErrorSnackBar('Unable to get printer MAC address');
+      }
+      return;
+    }
+
+    setState(() => _isThermalPrintingChallan = true);
+
+    try {
+      // Step 1: Fetch binary ESC/POS data from API
+      final binaryData = await _apiService.thermalPrintStockRequest(
+        widget.request.id,
+        'gatepass',
+        macAddress,
+      );
+
+      debugPrint('Received ${binaryData.length} bytes from API');
+
+      // Step 2: Send binary data to printer
+      final success = await _printerService.printBinaryData(binaryData);
+
+      if (mounted) {
+        if (success) {
+          context.showSuccessSnackBar('Challan printed successfully');
+        } else {
+          context.showErrorSnackBar('Failed to send data to printer');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showErrorSnackBar(
+          'Failed to print: ${e.toString().replaceAll('Exception: ', '')}'
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isThermalPrintingChallan = false);
+      }
+    }
+  }
+
+  Future<void> _handleThermalPrintSlip() async {
+    // Check approval status first
+    if (widget.request.status.toUpperCase() != 'APPROVED') {
+      if (mounted) {
+        context.showWarningSnackBar('Request must be approved before printing');
+      }
+      return;
+    }
+
+    // Check printer connection
+    if (!_printerService.isConnected) {
+      if (mounted) {
+        context.showErrorSnackBar('Please connect to printer first');
+      }
+      return;
+    }
+
+    final macAddress = _printerService.connectedDeviceMacAddress;
+    if (macAddress == null) {
+      if (mounted) {
+        context.showErrorSnackBar('Unable to get printer MAC address');
+      }
+      return;
+    }
+
+    setState(() => _isThermalPrintingSlip = true);
+
+    try {
+      // Step 1: Fetch binary ESC/POS data from API
+      final binaryData = await _apiService.thermalPrintStockRequest(
+        widget.request.id,
+        'warehouse_slip',
+        macAddress,
+      );
+
+      debugPrint('Received ${binaryData.length} bytes from API');
+
+      // Step 2: Send binary data to printer
+      final success = await _printerService.printBinaryData(binaryData);
+
+      if (mounted) {
+        if (success) {
+          context.showSuccessSnackBar('Slip printed successfully');
+        } else {
+          context.showErrorSnackBar('Failed to send data to printer');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showErrorSnackBar(
+          'Failed to print: ${e.toString().replaceAll('Exception: ', '')}'
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isThermalPrintingSlip = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final formattedDate = _getFormattedDate();
-    final vehicleId = _getVehicleId();
-    final driverName = widget.request.requestedBy;
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.all(16.w),
@@ -496,105 +505,124 @@ class _GatepassDialogState extends State<GatepassDialog> {
               ),
             ),
             SizedBox(height: 16.h),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
-                        ? () async {
-                      setState(() => _isSlipPrinting = true);
-                      try {
-                        final success = await _printerService.printSlip(
-                          widget.request,
-                          formattedDate,
-                          vehicleId,
-                          driverName,
-                          company: _companyType, // Use dynamic value
-                        );
-
-                        if (mounted) {
-                          if (success) {
-                            context.showSuccessSnackBar('Slip printed successfully');
-                          } else {
-                            context.showErrorSnackBar('Failed to print slip');
-                          }
-                        }
-                      } finally {
-                        if (mounted) setState(() => _isSlipPrinting = false);
-                      }
-                    }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0E5CA8),
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24.r),
-                      ),
+            // Show different buttons based on request type
+            if (widget.request.requestType.toUpperCase() == 'DEPOSIT')
+              // Single button for DEPOSIT requests
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isConnected &&
+                             !_isThermalPrintingChallan &&
+                             widget.request.status.toUpperCase() == 'APPROVED'
+                      ? _handleThermalPrintChallan
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0E5CA8),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24.r),
                     ),
-                    child: _isSlipPrinting
+                  ),
+                  child: _isThermalPrintingChallan
                       ? SizedBox(
-                      height: 20.h,
-                      width: 20.w,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.w,
-                      ),
-                    )
-                        : Text('PRINT SLIP', style: TextStyle(fontSize: 14.sp)),
-                  ),
+                          height: 20.h,
+                          width: 20.w,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.w,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.print_outlined, size: 18.sp),
+                            SizedBox(width: 8.w),
+                            Text('THERMAL PRINT', style: TextStyle(fontSize: 14.sp)),
+                          ],
+                        ),
                 ),
-                SizedBox(width: 16.w),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isConnected && !_isSlipPrinting && !_isChallanPrinting
-                        ? () async {
-                      setState(() => _isChallanPrinting = true);
-                      try {
-                        final success = await _printerService.printGatepass(
-                          widget.request,
-                          formattedDate,
-                          vehicleId,
-                          driverName,
-                          company: _companyType, // Use dynamic value
-                        );
-
-                        if (mounted) {
-                          if (success) {
-                            context.showSuccessSnackBar('Challan printed successfully');
-                          } else {
-                            context.showErrorSnackBar('Failed to print challan');
-                          }
-                        }
-                      } finally {
-                        if (mounted) setState(() => _isChallanPrinting = false);
-                      }
-                    }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0E5CA8),
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24.r),
+              )
+            else
+              // Two buttons for COLLECT requests
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isConnected &&
+                                 !_isThermalPrintingChallan &&
+                                 !_isThermalPrintingSlip &&
+                                 widget.request.status.toUpperCase() == 'APPROVED'
+                          ? _handleThermalPrintChallan
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5CA8),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24.r),
+                        ),
                       ),
+                      child: _isThermalPrintingChallan
+                          ? SizedBox(
+                              height: 20.h,
+                              width: 20.w,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.w,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.print_outlined, size: 18.sp),
+                                SizedBox(width: 8.w),
+                                Text('THERMAL CHALLAN', style: TextStyle(fontSize: 12.sp)),
+                              ],
+                            ),
                     ),
-                    child: _isChallanPrinting
-                        ? SizedBox(
-                      height: 20.h,
-                      width: 20.w,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.w,
-                      ),
-                    )
-                        : Text('PRINT CHALLAN', style: TextStyle(fontSize: 14.sp)),
                   ),
-                ),
-              ],
-            ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isConnected &&
+                                 !_isThermalPrintingChallan &&
+                                 !_isThermalPrintingSlip &&
+                                 widget.request.status.toUpperCase() == 'APPROVED'
+                          ? _handleThermalPrintSlip
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0E5CA8),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24.r),
+                        ),
+                      ),
+                      child: _isThermalPrintingSlip
+                          ? SizedBox(
+                              height: 20.h,
+                              width: 20.w,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.w,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.print_outlined, size: 18.sp),
+                                SizedBox(width: 8.w),
+                                Text('THERMAL SLIP', style: TextStyle(fontSize: 14.sp)),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

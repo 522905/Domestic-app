@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +22,7 @@ class PrinterService {
   Stream<bool> get connectionStatus => _connectionStatusController.stream;
   bool get isConnected => _isConnected;
   String? get connectedDeviceName => _connectedDevice?.platformName;
+  String? get connectedDeviceMacAddress => _connectedDevice?.remoteId.str;
 
   // Chunk size handling
   static const int _fallbackChunkSize = 200;
@@ -696,47 +698,21 @@ class PrinterService {
       bytes.addAll([10]);
       bytes.addAll([10]);
 
-      // Status
-      // bytes.addAll('------------------------------------------------'.codeUnits);
-      // bytes.addAll([10]);
-      // String status = 'PENDING';
-      // switch (transaction.status) {
-      //   case TransactionStatus.pending:
-      //     status = 'PENDING';
-      //     break;
-      //   case TransactionStatus.approved:
-      //     status = 'APPROVED';
-      //     break;
-      //   case TransactionStatus.rejected:
-      //     status = 'REJECTED';
-      //     break;
-      // }
-      // bytes.addAll([27, 69, 1]); // Bold ON
-      // bytes.addAll('Status: $status'.codeUnits);
-      // bytes.addAll([27, 69, 0]); // Bold OFF
-      // bytes.addAll([10]);
-      //
-      // // Approved by (if approved)
-      // if (transaction.status == TransactionStatus.approved) {
-      //   if (transaction.approvedByName != null && transaction.approvedByName!.isNotEmpty) {
-      //     bytes.addAll('Approved by: ${transaction.approvedByName}'.codeUnits);
-      //     bytes.addAll([10]);
-      //   }
-      //   if (transaction.approvedAt != null) {
-      //     final approvedDate = DateFormat('dd/MM/yyyy hh:mm a').format(transaction.approvedAt!.toLocal());
-      //     bytes.addAll('Approved on: $approvedDate'.codeUnits);
-      //     bytes.addAll([10]);
-      //   }
-      // }
-      //
-      // bytes.addAll('------------------------------------------------'.codeUnits);
-      // bytes.addAll([10, 10, 10, 10, 10]); // Extra spacing at end
-
-      // Cut paper
-
       bytes.addAll([29, 86, 66, 0]);
 
+      // Print complete bytes using developer.log (no truncation)
       debugPrint('Total receipt bytes: ${bytes.length}');
+
+      // Use developer.log to print complete array without truncation
+      developer.log('Complete bytes array: $bytes', name: 'PrinterService');
+
+      // Also print in chunks for debugPrint
+      final chunkSize = 100;
+      for (int i = 0; i < bytes.length; i += chunkSize) {
+        final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+        final chunk = bytes.sublist(i, end);
+        debugPrint('Bytes [$i-${end-1}]: $chunk');
+      }
 
       final success = await _writeInChunks(bytes);
 
@@ -747,6 +723,30 @@ class PrinterService {
       return success;
     } catch (e) {
       debugPrint('Error printing cash receipt: $e');
+      return false;
+    }
+  }
+
+  Future<bool> printBinaryData(List<int> binaryData) async {
+    if (!_isConnected || _writeCharacteristic == null) {
+      debugPrint('Printer not connected');
+      return false;
+    }
+
+    try {
+      debugPrint('bytes: $binaryData');
+      debugPrint('Sending ${binaryData.length} bytes to thermal printer');
+      final success = await _writeInChunks(binaryData);
+
+      if (success) {
+        debugPrint('Binary data sent successfully to thermal printer');
+      } else {
+        debugPrint('Failed to send binary data to thermal printer');
+      }
+
+      return success;
+    } catch (e) {
+      debugPrint('Error sending binary data: $e');
       return false;
     }
   }

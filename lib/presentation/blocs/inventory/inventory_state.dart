@@ -50,3 +50,32 @@ class InventoryDetailError extends InventoryState {
   @override
   List<Object> get props => [message];
 }
+
+// Action states for approve/reject operations
+class InventoryActionLoading extends InventoryState {
+  final String requestId;
+  final String action; // 'approve' or 'reject'
+
+  const InventoryActionLoading({
+    required this.requestId,
+    required this.action,
+  });
+
+  @override
+  List<Object> get props => [requestId, action];
+}
+
+class InventoryActionSuccess extends InventoryState {
+  final String message;
+  final String requestId;
+  final String action;
+
+  const InventoryActionSuccess({
+    required this.message,
+    required this.requestId,
+    required this.action,
+  });
+
+  @override
+  List<Object> get props => [message, requestId, action];
+}

@@ -180,10 +180,10 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                       children: [
                         Icon(
                           Icons.access_time,
-                          size: 14.w,
+                          size: 12.w,
                           color: const Color(0xFF666666),
                         ),
-                        SizedBox(width: 4.w),
+                        SizedBox(width: 2.w),
                         Text(
                           'Last visit: ${dateFormat.format(visitDate)}',
                           style: TextStyle(

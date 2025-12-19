@@ -865,19 +865,61 @@ class _DispatchVehicleScreenEnhancedState
     final activeGroups = _currentGroups.where((g) => !g.isDeleted).toList();
 
     if (activeGroups.isEmpty) {
-      return Container(
-        margin: EdgeInsets.all(16.w),
-        padding: EdgeInsets.all(32.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-        child: Center(
-          child: Text(
-            'No active groups',
-            style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+      // In equal mode, just show empty state
+      if (_currentMode == 'equal') {
+        return Container(
+          margin: EdgeInsets.all(16.w),
+          padding: EdgeInsets.all(32.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12.r),
           ),
-        ),
+          child: Center(
+            child: Text(
+              'No active groups',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+            ),
+          ),
+        );
+      }
+
+      // In unequal mode, show empty state + add unlinked button
+      return Column(
+        children: [
+          Container(
+            margin: EdgeInsets.all(16.w),
+            padding: EdgeInsets.all(32.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Center(
+              child: Text(
+                'No active groups',
+                style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _showAddUnlinkedGroupDialog,
+                icon: Icon(Icons.add_circle_outline, size: 20.sp),
+                label: const Text('Add Unlinked Item Group'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange,
+                  side: BorderSide(color: Colors.orange.shade300, width: 2),
+                  padding: EdgeInsets.symmetric(vertical: 14.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     }
 

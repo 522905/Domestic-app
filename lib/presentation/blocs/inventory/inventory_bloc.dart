@@ -19,13 +19,17 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     on<LoadInventoryRequestDetail>(_onLoadInventoryRequestDetail);
     on<SearchInventoryRequests>(_onSearchInventoryRequests);
     on<FilterInventoryRequests>(_onFilterInventoryRequests);
+    on<FilterInventoryRequestsByType>(_onFilterInventoryRequestsByType);
+    on<FilterInventoryRequestsByStatusAndType>(_onFilterInventoryRequestsByStatusAndType);
     on<ToggleFavoriteRequest>(_onToggleFavoriteRequest);
     on<AddInventoryRequest>(_onAddInventoryRequest);
     on<RefreshInventoryRequests>(_onRefreshInventoryRequests);
     on<UpdateInventoryRequest>(_onUpdateInventoryRequest);
     on<ApproveInventoryRequest>(_onApproveInventoryRequest);
     on<RejectInventoryRequest>(_onRejectInventoryRequest);
+    on<CancelInventoryRequest>(_onCancelInventoryRequest);
     on<ClearInventoryCache>(_onClearInventoryCache);
+    on<LoadInventoryDetails>(_onLoadInventoryDetails);
   }
 
   Future<void> _onLoadInventoryRequestDetail(
@@ -45,12 +49,18 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       ApproveInventoryRequest event,
       Emitter<InventoryState> emit,
       ) async {
+    emit(InventoryActionLoading(
+      requestId: event.requestId,
+      action: 'approve',
+    ));
+
     try {
       await _apiService.approveInventoryRequest(
         requestId: event.requestId,
         requestType: event.requestType,
       );
 
+      // Update local cache
       final updatedRequests = _allRequests.map((request) {
         if (request.id == event.requestId) {
           return request.copyWith(status: 'APPROVED');
@@ -59,7 +69,17 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       }).toList();
 
       _allRequests = updatedRequests;
-      emit(InventoryLoaded(requests: updatedRequests));
+
+      // Emit success state
+      emit(InventoryActionSuccess(
+        message: 'Request approved successfully',
+        requestId: event.requestId,
+        action: 'approve',
+      ));
+
+      // Trigger detail refresh after short delay
+      await Future.delayed(const Duration(milliseconds: 300));
+      add(LoadInventoryDetails(requestId: event.requestId));
     } catch (e) {
       emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
@@ -69,6 +89,11 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       RejectInventoryRequest event,
       Emitter<InventoryState> emit,
       ) async {
+    emit(InventoryActionLoading(
+      requestId: event.requestId,
+      action: 'reject',
+    ));
+
     try {
       await _apiService.rejectInventoryRequest(
         requestId: event.requestId,
@@ -76,6 +101,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
         requestType: event.requestType,
       );
 
+      // Update local cache
       final updatedRequests = _allRequests.map((request) {
         if (request.id == event.requestId) {
           return request.copyWith(status: 'REJECTED');
@@ -84,7 +110,56 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       }).toList();
 
       _allRequests = updatedRequests;
-      emit(InventoryLoaded(requests: updatedRequests));
+
+      // Emit success state
+      emit(InventoryActionSuccess(
+        message: 'Request rejected',
+        requestId: event.requestId,
+        action: 'reject',
+      ));
+
+      // Trigger detail refresh after short delay
+      await Future.delayed(const Duration(milliseconds: 300));
+      add(LoadInventoryDetails(requestId: event.requestId));
+    } catch (e) {
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
+    }
+  }
+
+  Future<void> _onCancelInventoryRequest(
+      CancelInventoryRequest event,
+      Emitter<InventoryState> emit,
+      ) async {
+    try {
+      // Call API to cancel the request
+      final cancelledRequest = await _apiService.cancelInventoryRequest(
+        event.requestId,
+      );
+
+      // Update the cache with the cancelled request from API
+      final updatedRequests = _allRequests.map((request) {
+        if (request.id == event.requestId) {
+          return cancelledRequest; // Use the full response from API
+        }
+        return request;
+      }).toList();
+
+      _allRequests = updatedRequests;
+
+      // Update current view if state is already loaded
+      if (state is InventoryLoaded) {
+        final currentRequests = (state as InventoryLoaded).requests;
+        final updatedCurrentRequests = currentRequests.map((request) {
+          if (request.id == event.requestId) {
+            return cancelledRequest;
+          }
+          return request;
+        }).toList();
+
+        emit(InventoryLoaded(requests: updatedCurrentRequests));
+      } else {
+        emit(InventoryLoaded(requests: updatedRequests));
+      }
     } catch (e) {
       emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
@@ -182,6 +257,36 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     emit(InventoryLoaded(requests: filteredRequests));
   }
 
+  // Handler for FilterInventoryRequestsByType
+  void _onFilterInventoryRequestsByType(
+    FilterInventoryRequestsByType event,
+    Emitter<InventoryState> emit,
+  ) {
+    if (_allRequests.isEmpty) return;
+
+    final filteredRequests = _allRequests.where((request) {
+      return request.requestType == event.requestType;
+    }).toList();
+
+    emit(InventoryLoaded(requests: filteredRequests));
+  }
+
+  // Handler for FilterInventoryRequestsByStatusAndType
+  void _onFilterInventoryRequestsByStatusAndType(
+    FilterInventoryRequestsByStatusAndType event,
+    Emitter<InventoryState> emit,
+  ) {
+    if (_allRequests.isEmpty) return;
+
+    final filteredRequests = _allRequests.where((request) {
+      final matchesStatus = request.status == event.status;
+      final isNotTransfer = event.excludeTransfer ? request.requestType != 'TRANSFER' : true;
+      return matchesStatus && isNotTransfer;
+    }).toList();
+
+    emit(InventoryLoaded(requests: filteredRequests));
+  }
+
   Future<void> _onToggleFavoriteRequest(
       ToggleFavoriteRequest event,
       Emitter<InventoryState> emit
@@ -264,5 +369,23 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
   void _onClearInventoryCache(ClearInventoryCache event, Emitter<InventoryState> emit) {
     _allRequests = [];
     emit(InventoryInitial());
+  }
+
+  // Handler to reload request details from cache after approval/rejection
+  Future<void> _onLoadInventoryDetails(
+    LoadInventoryDetails event,
+    Emitter<InventoryState> emit,
+  ) async {
+    try {
+      // Find request in cached list
+      final request = _allRequests.firstWhere(
+        (r) => r.id == event.requestId,
+        orElse: () => throw Exception('Request not found'),
+      );
+
+      emit(InventoryDetailLoaded(request: request));
+    } catch (e) {
+      emit(InventoryError(message: ErrorHandler.handleError(e)));
+    }
   }
 }

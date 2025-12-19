@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../services/User.dart';
 
 class InventoryRequest extends Equatable {
   final String? vehicle;
@@ -21,6 +22,9 @@ class InventoryRequest extends Equatable {
   final String? rejectedBy;
   final String? rejectedAt;
   final String? rejectionReason;
+  final String? cancelledBy;
+  final String? cancelledByName;
+  final String? cancelledAt;
   final String? sourceWarehouse;
   final List<Map<String, dynamic>>? driverInfo;
   final bool? regularDeliveryPartner;
@@ -49,6 +53,9 @@ class InventoryRequest extends Equatable {
     this.rejectedBy,
     this.rejectedAt,
     this.rejectionReason,
+    this.cancelledBy,
+    this.cancelledByName,
+    this.cancelledAt,
     this.driverInfo,
     this.imageUrl,
     this.regularDeliveryPartner,
@@ -78,6 +85,9 @@ class InventoryRequest extends Equatable {
     this.rejectedBy,
     this.rejectedAt,
     this.rejectionReason,
+    this.cancelledBy,
+    this.cancelledByName,
+    this.cancelledAt,
     this.driverInfo,
     this.imageUrl,
     this.regularDeliveryPartner,
@@ -106,6 +116,9 @@ class InventoryRequest extends Equatable {
     String? rejectedBy,
     String? rejectedAt,
     String? rejectionReason,
+    String? cancelledBy,
+    String? cancelledByName,
+    String? cancelledAt,
     String? sourceWarehouse,
     List<Map<String, dynamic>>? driverInfo,
     bool? regularDeliveryPartner,
@@ -134,6 +147,9 @@ class InventoryRequest extends Equatable {
       rejectedBy: rejectedBy ?? this.rejectedBy,
       rejectedAt: rejectedAt ?? this.rejectedAt,
       rejectionReason: rejectionReason ?? this.rejectionReason,
+      cancelledBy: cancelledBy ?? this.cancelledBy,
+      cancelledByName: cancelledByName ?? this.cancelledByName,
+      cancelledAt: cancelledAt ?? this.cancelledAt,
       sourceWarehouse: sourceWarehouse ?? this.sourceWarehouse,
       driverInfo: driverInfo ?? this.driverInfo,
       regularDeliveryPartner: regularDeliveryPartner ?? this.regularDeliveryPartner,
@@ -180,6 +196,9 @@ class InventoryRequest extends Equatable {
       rejectedBy: json['rejected_by']?.toString(),
       rejectedAt: json['rejected_at']?.toString(),
       rejectionReason: json['rejection_reason']?.toString(),
+      cancelledBy: json['cancelled_by']?.toString(),
+      cancelledByName: json['cancelled_by_name']?.toString(),
+      cancelledAt: json['cancelled_at']?.toString(),
       sourceWarehouse: json['source_warehouse']?.toString(),
       driverInfo: (json['driver_info'] as List?)
           ?.map((item) => Map<String, dynamic>.from(item))
@@ -212,6 +231,9 @@ class InventoryRequest extends Equatable {
       'rejected_by': rejectedBy,
       'rejected_at': rejectedAt,
       'rejection_reason': rejectionReason,
+      'cancelled_by': cancelledBy,
+      'cancelled_by_name': cancelledByName,
+      'cancelled_at': cancelledAt,
       'source_warehouse': sourceWarehouse,
       'driver_info': driverInfo,
       'regular_delivery_partner': regularDeliveryPartner,
@@ -243,6 +265,9 @@ class InventoryRequest extends Equatable {
     rejectedBy,
     rejectedAt,
     rejectionReason,
+    cancelledBy,
+    cancelledByName,
+    cancelledAt,
     sourceWarehouse,
     driverInfo,
     regularDeliveryPartner,
@@ -250,4 +275,19 @@ class InventoryRequest extends Equatable {
     remarks,
     vehicle,
   ];
+
+  /// Check if the current user can cancel this request
+  /// Returns true only if the request is PENDING and created by the current user
+  Future<bool> canBeCancelledBy() async {
+    if (status != 'PENDING') return false;
+
+    // The requestedBy field contains the user's name (not ID)
+    final userName = await User().getUserName();
+    return requestedBy == userName;
+  }
+
+  /// Synchronous version when you already have the user name
+  bool canBeCancelledByUser(String currentUserName) {
+    return status == 'PENDING' && requestedBy == currentUserName;
+  }
 }

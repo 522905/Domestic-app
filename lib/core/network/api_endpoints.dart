@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 class ApiEndpoints {
   final String baseUrl;
 
-  final String tempUrl = 'https://lpg.ops.arungas.com';
-  // final String tempUrl = 'http://192.168.171.49:9900';
+  // final String tempUrl = 'https://lpg.ops.arungas.com';
+  final String tempUrl = 'http://192.168.171.123:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
@@ -47,6 +47,8 @@ class ApiEndpoints {
   // Gate-pass endpoints
   String get gatepass => '$baseUrl/api/gatepass/';
   String get gatepassPrint => '$baseUrl/api/gatepass/print';
+  String thermalPrintStockRequest(String requestId) => '$tempUrl/api/thermal-printing/stock-requests/$requestId/thermal-print/';
+  String thermalPrintPaymentRequest(String transactionId) => '$tempUrl/api/thermal-printing/payment-requests/$transactionId/thermal-print/';
 
   // Collection request endpoints0
   String get collectionRequests => '$baseUrl/api/inventory-requests/';
@@ -74,6 +76,7 @@ class ApiEndpoints {
   String stockDetailApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/';
   String approveRequestsApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/approve/';
   String rejectRequestsApi(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/reject/';
+  String cancelInventoryRequest(String requestId) => '$tempUrl/api/stocks/stock-requests/$requestId/cancel/';
   String get unlinkedItemsList => '$tempUrl/api/stocks/exchange-return-items/';
   String get getMaterialRequestList => '$tempUrl/api/stocks/pending-material-requests/';
   String get getPendingSaleOrderList => '$tempUrl/api/stocks/pending-sales-orders-returns/';

@@ -32,8 +32,9 @@ class _InventoryPageState extends State<InventoryPage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   late TextEditingController _searchController;
-  final List<String> _statusTabs = ['All', 'Pending', 'Approved', 'Rejected'];
+  final List<String> _statusTabs = ['All', 'Pending', 'Collect', 'Deposit'];
   String _currentFilter = 'All';
+  String _searchQuery = '';
   List<Map<String, dynamic>> warehouses = [];
   List<Map<String, dynamic>> vehicles = [];
   // TODO remove this simply
@@ -42,7 +43,6 @@ class _InventoryPageState extends State<InventoryPage>
 
   List<String> _userRole = [];
   String? _userName = '';
-  bool _isLoading = true;
 
   @override
   void initState() {
@@ -62,6 +62,9 @@ class _InventoryPageState extends State<InventoryPage>
       if (!_tabController.indexIsChanging) {
         setState(() {
           _currentFilter = _statusTabs[_tabController.index];
+          // Clear search when changing tabs
+          _searchController.clear();
+          _searchQuery = '';
         });
         _filterRequests(_currentFilter);
       }
@@ -102,30 +105,45 @@ class _InventoryPageState extends State<InventoryPage>
         warehouses = List<Map<String, dynamic>>.from(_warehouses);
         _userRole = userRole.map((userRole) => userRole.role).toList();
         _userName = userName;
-        _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       context.showErrorSnackBar('Failed to load data: $e');
     }
   }
 
-  void _filterRequests(String status) {
-    if (status == 'All') {
+  void _filterRequests(String tabName) {
+    if (tabName == 'All') {
+      // Show all requests
       context
           .read<InventoryBloc>()
           .add(const FilterInventoryRequests(status: null));
-    } else {
+    } else if (tabName == 'Pending') {
+      // Show only pending requests (excluding TRANSFER)
       context
           .read<InventoryBloc>()
-          .add(FilterInventoryRequests(status: status.toUpperCase()));
+          .add(const FilterInventoryRequestsByStatusAndType(
+            status: 'PENDING',
+            excludeTransfer: true,
+          ));
+    } else if (tabName == 'Collect') {
+      // Show all COLLECT requests
+      context
+          .read<InventoryBloc>()
+          .add(const FilterInventoryRequestsByType(
+            requestType: 'COLLECT',
+          ));
+    } else if (tabName == 'Deposit') {
+      // Show all DEPOSIT requests
+      context
+          .read<InventoryBloc>()
+          .add(const FilterInventoryRequestsByType(
+            requestType: 'DEPOSIT',
+          ));
     }
   }
 
   Future<void> _navigateToActionScreen(Widget screen) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => screen),
     );
@@ -168,6 +186,11 @@ class _InventoryPageState extends State<InventoryPage>
                   Future.delayed(const Duration(milliseconds: 500), () {
                     Navigator.of(context).pop(); // Close the dialog after 1 second
                     context.read<InventoryBloc>().add(const RefreshInventoryRequests());
+
+                    // Re-apply current tab filter after refresh
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      _filterRequests(_currentFilter);
+                    });
                   });
                 }
               });
@@ -185,8 +208,19 @@ class _InventoryPageState extends State<InventoryPage>
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search Requests...',
+                hintText: 'Search by ID, Warehouse, or Person...',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.r),
                 ),
@@ -196,9 +230,9 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
               ),
               onChanged: (value) {
-                context
-                    .read<InventoryBloc>()
-                    .add(SearchInventoryRequests(query: value));
+                setState(() {
+                  _searchQuery = value;
+                });
               },
             ),
           ),
@@ -215,7 +249,24 @@ class _InventoryPageState extends State<InventoryPage>
               unselectedLabelColor: Colors.grey,
               indicatorColor: Theme.of(context).primaryColor,
               indicatorWeight: 3,
-              tabs: _statusTabs.map((status) => Tab(text: status)).toList(),
+              tabs: [
+                Tab(
+                  icon: Icon(Icons.list_alt, size: 20.sp),
+                  text: 'All',
+                ),
+                Tab(
+                  icon: Icon(Icons.pending_actions, size: 20.sp),
+                  text: 'Pending',
+                ),
+                Tab(
+                  icon: Icon(Icons.add_chart, size: 20.sp),
+                  text: 'Challan',
+                ),
+                Tab(
+                  icon: Icon(Icons.call_received, size: 20.sp),
+                  text: 'Deposit',
+                ),
+              ],
             ),
           ),
           // Content
@@ -232,12 +283,19 @@ class _InventoryPageState extends State<InventoryPage>
 
                     // Handle loaded state
                     else if (state is InventoryLoaded) {
-                      // Filter by status
-                      final requests = status == 'All'
-                          ? state.requests
-                          : state.requests
-                          .where((r) => r.status == status.toUpperCase())
-                          .toList();
+                      // BLoC already filtered the requests based on tab selection
+                      var requests = state.requests;
+
+                      // Apply search filter on top of tab filter
+                      if (_searchQuery.isNotEmpty) {
+                        final query = _searchQuery.toLowerCase();
+                        requests = requests.where((request) {
+                          return request.id.toLowerCase().contains(query) ||
+                              request.warehouse.toLowerCase().contains(query) ||
+                              request.requestedBy.toLowerCase().contains(query) ||
+                              request.status.toLowerCase().contains(query);
+                        }).toList();
+                      }
 
                       if (requests.isEmpty) {
                         return Center(
@@ -271,7 +329,10 @@ class _InventoryPageState extends State<InventoryPage>
                           context
                               .read<InventoryBloc>()
                               .add(const RefreshInventoryRequests());
-                          return Future.delayed(const Duration(milliseconds: 200));
+                          await Future.delayed(const Duration(milliseconds: 200));
+
+                          // Re-apply current tab filter after refresh
+                          _filterRequests(_currentFilter);
                         },
                         child: ListView.builder(
                           padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -348,22 +409,18 @@ class _InventoryPageState extends State<InventoryPage>
     return BlocBuilder<InventoryBloc, InventoryState>(
       builder: (context, state) {
         if (state is InventoryLoaded) {
-          final statusCounts = {
-            'PENDING':
-                state.requests.where((r) => r.status == 'PENDING').length,
-            'APPROVED':
-                state.requests.where((r) => r.status == 'APPROVED').length,
-            'REJECTED':
-                state.requests.where((r) => r.status == 'REJECTED').length,
-          };
-
-          // Filter statuses with non-zero counts
-          final filteredStatuses =
-              statusCounts.entries.where((entry) => entry.value > 0).toList();
+          final pendingCount = state.requests.where((r) => r.status == 'PENDING' && r.requestType != 'TRANSFER').length;
+          final collectCount = state.requests.where((r) => r.requestType == 'COLLECT').length;
+          final depositCount = state.requests.where((r) => r.requestType == 'DEPOSIT').length;
 
           if (state.requests.isEmpty) {
             return Container(
+              margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8.r),
+              ),
               child: Center(
                 child: Text(
                   'No requests found',
@@ -375,10 +432,78 @@ class _InventoryPageState extends State<InventoryPage>
               ),
             );
           }
+
+          // Build list of count rows based on current filter/tab
+          final summaryRows = <Widget>[];
+
+          // Show only relevant stats based on active tab
+          if (_currentFilter == 'All') {
+            // Show all non-zero counts
+            if (pendingCount > 0) {
+              summaryRows.add(_buildSummaryRow(
+                icon: Icons.pending_actions,
+                label: 'Pending',
+                count: pendingCount,
+                color: Colors.amber,
+              ));
+            }
+
+            if (collectCount > 0) {
+              if (summaryRows.isNotEmpty) {
+                summaryRows.add(Divider(height: 16.h, color: Colors.grey[300]));
+              }
+              summaryRows.add(_buildSummaryRow(
+                icon: Icons.call_received,
+                label: 'Collect',
+                count: collectCount,
+                color: const Color(0xFFF7941D),
+              ));
+            }
+
+            if (depositCount > 0) {
+              if (summaryRows.isNotEmpty) {
+                summaryRows.add(Divider(height: 16.h, color: Colors.grey[300]));
+              }
+              summaryRows.add(_buildSummaryRow(
+                icon: Icons.call_made,
+                label: 'Deposit',
+                count: depositCount,
+                color: const Color(0xFF0E5CA8),
+              ));
+            }
+          } else if (_currentFilter == 'Pending') {
+            // Show only Pending count
+            summaryRows.add(_buildSummaryRow(
+              icon: Icons.pending_actions,
+              label: 'Pending',
+              count: pendingCount,
+              color: Colors.amber,
+            ));
+          } else if (_currentFilter == 'Collect') {
+            // Show only Collect count
+            summaryRows.add(_buildSummaryRow(
+              icon: Icons.call_received,
+              label: 'Collect',
+              count: collectCount,
+              color: const Color(0xFFF7941D),
+            ));
+          } else if (_currentFilter == 'Deposit') {
+            // Show only Deposit count
+            summaryRows.add(_buildSummaryRow(
+              icon: Icons.call_made,
+              label: 'Deposit',
+              count: depositCount,
+              color: const Color(0xFF0E5CA8),
+            ));
+          }
+
           return Container(
+            margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
             padding: EdgeInsets.all(16.w),
             decoration: BoxDecoration(
               color: Colors.white,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: Colors.grey[300]!),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -387,19 +512,8 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
               ],
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: filteredStatuses.map((status) {
-                return _summaryCard(
-                  status.key,
-                  status.value,
-                  status.key == 'PENDING'
-                      ? const Color(0xFFFFC107)
-                      : status.key == 'APPROVED'
-                          ? const Color(0xFF4CAF50)
-                          : const Color(0xFFF44336),
-                );
-              }).toList(),
+            child: Column(
+              children: summaryRows,
             ),
           );
         }
@@ -408,39 +522,72 @@ class _InventoryPageState extends State<InventoryPage>
     );
   }
 
-  Widget _summaryCard(String title, int count, Color color) {
-    return Container(
-      width: 100.w,
-      padding: EdgeInsets.symmetric(vertical: 5.h, horizontal: 4.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        children: [
-          Text(
-            title,
+  Widget _buildSummaryRow({
+    required IconData icon,
+    required String label,
+    required int count,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(8.w),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 20.sp,
+          ),
+        ),
+        SizedBox(width: 12.w),
+        Expanded(
+          child: Text(
+            label,
             style: TextStyle(
-              fontSize: 14.sp,
-              color: color,
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[800],
             ),
           ),
-          SizedBox(height: 8.h),
-          Text(
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Text(
             count.toString(),
             style: TextStyle(
-              fontSize: 24.sp,
+              fontSize: 16.sp,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: Colors.white,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
+  Color _getRequestTypeColor(String requestType) {
+    switch (requestType) {
+      case 'COLLECT':
+        return const Color(0xFFF7941D); // Orange for Collect
+      case 'DEPOSIT':
+        return const Color(0xFF0E5CA8); // Blue for Deposit
+      case 'TRANSFER':
+        return const Color(0xFF9C27B0); // Purple for Transfer
+      default:
+        return Colors.grey;
+    }
+  }
+
   Widget _buildInventoryRequestCard(InventoryRequest request) {
+    // Debug: Check if cancel button should be visible
+
     Color statusColor;
     switch (request.status) {
       case 'PENDING':
@@ -452,13 +599,12 @@ class _InventoryPageState extends State<InventoryPage>
       case 'REJECTED':
         statusColor = const Color(0xFFF44336);
         break;
+      case 'CANCELLED':
+        statusColor = const Color(0xFF9E9E9E);
+        break;
       default:
         statusColor = const Color(0xFF2196F3);
     }
-
-    final isCollectionRequest = request.requestType == 'COLLECT';
-    final isDepositRequest = request.requestType == 'DEPOSIT';
-    final isTransferRequest = request.requestType == 'TRANSFER';
 
     final dtLocal = DateTime.parse(request.timestamp).toLocal();
     return Card(
@@ -506,32 +652,88 @@ class _InventoryPageState extends State<InventoryPage>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.inventory_2_rounded,
-                        size: 16.sp,
-                        color: isCollectionRequest
-                            ? const Color(0xFFF7941D)
-                            : const Color(0xFF0E5CA8),
-                      ),
-                      SizedBox(width: 8.w),
-                      Text(
-                        "${request.id} - {${request.requestType}}",
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(6.w),
+                          decoration: BoxDecoration(
+                            color: _getRequestTypeColor(request.requestType).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Icon(
+                            Icons.inventory_2_rounded,
+                            size: 20.sp,
+                            color: _getRequestTypeColor(request.requestType),
+                          ),
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              // ID Text
+                              Text(
+                                request.id,
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF333333),
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
+                              // Inline Type Badge
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                decoration: BoxDecoration(
+                                  color: _getRequestTypeColor(request.requestType).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: _getRequestTypeColor(request.requestType),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  request.requestType,
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: _getRequestTypeColor(request.requestType),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  SizedBox(width: 8.w),
                   StatusChip(
                     label: request.status,
                     color: statusColor,
                   ),
                 ],
               ),
-              SizedBox(height: 8.h),
+              SizedBox(height: 6.h),
+              Row(
+                children: [
+                  Icon(
+                    Icons.person,
+                    size: 16.sp,
+                    color: Colors.grey[600],
+                  ),
+                  SizedBox(width: 4.w),
+                  Text(
+                    'Req. By: ${request.requestedBy}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16.sp,
+                      color: Colors.deepOrange[300],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 2.h),
               Row(
                 children: [
                   Icon(
@@ -542,24 +744,6 @@ class _InventoryPageState extends State<InventoryPage>
                   SizedBox(width: 4.w),
                   Text(
                     'Warehouse: ${request.warehouse}',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 2.h),
-              Row(
-                children: [
-                  Icon(
-                    Icons.person,
-                    size: 16.sp,
-                    color: Colors.grey[600],
-                  ),
-                  SizedBox(width: 4.w),
-                  Text(
-                    'Requested by: ${request.requestedBy}',
                     style: TextStyle(
                       fontSize: 14.sp,
                       color: Colors.grey[600],
@@ -603,49 +787,71 @@ class _InventoryPageState extends State<InventoryPage>
                         )
                     ],
                   ),
-                  if (request.status == 'PENDING')
-                    Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(12.r),
-                        border: Border.all(
-                          color: Colors.amber.shade200,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.priority_high,
-                            size: 12.sp,
-                            color: Colors.amber,
-                          ),
-                          SizedBox(width: 4.w),
-                          Text(
-                            'Needs Approval',
-                            style: TextStyle(
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.amber[800],
+                  Row(
+                    children: [
+                      if (request.status == 'PENDING')
+                        Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                              color: Colors.amber.shade200,
+                              width: 1,
                             ),
                           ),
-                        ],
-                      ),
-                    )
-                  else if (request.status == 'APPROVED')
-                    Icon(
-                      Icons.check_circle,
-                      size: 20.sp,
-                      color: Colors.green,
-                    )
-                  else
-                    Icon(
-                      Icons.cancel,
-                      size: 20.sp,
-                      color: Colors.red,
-                    ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.priority_high,
+                                size: 12.sp,
+                                color: Colors.amber,
+                              ),
+                              SizedBox(width: 4.w),
+                              Text(
+                                'Needs Approval',
+                                style: TextStyle(
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (request.status == 'APPROVED')
+                        Icon(
+                          Icons.check_circle,
+                          size: 20.sp,
+                          color: Colors.green,
+                        )
+                      else if (request.status == 'CANCELLED')
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.cancel,
+                              size: 18.sp,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Cancelled',
+                              style: TextStyle(
+                                fontSize: 10.sp,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Icon(
+                          Icons.cancel,
+                          size: 20.sp,
+                          color: Colors.red,
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ],
