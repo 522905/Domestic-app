@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../core/models/order/selectable_order_item.dart';
 import '../../../core/models/order/order_data.dart';
 import '../professional_snackbar.dart';
+import 'quota_badge.dart';
 
 class OrderItemsWidget extends StatefulWidget {
   final OrderData orderData;
@@ -428,6 +429,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
     final color = _getItemColor(item.itemCode, baseColor);
 
     final isOutOfStock = item.isOutOfStock;
+    final isSelectable = item.isSelectable;
 
     return Card(
       margin: EdgeInsets.only(bottom: 12.h),
@@ -440,7 +442,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
         ),
       ),
       child: Opacity(
-        opacity: isOutOfStock ? 0.6 : 1.0,
+        opacity: !isSelectable ? 0.6 : 1.0,
         child: Padding(
           padding: EdgeInsets.all(16.w),
           child: Column(
@@ -498,12 +500,17 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                             Text(
                               'Stock: ${item.maxQuantity}',
                               style: TextStyle(
-                                fontSize: 13.sp,
+                                fontSize: 9.sp,
                                 color: isOutOfStock ? Colors.red[700] : Colors.green[700],
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             SizedBox(width: 8.w),
+                            // Show quota badge if quota info is available
+                            if (item.quota != null) ...[
+                              QuotaBadge(quota: item.quota!),
+                              SizedBox(width: 8.w),
+                            ],
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                               decoration: BoxDecoration(
@@ -548,14 +555,14 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: isOutOfStock ? null : () => _showQuantityDialog(item),
+                    onPressed: !isSelectable ? null : () => _showQuantityDialog(item),
                     icon: Icon(
-                      isOutOfStock ? Icons.block : Icons.add_shopping_cart,
+                      !isSelectable ? Icons.block : Icons.add_shopping_cart,
                       size: 18.sp,
                     ),
-                    label: Text(isOutOfStock ? 'Out of Stock' : 'Select Item'),
+                    label: Text(_getButtonText(item)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isOutOfStock ? Colors.grey : color,
+                      backgroundColor: !isSelectable ? Colors.grey : color,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8.r),
@@ -634,15 +641,57 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
     }
   }
 
+  String _getButtonText(SelectableOrderItem item) {
+    if (item.quota?.isBlocked ?? false) {
+      return 'Over Quota';
+    } else if (item.isOutOfStock) {
+      return 'Out of Stock';
+    } else {
+      return 'Select Item';
+    }
+  }
+
+  Color _getQuotaWarningColor(QuotaInfo quota) {
+    switch (quota.status) {
+      case QuotaStatus.available:
+        return Colors.green;
+      case QuotaStatus.low:
+        return Colors.orange;
+      case QuotaStatus.zero:
+      case QuotaStatus.blocked:
+        return Colors.red;
+      case QuotaStatus.unlimited:
+        return Colors.blue;
+    }
+  }
+
+  IconData _getQuotaWarningIcon(QuotaInfo quota) {
+    switch (quota.status) {
+      case QuotaStatus.available:
+        return Icons.check_circle;
+      case QuotaStatus.low:
+        return Icons.warning;
+      case QuotaStatus.zero:
+      case QuotaStatus.blocked:
+        return Icons.cancel;
+      case QuotaStatus.unlimited:
+        return Icons.verified;
+    }
+  }
+
   void _showQuantityDialog(SelectableOrderItem item) {
     final selectedItem = _getSelectedItem(item);
     int selectedQty = selectedItem?.metadata['selected_qty'] ?? 1;
-    final maxQty = item.maxQuantity;
+    final maxQty = item.effectiveMaxQuantity;
     late TextEditingController quantityController;
 
-    // Don't allow selection if out of stock
-    if (item.isOutOfStock) {
-      context.showErrorSnackBar('${item.displayName} is out of stock');
+    // Don't allow selection if not selectable (out of stock or over quota)
+    if (!item.isSelectable) {
+      if (item.quota?.isBlocked ?? false) {
+        context.showErrorSnackBar('${item.displayName} - Over quota limit');
+      } else {
+        context.showErrorSnackBar('${item.displayName} is out of stock');
+      }
       return;
     }
 
@@ -665,7 +714,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: EdgeInsets.all(12.w),
+                  padding: EdgeInsets.all(5.w),
                   decoration: BoxDecoration(
                     color: Colors.grey[50],
                     borderRadius: BorderRadius.circular(8.r),
@@ -714,27 +763,83 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                   ),
                 ),
                 SizedBox(height: 16.h),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Maximum available:',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 14.sp,
+                // Show quota info if available
+                if (item.quota != null && item.quota!.hasQuotaLimit) ...[
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: _getQuotaWarningColor(item.quota!).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(
+                        color: _getQuotaWarningColor(item.quota!),
+                        width: 1,
                       ),
                     ),
-                    Text(
-                      '$maxQty',
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _getQuotaWarningIcon(item.quota!),
+                              color: _getQuotaWarningColor(item.quota!),
+                              size: 16.sp,
+                            ),
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Quota Limited',
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                                color: _getQuotaWarningColor(item.quota!),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Stock: ${item.maxQuantity}  |  Quota: ${item.quota!.available}',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Maximum: $maxQty units',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: _getQuotaWarningColor(item.quota!),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                SizedBox(height: 20.h),
+                  ),
+                  SizedBox(height: 16.h),
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Maximum available:',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                      Text(
+                        '$maxQty',
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 20.h),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -884,6 +989,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
         ...item.metadata,
         'selected_qty': quantity,
       },
+      quota: item.quota,
     );
 
     updatedItems.add(newItem);

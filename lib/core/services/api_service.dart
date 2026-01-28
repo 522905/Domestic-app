@@ -10,11 +10,13 @@ import '../../utils/error_handler.dart';
 import '../models/inventory/inventory_request.dart';
 import '../models/purchase_invoice/api_response.dart';
 import '../models/purchase_invoice/purchase_invoice.dart';
+import '../../domain/entities/quota/quota_snapshot.dart';
 import '../network/api_client.dart';
 import 'api_service_interface.dart';
 
 import '../models/api_validation_exception.dart';
 import '../models/insufficient_stock_exception.dart';
+import '../models/quota_exceeded_exception.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
@@ -35,6 +37,8 @@ class ApiService implements ApiServiceInterface {
     if (error is DioException) {
       if (error.error is SessionExpiredException) {
         debugPrint('SESSION EXPIRED: ${error.message}');
+        // Re-throw SessionExpiredException to trigger logout
+        throw error.error as SessionExpiredException;
       } else if (error.type == DioExceptionType.connectionTimeout ||
           error.type == DioExceptionType.sendTimeout ||
           error.type == DioExceptionType.receiveTimeout) {
@@ -42,6 +46,15 @@ class ApiService implements ApiServiceInterface {
       } else if (error.response != null) {
         final statusCode = error.response?.statusCode;
         final data = error.response?.data;
+
+        // Handle 401 Unauthorized - Session expired or invalid token
+        if (statusCode == 401) {
+          debugPrint('🔐 401 UNAUTHORIZED: Token expired or invalid. Logging out...');
+          // Clear user session
+          User().clearTokens();
+          // Throw session expired exception to trigger logout
+          throw SessionExpiredException('Authentication credentials were not provided or expired');
+        }
 
         if (statusCode == 426) {
           Map<String, dynamic>? payload;
@@ -106,6 +119,13 @@ class ApiService implements ApiServiceInterface {
             data.containsKey('error_code') &&
             data['error_code'] == 'INSUFFICIENT_STOCK') {
           throw InsufficientStockException.fromApiResponse(data);
+        }
+
+        // Check for QUOTA_EXCEEDED error code
+        if (data is Map<String, dynamic> &&
+            data.containsKey('error_code') &&
+            data['error_code'] == 'QUOTA_EXCEEDED') {
+          throw QuotaExceededException.fromApiResponse(data);
         }
       } else {
         debugPrint('UNKNOWN ERROR: ${error.message}');
@@ -1795,6 +1815,339 @@ class ApiService implements ApiServiceInterface {
     );
   }
 
+  // ============================================================================
+  // DIGITAL CREDIT METHODS
+  // ============================================================================
+
+  @override
+  Future<Map<String, dynamic>> getDigitalCredits({
+    String? dataStatus,
+    String? claimStatus,
+    String? fromDate,
+    String? toDate,
+    bool? isMine,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (dataStatus != null) queryParams['data_status'] = dataStatus;
+      if (claimStatus != null) queryParams['claim_status'] = claimStatus;
+      if (fromDate != null) queryParams['from_date'] = fromDate;
+      if (toDate != null) queryParams['to_date'] = toDate;
+      if (isMine != null) queryParams['is_mine'] = isMine.toString();
+
+      final response = await apiClient.get(
+        apiClient.endpoints.digitalCredits,
+        queryParameters: queryParams,
+      );
+
+      // API returns array directly, wrap it in a Map with 'results' key
+      if (response.data is List) {
+        return {'results': response.data};
+      }
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> createDigitalCredit({
+    required String orderId,
+    required String orderDate,
+    bool autoClaim = false,
+  }) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.digitalCredits,
+        data: {
+          'order_id': orderId,
+          'order_date': orderDate,
+          'auto_claim': autoClaim,
+        },
+      );
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getDigitalCreditDetail(String id) async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.digitalCreditDetail(id));
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> claimDigitalCredit(String id) async {
+    try {
+      final response = await apiClient.post(apiClient.endpoints.digitalCreditClaim(id));
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> retryDigitalCredit(String id) async {
+    try {
+      final response = await apiClient.post(apiClient.endpoints.digitalCreditRetry(id));
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> switchCreditCompany(String id, int targetCompanyId) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.digitalCreditSwitchCompany(id),
+        data: {'target_company_id': targetCompanyId},
+      );
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getClaimTransfers() async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.claimTransfers);
+
+      // API returns array directly, wrap it in a Map with 'results' key
+      if (response.data is List) {
+        return {'results': response.data};
+      }
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> approveClaimTransfer(String id) async {
+    try {
+      final response = await apiClient.post(apiClient.endpoints.claimTransferApprove(id));
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> rejectClaimTransfer(String id, {String? reason}) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.claimTransferReject(id),
+        data: reason != null ? {'reason': reason} : {},
+      );
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  // ============================================================================
+  // QUOTA METHODS
+  // ============================================================================
+
+  @override
+  Future<QuotaSnapshot> getQuotaSnapshot() async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.quotaLiveSnapshot);
+      return QuotaSnapshot.fromJson(response.data);
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> triggerQuotaSync() async {
+    try {
+
+      final response = await apiClient.post(apiClient.endpoints.quotaSync);
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getQuotaDashboard() async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.quotaDashboard);
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getQuotaHistory({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? itemCode,
+    String sort = '-entry_date',
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+        'sort': sort,
+      };
+
+      if (dateFrom != null) {
+        queryParams['date_from'] = _formatDate(dateFrom);
+      }
+      if (dateTo != null) {
+        queryParams['date_to'] = _formatDate(dateTo);
+      }
+      if (itemCode != null) {
+        queryParams['item_code'] = itemCode;
+      }
+
+      // Debug: Log API request
+      print('API getQuotaHistory - Request params: $queryParams');
+
+      final response = await apiClient.get(
+        apiClient.endpoints.quotaHistory,
+        queryParameters: queryParams,
+      );
+
+      final responseData = response.data as Map<String, dynamic>;
+
+      // Debug: Log API response summary
+      print('API getQuotaHistory - Response: count=${responseData['count']}, results=${(responseData['results'] as List).length}');
+      if (responseData['results'] != null) {
+        final results = responseData['results'] as List;
+        for (var entry in results) {
+          print('  API Entry: ${entry['entry_date']} - ${entry['item_code']} - ${entry['item_name']}');
+        }
+      }
+
+      return responseData;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getQuotaHistoryDetail({
+    required DateTime entryDate,
+    required String itemCode,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'entry_date': _formatDate(entryDate),
+        'item_code': itemCode,
+      };
+
+      final response = await apiClient.get(
+        apiClient.endpoints.quotaHistoryDetail,
+        queryParameters: queryParams,
+      );
+
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  /// Helper method to format DateTime to YYYY-MM-DD
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Future<List<dynamic>> getBonusSchemes({bool includeInactive = false}) async {
+    try {
+      final queryParams = includeInactive
+          ? <String, String>{'include_inactive': 'true'}
+          : null;
+
+      final response = await apiClient.get(
+        apiClient.endpoints.bonusSchemes,
+        queryParameters: queryParams,
+      );
+
+      final responseData = response.data as Map<String, dynamic>;
+      return responseData['schemes'] as List<dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBonuses({
+    String status = 'all',
+    String? itemCode,
+    String? scheme,
+    String sort = '-earned_date',
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'status': status,
+        'sort': sort,
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
+
+      if (itemCode != null) {
+        queryParams['item_code'] = itemCode;
+      }
+      if (scheme != null) {
+        queryParams['scheme'] = scheme;
+      }
+
+      final response = await apiClient.get(
+        apiClient.endpoints.bonuses,
+        queryParameters: queryParams,
+      );
+
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBonusDetail(int id) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.bonusDetail(id),
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
   // @override
   Future<Map<String, dynamic>> getERVCalculation({
     required String supplierGstin,
@@ -1900,7 +2253,7 @@ class ApiService implements ApiServiceInterface {
         if (response.data is List<int>) {
           return response.data as List<int>;
         } else {
-          throw Exception('Invalid response format');
+          throw Exception('Invalid re  sponse format');
         }
       } else {
         // For error responses, try to parse as JSON to get error message

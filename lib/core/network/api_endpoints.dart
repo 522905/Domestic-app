@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 class ApiEndpoints {
   final String baseUrl;
 
-  // final String tempUrl = 'https://lpg.ops.arungas.com';
-  final String tempUrl = 'http://192.168.171.123:9900';
+  final String tempUrl = 'https://lpg.ops.arungas.com';
+  // final String tempUrl = 'http://192.168.171.24:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
@@ -123,6 +123,30 @@ class ApiEndpoints {
   String get sdmsInvoiceAssign => '$tempUrl/sdms/api/transactions/invoice-assign/';
   String get sdmsCreditPayment => '$tempUrl/sdms/api/transactions/credit-payment/';
   String sdmsRetryTask(String id) => '$tempUrl/sdms/api/transactions/$id/retry-task/';
+
+  // Digital Credit endpoints
+  String get digitalCredits => '$tempUrl/sdms-ops/api/credits/';
+  String digitalCreditDetail(String id) => '$tempUrl/sdms-ops/api/credits/$id/';
+  String digitalCreditClaim(String id) => '$tempUrl/sdms-ops/api/credits/$id/claim/';
+  String digitalCreditRetry(String id) => '$tempUrl/sdms-ops/api/credits/$id/retry/';
+  String digitalCreditSwitchCompany(String id) => '$tempUrl/sdms-ops/api/credits/$id/switch-company/';
+  String get claimTransfers => '$tempUrl/sdms-ops/api/claim-transfers/';
+  String claimTransferApprove(String id) => '$tempUrl/sdms-ops/api/claim-transfers/$id/approve/';
+  String claimTransferReject(String id) => '$tempUrl/sdms-ops/api/claim-transfers/$id/reject/';
+
+  // Quota endpoints
+  String get quotaLiveSnapshot => '$tempUrl/api/quotas/live-snapshot/';
+  String get quotaSync => '$tempUrl/api/quotas/sync/';
+  String get quotaDashboard => '$tempUrl/api/quotas/dashboard/';
+  String get quotaSystemStatus => '$tempUrl/api/quotas/system-status/';
+  String get quotaHistory => '$tempUrl/api/quotas/history/';
+  String get quotaHistoryDetail => '$tempUrl/api/quotas/history/detail/';
+
+  // Bonus endpoints
+  String get bonusSchemes => '$tempUrl/api/quotas/bonus-schemes/';
+  String bonusDetail(int id) => '$tempUrl/api/quotas/bonuses/$id/';
+  String get bonuses => '$tempUrl/api/quotas/bonuses/';
+
   // In your endpoints class
   String get warehouseStock => '$tempUrl/api/stocks/warehouse-balance/';
   String get ledgerData => '$tempUrl/reports/api/general-ledger/';

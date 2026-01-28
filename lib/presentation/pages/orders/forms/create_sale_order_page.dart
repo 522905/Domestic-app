@@ -18,8 +18,11 @@ import '../../../widgets/professional_snackbar.dart';
 import '../../../blocs/orders/orders_bloc.dart';
 import '../../../widgets/selectors/vehicle_selector_dialog.dart';
 import '../../../widgets/selectors/warehouse_selector_dialog.dart';
+import '../../../widgets/order_error_dialog.dart';
 import '../../../widgets/error_dialog.dart';
 import '../../../widgets/insufficient_stock_dialog.dart';
+import '../../../../core/models/quota_exceeded_exception.dart';
+import '../../../../core/models/order/quota_failure.dart';
 
 class CreateSaleOrderScreen extends StatefulWidget {
   const CreateSaleOrderScreen({Key? key}) : super(key: key);
@@ -534,16 +537,28 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
           onRetry: _submitOrder,  // Pass retry callback
         );
       }
+    } on QuotaExceededException catch (e) {
+      setState(() {
+        _isSubmitting = false;
+      });
+
+      if (mounted) {
+        // Show quota error dialog with failures from exception
+        _showQuotaExceededDialog(context, e.quotaFailures);
+      }
     } catch (e) {
       setState(() {
         _isSubmitting = false;
       });
 
       if (mounted) {
-        context.showErrorDialog(
-          title: 'Order Creation Failed',
-          error: e,
-          onRetry: _submitOrder,
+        OrderErrorDialog.show(
+          context: context,
+          errorData: e,
+          onClose: () {
+            // Navigate back to dashboard
+            Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+          },
         );
       }
     }
@@ -593,6 +608,152 @@ class _CreateSaleOrderScreenState extends State<CreateSaleOrderScreen> {
         _submitOrder();
       }
     });
+  }
+
+  /// Shows a dialog when quota is exceeded
+  void _showQuotaExceededDialog(BuildContext context, List<QuotaFailure> failures) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber, color: Colors.orange, size: 24.sp),
+            SizedBox(width: 8.w),
+            Text(
+              'Quota Exceeded',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cannot place order. Quota exceeded for:',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+                SizedBox(height: 16.h),
+                // List of failures
+                ...failures.map((failure) => _buildQuotaFailureCard(failure)),
+                SizedBox(height: 16.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.blue[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline, color: Colors.blue, size: 20.sp),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          'Tip: Post pending sales in SDMS to increase your quota.',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: Colors.blue[900],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Adjust Quantities'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to quota status page
+              Navigator.pushNamed(context, '/quota');
+            },
+            icon: Icon(Icons.assessment, size: 18.sp),
+            label: const Text('Quota Status'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0E5CA8),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a card showing quota failure details for an item
+  Widget _buildQuotaFailureCard(QuotaFailure failure) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: Colors.red[50],
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.red[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            failure.itemCode,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.red[900],
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Requested: ${failure.requested}',
+                    style: TextStyle(fontSize: 12.sp, color: Colors.grey[700]),
+                  ),
+                  Text(
+                    'Available: ${failure.available}',
+                    style: TextStyle(fontSize: 12.sp, color: Colors.grey[700]),
+                  ),
+                ],
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: Colors.red[100],
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
+                child: Text(
+                  'Short by: ${failure.shortfall}',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red[900],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Map<String, int> _calculateOrderSummary() {

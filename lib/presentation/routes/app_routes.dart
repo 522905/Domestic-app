@@ -15,7 +15,20 @@ import '../pages/defect_inspection/dir_list_screen.dart';
 import '../pages/defect_inspection/dir_detail_screen.dart';
 import '../pages/purchase_invoice/purchase_invoice_details_screen.dart';
 import '../pages/purchase_invoice/purchase_invoice_screen.dart';
+import '../pages/digital_credit/digital_credits_list_page.dart';
+import '../pages/digital_credit/credit_detail_page.dart';
+import '../pages/quota/quota_snapshot_page.dart';
+import '../pages/bonus/bonus_schemes_page.dart';
+import '../pages/bonus/bonus_list_page.dart';
+import '../pages/bonus/bonus_detail_page.dart';
 import '../blocs/orders/orders_bloc.dart';
+import '../blocs/digital_credit/digital_credit_bloc.dart';
+import '../blocs/bonus_schemes/bonus_schemes_bloc.dart';
+import '../blocs/bonus_schemes/bonus_schemes_event.dart';
+import '../blocs/bonus_list/bonus_list_bloc.dart';
+import '../blocs/bonus_list/bonus_list_event.dart';
+import '../blocs/bonus_detail/bonus_detail_bloc.dart';
+import '../blocs/bonus_detail/bonus_detail_event.dart';
 import '../blocs/inventory/inventory_bloc.dart';
 import '../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../../../core/services/api_service_interface.dart';
@@ -39,6 +52,18 @@ class AppRoutes {
 
   // Procurement/Purchase Invoice routes
   static const String procurementInvoiceDetail = 'procurement-invoice';
+
+  // Digital Credit routes
+  static const String digitalCredits = 'digital-credits';
+  static const String digitalCreditDetail = 'digital-credit';
+
+  // Quota routes
+  static const String quota = 'quota';
+
+  // Bonus routes
+  static const String bonusSchemes = 'bonus-schemes';
+  static const String bonusList = 'bonus-list';
+  static const String bonusDetail = 'bonus-detail';
 
   // Company-aware navigation handler
   static Future<void> navigateWithCompanyCheck(
@@ -336,6 +361,80 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (_) => const PurchaseInvoiceScreen(),
         );
+
+    // DIGITAL CREDITS
+      case 'digital-credits':
+        if (segments.length == 1) {
+          // /digital-credits → Digital Credits List with optional initialTab query param
+          final initialTab = int.tryParse(uri.queryParameters['tab'] ?? '0') ?? 0;
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<DigitalCreditBloc>(context),
+              child: DigitalCreditsListPage(initialTab: initialTab),
+            ),
+          );
+        }
+        return _errorRoute();
+
+      case 'digital-credit':
+        if (segments.length == 2) {
+          // /digital-credit/abc123 → Credit Detail
+          final creditId = segments[1];
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<DigitalCreditBloc>(context),
+              child: CreditDetailPage(creditId: creditId),
+            ),
+          );
+        }
+        return _errorRoute();
+
+      case 'quota':
+        // /quota → Quota Snapshot Page
+        return MaterialPageRoute(
+          builder: (_) => const QuotaSnapshotPage(),
+        );
+
+      // BONUS ROUTES
+      case 'bonus-schemes':
+        // /bonus-schemes → Bonus Schemes Page
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => BonusSchemesBloc(
+              apiService: context.read<ApiServiceInterface>(),
+            )..add(const LoadBonusSchemes()),
+            child: const BonusSchemesPage(),
+          ),
+        );
+
+      case 'bonus-list':
+        // /bonus-list?status=active → Bonus List Page
+        final initialStatus = uri.queryParameters['status'];
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => BonusListBloc(
+              apiService: context.read<ApiServiceInterface>(),
+            )..add(const LoadBonusList()),
+            child: BonusListPage(initialStatus: initialStatus),
+          ),
+        );
+
+      case 'bonus-detail':
+        // /bonus-detail/123 → Bonus Detail Page
+        if (segments.length == 2) {
+          final bonusId = int.tryParse(segments[1]);
+          if (bonusId != null) {
+            return MaterialPageRoute(
+              builder: (context) => BlocProvider(
+                create: (context) => BonusDetailBloc(
+                  apiService: context.read<ApiServiceInterface>(),
+                )..add(LoadBonusDetail(bonusId)),
+                child: const BonusDetailPage(),
+              ),
+            );
+          }
+        }
+        return _errorRoute();
 
       default:
         return _errorRoute();

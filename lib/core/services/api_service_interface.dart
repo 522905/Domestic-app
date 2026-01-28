@@ -3,6 +3,7 @@ import 'dart:ffi';
 
 import '../../data/models/sdms/sdms_transaction.dart';
 import '../../domain/entities/warehouse.dart';
+import '../../domain/entities/quota/quota_snapshot.dart';
 import '../models/inventory/inventory_request.dart';
 import '../models/purchase_invoice/api_response.dart';
 import '../models/purchase_invoice/driver.dart';
@@ -200,6 +201,57 @@ abstract class ApiServiceInterface {
   Future<SDMSApiResponse> createInvoiceAssign(String orderId);
   Future<SDMSApiResponse> createCreditPayment(String orderId);
   Future<void> retryTask(String transactionId);
+
+  // Digital Credit methods
+  Future<Map<String, dynamic>> getDigitalCredits({
+    String? dataStatus,
+    String? claimStatus,
+    String? fromDate,
+    String? toDate,
+    bool? isMine,
+  });
+  Future<Map<String, dynamic>> createDigitalCredit({
+    required String orderId,
+    required String orderDate,
+    bool autoClaim = false,
+  });
+  Future<Map<String, dynamic>> getDigitalCreditDetail(String id);
+  Future<Map<String, dynamic>> claimDigitalCredit(String id);
+  Future<Map<String, dynamic>> retryDigitalCredit(String id);
+  Future<Map<String, dynamic>> switchCreditCompany(String id, int targetCompanyId);
+  Future<Map<String, dynamic>> getClaimTransfers();
+  Future<Map<String, dynamic>> approveClaimTransfer(String id);
+  Future<Map<String, dynamic>> rejectClaimTransfer(String id, {String? reason});
+
+  // Quota methods
+  Future<QuotaSnapshot> getQuotaSnapshot();
+  Future<Map<String, dynamic>> triggerQuotaSync();
+  Future<Map<String, dynamic>> getQuotaDashboard();
+  Future<Map<String, dynamic>> getQuotaHistory({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? itemCode,
+    String sort = '-entry_date',
+    int page = 1,
+    int pageSize = 30,
+  });
+  Future<Map<String, dynamic>> getQuotaHistoryDetail({
+    required DateTime entryDate,
+    required String itemCode,
+  });
+
+  // Bonus methods
+  Future<List<dynamic>> getBonusSchemes({bool includeInactive = false});
+  Future<Map<String, dynamic>> getBonuses({
+    String status = 'all',
+    String? itemCode,
+    String? scheme,
+    String sort = '-earned_date',
+    int page = 1,
+    int pageSize = 20,
+  });
+  Future<Map<String, dynamic>> getBonusDetail(int id);
+
   Future<Map<String, dynamic>> checkAppVersion();
   Future<Map<String, dynamic>> getWarehouseStock({String? warehouseId});
   Future<Map<String, dynamic>> getGeneralLedger({
