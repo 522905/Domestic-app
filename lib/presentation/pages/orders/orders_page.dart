@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../utils/currency_utils.dart';
 import '../../blocs/orders/orders_bloc.dart';
 import '../../blocs/orders/orders_event.dart';
@@ -127,9 +128,9 @@ class _OrdersPageState extends State<OrdersPage> {
     return Scaffold(
       drawer: GlobalDrawer.getDrawer(context),
       appBar: AppBar(
-        title: const Text(
-          'Orders',
-          style: TextStyle(
+        title: Text(
+          AppLocalizations.of(context)!.ordersPageTitle,
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -236,7 +237,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search orders...',
+                    hintText: AppLocalizations.of(context)!.ordersSearchHint,
                     hintStyle: TextStyle(color: Colors.grey, fontSize: 16.sp),
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     filled: true,
@@ -303,7 +304,7 @@ class _OrdersPageState extends State<OrdersPage> {
             if ((_isGeneralManager() || state.availableFilters.containsKey('vehicle')) &&
                 state.availableFilters['vehicle']?.isNotEmpty == true)
               _buildFilterChip(
-                label: 'Vehicle',
+                label: AppLocalizations.of(context)!.ordersFilterVehicle,
                 value: _selectedVehicle,
                 options: state.availableFilters['vehicle'] ?? [],
                 onSelected: (value) {
@@ -320,7 +321,7 @@ class _OrdersPageState extends State<OrdersPage> {
             if (state.availableFilters.containsKey('warehouse') &&
                 state.availableFilters['warehouse']?.isNotEmpty == true)
               _buildFilterChip(
-                label: 'Warehouse',
+                label: AppLocalizations.of(context)!.ordersFilterWarehouse,
                 value: _selectedWarehouse,
                 options: state.availableFilters['warehouse'] ?? [],
                 onSelected: (value) {
@@ -337,7 +338,7 @@ class _OrdersPageState extends State<OrdersPage> {
             if (state.availableFilters.containsKey('status') &&
                 state.availableFilters['status']?.isNotEmpty == true)
               _buildFilterChip(
-                label: 'Status',
+                label: AppLocalizations.of(context)!.ordersFilterStatus,
                 value: _selectedStatus,
                 options: state.availableFilters['status'] ?? [],
                 onSelected: (value) {
@@ -560,7 +561,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
           TextButton.icon(
             icon: Icon(Icons.clear, size: 16.sp),
-            label: Text('Clear All', style: TextStyle(fontSize: 12.sp)),
+            label: Text(AppLocalizations.of(context)!.buttonClearAll, style: TextStyle(fontSize: 12.sp)),
             onPressed: _clearAllFilters,
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFFF44336),
@@ -945,7 +946,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
           SizedBox(height: 16.h),
           Text(
-            'No orders found',
+            AppLocalizations.of(context)!.ordersEmptyOrders,
             style: TextStyle(
               fontSize: 18.sp,
               color: Colors.grey[600],
@@ -954,7 +955,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
           SizedBox(height: 8.h),
           Text(
-            'Create a new order using the + button',
+            AppLocalizations.of(context)!.emptyStateCreateFirst,
             style: TextStyle(
               fontSize: 14.sp,
               color: Colors.grey[500],
@@ -977,7 +978,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
           SizedBox(height: 16.h),
           Text(
-            'No orders match your filters',
+            AppLocalizations.of(context)!.ordersEmptyOrders,
             style: TextStyle(
               fontSize: 18.sp,
               color: Colors.grey[600],
@@ -986,7 +987,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
           SizedBox(height: 8.h),
           Text(
-            'Try adjusting your search or filters',
+            AppLocalizations.of(context)!.emptyStateTryAgain,
             style: TextStyle(
               fontSize: 14.sp,
               color: Colors.grey[500],
@@ -999,7 +1000,7 @@ class _OrdersPageState extends State<OrdersPage> {
               backgroundColor: const Color(0xFF0E5CA8),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Clear Filters'),
+            child: Text(AppLocalizations.of(context)!.buttonClearFilters),
           ),
         ],
       ),
@@ -1018,7 +1019,7 @@ class _OrdersPageState extends State<OrdersPage> {
           ),
           SizedBox(height: 16.h),
           Text(
-            'Oops! Something went wrong',
+            AppLocalizations.of(context)!.errorGeneric,
             style: TextStyle(
               fontSize: 18.sp,
               color: Colors.grey[600],
@@ -1044,7 +1045,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 context.read<OrdersBloc>().add(const RefreshOrders());
               },
               icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
+              label: Text(AppLocalizations.of(context)!.buttonTryAgain),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0E5CA8),
                 foregroundColor: Colors.white,

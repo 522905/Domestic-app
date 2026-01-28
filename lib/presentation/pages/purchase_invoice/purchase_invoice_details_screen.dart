@@ -123,6 +123,10 @@ return data['erp_data']?['address_display'] ?? '';
     return data['erp_data']?['custom_sap_doc_number'] ?? '';
   }
 
+  String _getLoadType(Map<String, dynamic> data) {
+    return data['erp_data']?['custom_load_type_summary'] ?? '';
+  }
+
   List<Map<String, dynamic>> _getItemData(Map<String, dynamic> data) {
     List<dynamic> items = data['erp_data']?['items'] ?? [];
     return items.map((item) => {
@@ -1095,6 +1099,8 @@ return data['erp_data']?['address_display'] ?? '';
                                 ),
                               ),
                               _buildStatusBadge(_getWorkflowStatus(_invoiceDetails)),
+                              _buildStatusBadge(_getLoadType(_invoiceDetails)),
+
                             ],
                           ),
                           SizedBox(height: 16.h),
@@ -1104,6 +1110,7 @@ return data['erp_data']?['address_display'] ?? '';
                                   ? dateFormat.format(DateTime.parse(_getSupplierInvoiceDate(_invoiceDetails))) : ''
                             ),
                           _buildDetailRow('SAP Doc Num.: ', _getSapDocNumber(_invoiceDetails), isBold: true),
+                          _buildDetailRow('Load Type: ', _getLoadType(_invoiceDetails), isBold: true),
                           _buildDetailRow('Invoice:', _getSupplierInvoiceNumber(_invoiceDetails)),
                           _buildDetailRow('Company', _getCompany(_invoiceDetails)),
                           _buildDetailRow('Supplier:', '${_getSupplierName(_invoiceDetails)} (${_getSupplierGstin(_invoiceDetails)})'),

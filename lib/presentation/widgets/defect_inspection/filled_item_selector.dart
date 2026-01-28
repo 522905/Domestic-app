@@ -66,31 +66,99 @@ class FilledItemSelector extends StatelessWidget {
               size: 28.sp,
             ),
             isExpanded: true,
-            items: items.map((item) {
-              return DropdownMenuItem<FilledItemMasterData>(
-                value: item,
-                child: Row(
+            selectedItemBuilder: (BuildContext context) {
+              return items.map((item) {
+                return Row(
                   children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm.w,
+                        vertical: 4.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColorsEnhanced.brandBlue,
+                        borderRadius: BorderRadius.circular(4.r),
+                      ),
+                      child: Text(
+                        item.sourceItemCode,
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.sp,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: AppSpacing.sm.w),
                     Expanded(
                       child: Text(
                         item.sourceItemName,
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColorsEnhanced.darkGray,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: AppSpacing.xs.w),
+                  ],
+                );
+              }).toList();
+            },
+            items: items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              final isLast = index == items.length - 1;
+
+              return DropdownMenuItem<FilledItemMasterData>(
+                value: item,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Item Code and Name
+                    Row(
+                      children: [
+                        Text(
+                          '[${item.sourceItemCode}]',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColorsEnhanced.brandBlue,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.sp,
+                          ),
+                        ),
+                        SizedBox(width: AppSpacing.sm.w),
+                        Expanded(
+                          child: Text(
+                            item.sourceItemName,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColorsEnhanced.darkGray,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4.h),
+                    // Stock
                     Text(
-                      'Stock: ${item.availableStock.toStringAsFixed(0)}',
+                      'Stock: ${item.availableStock.toStringAsFixed(0)} units',
                       style: AppTextStyles.labelMedium.copyWith(
                         color: item.availableStock > 0
                             ? AppColorsEnhanced.successGreen
                             : AppColorsEnhanced.errorRed,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11.sp,
                       ),
                     ),
+                    // Divider (except for last item)
+                    if (!isLast) ...[
+                      SizedBox(height: 8.h),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: AppColorsEnhanced.lightGray,
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -99,12 +167,16 @@ class FilledItemSelector extends StatelessWidget {
           ),
         ),
         if (selectedItem != null) ...[
-          SizedBox(height: AppSpacing.xs.h),
+          SizedBox(height: AppSpacing.sm.h),
           Container(
             padding: EdgeInsets.all(AppSpacing.sm.w),
             decoration: BoxDecoration(
-              color: AppColorsEnhanced.infoBlue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6.r),
+              color: AppColorsEnhanced.infoBlue.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(
+                color: AppColorsEnhanced.infoBlue.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Row(
               children: [
@@ -116,9 +188,10 @@ class FilledItemSelector extends StatelessWidget {
                 SizedBox(width: AppSpacing.xs.w),
                 Expanded(
                   child: Text(
-                    'Available: ${selectedItem!.availableStock.toStringAsFixed(0)} units in stock',
+                    'Available Stock: ${selectedItem!.availableStock.toStringAsFixed(0)} units',
                     style: AppTextStyles.labelMedium.copyWith(
                       color: AppColorsEnhanced.infoBlue,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),

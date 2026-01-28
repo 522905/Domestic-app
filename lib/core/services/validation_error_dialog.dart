@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/api_validation_exception.dart';
 
 class ValidationErrorDialog extends StatelessWidget {
@@ -139,7 +140,10 @@ class ValidationErrorDialog extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    ...exception.balanceInfo!.entries.map((entry) {
+                    ...exception.balanceInfo!.entries.where((entry) {
+                      // Only show shortfall and cutoff_date
+                      return entry.key == 'shortfall' || entry.key == 'cutoff_date';
+                    }).map((entry) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: Row(
@@ -153,7 +157,7 @@ class ValidationErrorDialog extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '${entry.value}',
+                              _formatBalanceValue(entry.value, entry.key),
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -202,11 +206,46 @@ class ValidationErrorDialog extends StatelessWidget {
   }
 
   String _formatBalanceKey(String key) {
+    // Map shortfall to Pending Amount
+    if (key == 'shortfall') {
+      return 'Pending Amount';
+    }
+
     return key
         .replaceAll('_', ' ')
         .split(' ')
         .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
         .join(' ');
+  }
+
+  String _formatBalanceValue(dynamic value, String key) {
+    // If value is null or not a number, return as is
+    if (value == null) return '-';
+
+    // If it's a date field, return as is (don't format as currency)
+    if (key.contains('date') || key.contains('time')) {
+      return value.toString();
+    }
+
+    // Try to parse as number
+    num? numValue;
+    if (value is num) {
+      numValue = value;
+    } else if (value is String) {
+      numValue = num.tryParse(value);
+    }
+
+    // If not a valid number, return as string
+    if (numValue == null) return value.toString();
+
+    // Format with Indian numbering system and rupee symbol
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
+
+    return formatter.format(numValue);
   }
 
   static void show(BuildContext context, ApiValidationException exception, {VoidCallback? onRetry}) {

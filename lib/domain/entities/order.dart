@@ -172,6 +172,7 @@ class OrderItem {
   final String itemGroup;
   final int actualQty;
   final int projectedQty;
+  final int customCrrEmptyReceived;
 
   OrderItem({
     required this.id,
@@ -186,6 +187,7 @@ class OrderItem {
     required this.itemGroup,
     required this.actualQty,
     required this.projectedQty,
+    required this.customCrrEmptyReceived,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -202,6 +204,7 @@ class OrderItem {
       itemGroup: json['item_group'] ?? '',
       actualQty: (json['actual_qty'] ?? 0).toInt(),
       projectedQty: (json['projected_qty'] ?? 0).toInt(),
+      customCrrEmptyReceived: (json['custom_crr_empty_received'] ?? 0).toInt(),
     );
   }
 }

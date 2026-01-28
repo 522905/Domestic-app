@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/models/inventory/inventory_request.dart';
 import '../../../../core/services/api_service_interface.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../../utils/error_handler.dart';
 import '../../../blocs/inventory/inventory_bloc.dart';
 import '../../../blocs/inventory/inventory_event.dart';
@@ -90,7 +91,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
 
       if (mounted) {
         context.showErrorDialog(
-          title: 'Failed to Load Pending Delivery Items',
+          title: AppLocalizations.of(context)!.collectFailedToLoadItems,
           error: e,
           onRetry: _loadPendingDeliveryItems,
         );
@@ -102,7 +103,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
     final selectedVehicle = await VehicleSelectorDialog.show(
       context: context,
       vehicles: _vehicles,
-      title: 'Select vehicle',
+      title: AppLocalizations.of(context)!.dialogSelectVehicleTitle,
     );
 
     if (selectedVehicle != null) {
@@ -154,7 +155,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
       builder: (context, setPageState) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Select Delivery Items'),
+            title: Text(AppLocalizations.of(context)!.collectSelectDeliveryItems),
             backgroundColor: const Color(0xFF0E5CA8),
             foregroundColor: Colors.white,
             actions: [
@@ -170,7 +171,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                         borderRadius: BorderRadius.circular(15.r),
                       ),
                       child: Text(
-                        '${_selectedItems.length} items',
+                        '${_selectedItems.length} ${AppLocalizations.of(context)!.inventoryItemsLabel.toLowerCase()}',
                         style: TextStyle(
                           color: const Color(0xFF0E5CA8),
                           fontWeight: FontWeight.bold,
@@ -235,7 +236,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Selected Items (${_selectedItems.length})',
+                  '${AppLocalizations.of(context)!.collectSelectedItems} (${_selectedItems.length})',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16.sp,
@@ -255,7 +256,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                         ),
                       ),
                       Text(
-                        'Qty: ${item.metadata['selected_qty'] ?? 0}',
+                        '${AppLocalizations.of(context)!.inventoryQtyHeader}: ${item.metadata['selected_qty'] ?? 0}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14.sp,
@@ -268,7 +269,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                   Padding(
                     padding: EdgeInsets.only(top: 4.h),
                     child: Text(
-                      '... and ${_selectedItems.length - 3} more items',
+                      '... ${AppLocalizations.of(context)!.collectAndMoreItems(_selectedItems.length - 3)}',
                       style: TextStyle(
                         fontSize: 12.sp,
                         color: Colors.grey[600],
@@ -282,7 +283,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Total Quantity:',
+                        AppLocalizations.of(context)!.collectTotalQuantity,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14.sp,
@@ -328,7 +329,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                 ),
               ),
               child: Text(
-                'Back to Challan',
+                AppLocalizations.of(context)!.collectBackToChallan,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16.sp,
@@ -367,7 +368,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Collecting from:',
+                  AppLocalizations.of(context)!.collectCollectingFrom,
                   style: TextStyle(
                     fontSize: 11.sp,
                     color: Colors.grey[600],
@@ -392,8 +393,8 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
             ),
             child: Text(
               _activeWarehouseId != null
-                  ? 'ID: $_activeWarehouseId'
-                  : 'ID: Unknown',
+                  ? '${AppLocalizations.of(context)!.labelID}: $_activeWarehouseId'
+                  : '${AppLocalizations.of(context)!.labelID}: ${AppLocalizations.of(context)!.labelUnknown}',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 11.sp,
@@ -408,12 +409,12 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
 
   void _showConfirmCollectionDialog() {
     if (_selectedItems.isEmpty) {
-      context.showWarningSnackBar('Please select at least one item');
+      context.showWarningSnackBar(AppLocalizations.of(context)!.depositAddAtLeastOneItem);
       return;
     }
 
     if (_selectedVehicleId == null) {
-      context.showWarningSnackBar('Please select a vehicle');
+      context.showWarningSnackBar(AppLocalizations.of(context)!.depositSelectVehicleWarning);
       return;
     }
 
@@ -436,9 +437,9 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Confirm Collection',
-                      style: TextStyle(
+                    Text(
+                      AppLocalizations.of(context)!.collectConfirmTitle,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -451,8 +452,8 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                 ),
                 const Divider(),
                 const SizedBox(height: 8),
-                const Text(
-                    'Are you sure you want to submit this collection request?'),
+                Text(
+                    AppLocalizations.of(context)!.collectConfirmSubmitMessage),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -464,17 +465,17 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Vehicle: $_selectedVehicle',
+                        '${AppLocalizations.of(context)!.ordersFilterVehicle}: $_selectedVehicle',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       if (_activeWarehouse != null)
                         Text(
-                          'From Warehouse: $_activeWarehouse',
+                          '${AppLocalizations.of(context)!.collectFromWarehouse}: $_activeWarehouse',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       const SizedBox(height: 8),
-                      const Text('Items:',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('${AppLocalizations.of(context)!.inventoryItemsLabel}:',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       ...summary.entries.map((e) => Padding(
                         padding: const EdgeInsets.only(left: 16, top: 4),
                         child: Text('• ${e.key}: ${e.value}'),
@@ -493,7 +494,7 @@ class _CollectInventoryScreenState extends State<CollectInventoryScreen> {
                           foregroundColor: const Color(0xFF0E5CA8),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        child: const Text('Cancel'),
+                        child: Text(AppLocalizations.of(context)!.buttonCancel),
                       ),
                     ),
                     const SizedBox(width: 16),

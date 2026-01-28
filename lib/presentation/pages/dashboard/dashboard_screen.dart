@@ -6,6 +6,7 @@ import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
 import '../../widgets/notification/inbox.dart';
 import '../../widgets/warehouse_stock_card_screen.dart';
+import '../../widgets/dashboard/quota_dashboard_widget.dart';
 import '../../widgets/professional_snackbar.dart';
 import '../cash/forms/cash_deposit_page.dart';
 import '../inventory/forms/collect_inventory_request_screen.dart';
@@ -13,6 +14,7 @@ import '../inventory/forms/deposit_inventory_request_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../purchase_invoice/purchase_invoice_screen.dart';
 import 'package:lpg_distribution_app/l10n/app_localizations.dart';
+import 'package:lpg_distribution_app/l10n/l10n_extensions.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -96,9 +98,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Simulate API call - replace with actual API calls
       await Future.delayed(const Duration(seconds: 1));
 
-      // Load pending counts based on user role
-      await _loadPendingCounts();
-
       // Load dashboard statistics
       await _loadStatistics();
 
@@ -113,35 +112,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _isLoading = false;
         });
       }
-    }
-  }
-
-  Future<void> _loadPendingCounts() async {
-    // Mock data - replace with actual data from your lists/state
-    if (_userRoles.contains('Warehouse Manager') || _userRoles.contains('General Manager')) {
-      // Load from inventory list
-      setState(() {
-        _pendingInventoryApprovals = 1; // Get from your inventory list where status = 'pending'
-      });
-    }
-
-    if (_userRoles.contains('Cashier') || _userRoles.contains('General Manager')) {
-      // Load from cash list
-      setState(() {
-        _pendingCashApprovals = 3; // Get from your cash list where status = 'pending'
-      });
-    }
-
-    if (_userRoles.contains('General Manager')) {
-      setState(() {
-        _pendingOrderApprovals = 2; // Get from your orders list where status = 'pending'
-      });
-    }
-
-    if (_userRoles.contains('cse') || _userRoles.contains('General Manager')) {
-      setState(() {
-        _pendingCSETickets = 15; // Get from your CSE tickets
-      });
     }
   }
 
@@ -306,12 +276,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: const Color(0xFF0E5CA8),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.all(16.w),
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeSection(),
-              SizedBox(height: 24.h),
+              QuotaDashboardWidget(
+                greetingLine: _buildGreetingLine(context),
+                roleLine: _buildRoleLine(context),
+                pendingCount: _getTotalPendingCount(),
+                pendingLabel: _pendingApprovalLabel(context),
+              ),
+              SizedBox(height: 16.h),
               ..._buildRoleBasedContent(),
             ],
           ),
@@ -320,143 +295,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildWelcomeSection() {
+  String _buildGreetingLine(BuildContext context) {
     final String greeting = _getTimeBasedGreeting(context);
     final String fallbackName = context.l10n.translate('dashboardUserFallback');
     final String userName = _userName?.split(' ').first ?? fallbackName;
+    return context.l10n.translate(
+      'dashboardGreetingMessage',
+      params: [greeting, userName],
+    );
+  }
+
+  String _buildRoleLine(BuildContext context) {
     final String roleDisplay = _formatUserRoles(context);
     final String? companyCode = activeCompany?.shortCode;
-    final String greetingLine = context.l10n.translate(
-      'dashboardGreetingMessage',
-      params: <String, String>{
-        'greeting': greeting,
-        'name': userName,
-      },
-    );
-    final String roleLine = companyCode != null
+    return companyCode != null
         ? context.l10n.translate(
-      'dashboardRoleWithCompany',
-      params: <String, String>{
-        'roles': roleDisplay,
-        'company': companyCode,
-      },
-    )
-      : roleDisplay;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(24.w),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF0E5CA8).withOpacity(0.1),
-            const Color(0xFF0E5CA8).withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(
-          color: const Color(0xFF0E5CA8).withOpacity(0.2),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0E5CA8).withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(12.w),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0E5CA8).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF0E5CA8).withOpacity(0.2),
-                    width: 2,
-                  ),
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: const Color(0xFF0E5CA8),
-                  size: 24.sp,
-                ),
-              ),
-              SizedBox(width: 16.w),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      greetingLine,
-                      style: TextStyle(
-                        fontSize: 22.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      roleLine,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: const Color(0xFF0E5CA8),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (_getTotalPendingCount() > 0) ...[
-            SizedBox(height: 16.h),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.orange.withOpacity(0.2),
-                    Colors.orange.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20.r),
-                border: Border.all(
-                  color: Colors.orange.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.notifications_active,
-                    color: Colors.orange[800],
-                    size: 16.sp,
-                  ),
-                  SizedBox(width: 6.w),
-                  Text(
-                    _pendingApprovalLabel(context),
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      color: Colors.orange[800],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
+            'dashboardRoleWithCompany',
+            params: [roleDisplay, companyCode],
+          )
+        : roleDisplay;
   }
 
   List<Widget> _buildRoleBasedContent() {
@@ -465,31 +322,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Delivery Boy Content
     if (_userRoles.contains('Delivery Boy')) {
       sections.add(_buildDeliveryBoySection());
-      sections.add(SizedBox(height: 24.h));
+      sections.add(SizedBox(height: 8.h));
     }
 
     // Cashier Content
     if (_userRoles.contains('Cashier')) {
       sections.add(_buildCashierSection());
-      sections.add(SizedBox(height: 24.h));
+      sections.add(SizedBox(height: 8.h));
     }
 
     // Warehouse Manager Content
     if (_userRoles.contains('Warehouse Manager')) {
       sections.add(_buildWarehouseManagerSection());
-      sections.add(SizedBox(height: 24.h));
+      sections.add(SizedBox(height: 16.h));
     }
 
     // CSE Content
     if (_userRoles.contains('cse')) {
       sections.add(_buildCSESection());
-      sections.add(SizedBox(height: 24.h));
+      sections.add(SizedBox(height: 16.h));
     }
 
     // General Manager Content
     if (_userRoles.contains('General Manager')) {
       sections.add(_buildGeneralManagerSection());
-      sections.add(SizedBox(height: 24.h));
+      sections.add(SizedBox(height: 16.h));
     }
 
     // Default content if no specific role content
@@ -506,46 +363,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(l10n.translate('dashboardQuickActionsTitle'), Icons.flash_on),
-        SizedBox(height: 16.h),
+        SizedBox(height: 12.h),
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
-          crossAxisSpacing: 12.w,
-          mainAxisSpacing: 12.h,
-          childAspectRatio: 1.1,
+          crossAxisSpacing: 8.w,
+          mainAxisSpacing: 8.h,
+          childAspectRatio: 1.3,
           children: [
             _buildActionCard(
-              title: '${l10n.translate('dashboardCreateOrderTitle')} (1)',
+              title: l10n.translate('dashboardCreateOrderTitle'),
               subtitle: l10n.translate('dashboardCreateOrderSubtitle'),
               icon: Icons.add_shopping_cart,
               color: const Color(0xFF0E5CA8),
               onTap: () => _navigateToCreateOrder(),
             ),
             _buildActionCard(
-              title: '${l10n.translate('dashboardDepositItemsTitle')} (2)',
+              title: l10n.translate('dashboardDepositItemsTitle'),
               subtitle: l10n.translate('dashboardDepositItemsSubtitle'),
               icon: Icons.remove_circle_outline,
               color: Colors.blue,
               onTap: () => _navigateToInventoryDeposit(),
             ),
             _buildActionCard(
-              title: '${l10n.translate('dashboardCashDepositTitle')} (3)',
+              title: l10n.translate('dashboardCashDepositTitle'),
               subtitle: l10n.translate('dashboardCashDepositSubtitle'),
               icon: Icons.account_balance_wallet,
               color: Colors.green,
               onTap: () => _navigateToCashDeposit(),
             ),
             _buildActionCard(
-              title: '${l10n.translate('dashboardChallanTitle')} (4)',
+              title: l10n.translate('dashboardChallanTitle'),
               subtitle: l10n.translate('dashboardChallanSubtitle'),
               icon: Icons.add_circle_outline,
               color: Colors.orange,
               onTap: () => _navigateToInventoryCollect(),
             ),
-
           ],
         ),
+        SizedBox(height: 10.h),
+        // Warehouse stock card
+        const WarehouseStockCard(),
       ],
     );
   }
@@ -556,7 +415,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(l10n.translate('dashboardInventoryManagementTitle'), Icons.warehouse),
-        SizedBox(height: 16.h),
+        SizedBox(height: 12.h),
         _buildApprovalCard(
           title: l10n.translate('dashboardProcurementTitle'),
           subtitle: l10n.translate('dashboardProcurementSubtitle'),
@@ -571,7 +430,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
           showViewAll: true,
         ),
-        SizedBox(height: 16.h),
+        SizedBox(height: 10.h),
         _buildApprovalCard(
           title: l10n.translate('dashboardInventoryApprovalsTitle'),
           subtitle: l10n.translate('dashboardInventoryApprovalsSubtitle'),
@@ -581,7 +440,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onTap: () => _navigateToInventoryApprovals(),
           showViewAll: true,
         ),
-        SizedBox(height: 16.h),
+        SizedBox(height: 10.h),
         _buildApprovalCard(
           title: 'Defect Inspection',
           subtitle: 'Manage defective cylinder reports',
@@ -591,7 +450,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onTap: () => _navigateToDefectInspection(),
           showViewAll: true,
         ),
-        SizedBox(height: 12.h),
+        SizedBox(height: 10.h),
         // Warehouse stock card
         const WarehouseStockCard(),
       ],
@@ -604,7 +463,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(l10n.translate('dashboardCashManagementTitle'), Icons.account_balance_wallet),
-        SizedBox(height: 16.h),
+        SizedBox(height: 12.h),
         _buildApprovalCard(
           title: l10n.translate('dashboardCashApprovalsTitle'),
           subtitle: l10n.translate('dashboardCashApprovalsSubtitle'),
@@ -624,7 +483,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(l10n.translate('dashboardCustomerSupportTitle'), Icons.support_agent),
-        SizedBox(height: 16.h),
+        SizedBox(height: 12.h),
         _buildApprovalCard(
           title: l10n.translate('dashboardOpenTicketsTitle'),
           subtitle: l10n.translate('dashboardOpenTicketsSubtitle'),
@@ -634,7 +493,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onTap: () => _navigateToCSETickets(),
           showViewAll: true,
         ),
-        SizedBox(height: 12.h),
+        SizedBox(height: 10.h),
         Row(
           children: [
             Expanded(
@@ -666,7 +525,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(l10n.translate('dashboardSystemOverviewTitle'), Icons.dashboard),
-        SizedBox(height: 16.h),
+        SizedBox(height: 12.h),
 
         // Quick Stats Row
         Row(
@@ -679,7 +538,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: const Color(0xFF0E5CA8),
               ),
             ),
-            SizedBox(width: 12.w),
+            SizedBox(width: 10.w),
             Expanded(
               child: _buildStatsCard(
                 title: l10n.translate('dashboardActiveUsersLabel'),
@@ -691,11 +550,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
 
-        SizedBox(height: 16.h),
+        SizedBox(height: 12.h),
 
         // Approvals Overview
         _buildSectionHeader(l10n.translate('dashboardAllApprovalsTitle'), Icons.approval, size: 16),
-        SizedBox(height: 12.h),
+        SizedBox(height: 10.h),
 
         Row(
           children: [
@@ -737,7 +596,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(l10n.translate('dashboardGettingStartedTitle'), Icons.info),
-        SizedBox(height: 16.h),
+        SizedBox(height: 12.h),
         _buildActionCard(
           title: l10n.translate('dashboardViewProfileTitle'),
           subtitle: l10n.translate('dashboardViewProfileSubtitle'),
@@ -753,18 +612,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.all(8.w),
+          padding: EdgeInsets.all(6.w),
           decoration: BoxDecoration(
             color: const Color(0xFF0E5CA8).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8.r),
+            borderRadius: BorderRadius.circular(6.r),
           ),
           child: Icon(
             icon,
             color: const Color(0xFF0E5CA8),
-            size: (size ?? 20).sp,
+            size: (size ?? 18).sp,
           ),
         ),
-        SizedBox(width: 12.w),
+        SizedBox(width: 10.w),
         Text(
           title,
           style: TextStyle(
@@ -786,12 +645,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: EdgeInsets.all(16.w),
+        padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
             color: color.withOpacity(0.2),
             width: 1.5,
@@ -833,7 +692,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 12.sp,
+                fontSize: 10.sp,
                 color: Colors.grey[600],
               ),
               textAlign: TextAlign.center,
@@ -855,19 +714,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: EdgeInsets.all(16.w),
+        padding: EdgeInsets.all(14.w),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
-            color: count > 0 ? color.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+            color: color.withOpacity(0.3),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: count > 0 ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.05),
+              color: color.withOpacity(0.1),
               blurRadius: 0,
               offset: const Offset(0, 2),
             ),
@@ -878,13 +737,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Container(
               padding: EdgeInsets.all(12.w),
               decoration: BoxDecoration(
-                color: (count > 0 ? color : Colors.grey).withOpacity(0.1),
+                color: color.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 24.sp,
-                color: count > 0 ? color : Colors.grey,
+                color: color,
               ),
             ),
             SizedBox(width: 16.w),
@@ -897,7 +756,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.bold,
-                      color: count > 0 ? Colors.black87 : Colors.grey,
+                      color: Colors.black87,
                     ),
                   ),
                   SizedBox(height: 4.h),
@@ -911,50 +770,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-            Column(
-              children: [
-                if (count > 0)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(20.r),
-                    ),
-                    child: Text(
-                      count.toString(),
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20.r),
-                    ),
-                    child: Text(
-                      context.l10n.translate('dashboardStatusClear'),
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        color: Colors.green,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                if (showViewAll) ...[
-                  SizedBox(height: 4.h),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 12.sp,
-                    color: Colors.grey[400],
-                  ),
-                ],
-              ],
-            ),
+            if (showViewAll)
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 12.sp,
+                color: Colors.grey[400],
+              ),
           ],
         ),
       ),
@@ -968,7 +789,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color color,
   }) {
     return Container(
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.r),
@@ -1034,7 +855,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12.r),
           border: Border.all(
-            color: count > 0 ? color.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+            color: color.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -1045,7 +866,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.bold,
-                color: count > 0 ? color : Colors.grey,
+                color: color,
               ),
             ),
             SizedBox(height: 4.h),
@@ -1114,9 +935,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Text(
                             l10n.translate(
                               'dashboardPendingCountLabel',
-                              params: <String, String>{
-                                'count': _getTotalPendingCount().toString(),
-                              },
+                              params: [_getTotalPendingCount().toString()],
                             ),
                             style: TextStyle(
                               fontSize: 12.sp,
@@ -1139,9 +958,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             l10n.translate('dashboardInventoryApprovalsTitle'),
                             l10n.translate(
                               'dashboardInventoryPendingSubtitle',
-                              params: <String, String>{
-                                'count': _pendingInventoryApprovals.toString(),
-                              },
+                              params: [_pendingInventoryApprovals.toString()],
                             ),
                             Icons.inventory,
                             Colors.blue,
@@ -1155,9 +972,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             l10n.translate('dashboardCashApprovalsTitle'),
                             l10n.translate(
                               'dashboardCashPendingSubtitle',
-                              params: <String, String>{
-                                'count': _pendingCashApprovals.toString(),
-                              },
+                              params: [_pendingCashApprovals.toString()],
                             ),
                             Icons.account_balance_wallet,
                             Colors.green,
@@ -1171,9 +986,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             l10n.translate('dashboardOrderApprovalsTitle'),
                             l10n.translate(
                               'dashboardOrdersPendingSubtitle',
-                              params: <String, String>{
-                                'count': _pendingOrderApprovals.toString(),
-                              },
+                              params: [_pendingOrderApprovals.toString()],
                             ),
                             Icons.shopping_cart,
                             Colors.orange,
@@ -1187,9 +1000,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             l10n.translate('dashboardCseTicketsTitle'),
                             l10n.translate(
                               'dashboardTicketsPendingSubtitle',
-                              params: <String, String>{
-                                'count': _pendingCSETickets.toString(),
-                              },
+                              params: [_pendingCSETickets.toString()],
                             ),
                             Icons.support_agent,
                             Colors.purple,
@@ -1400,10 +1211,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final String countString = pendingCount.toString();
     return pendingCount == 1
         ? context.l10n
-        .translate('dashboardPendingApprovalSingle', params: <String, String>{'count': countString})
+        .translate('dashboardPendingApprovalSingle', params: [countString])
         : context.l10n.translate(
       'dashboardPendingApprovalsMultiple',
-      params: <String, String>{'count': countString},
+      params: [countString],
     );
   }
 
@@ -1450,10 +1261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else {
       return context.l10n.translate(
         'dashboardAdditionalRoles',
-        params: <String, String>{
-          'firstRole': formattedRoles.first,
-          'remainingCount': (formattedRoles.length - 1).toString(),
-        },
+        params: [formattedRoles.first, (formattedRoles.length - 1).toString()],
       );
     }
   }
@@ -1520,7 +1328,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _showSuccessSnackBar(
             context.l10n.translate(
               'dashboardNewApprovalPending',
-              params: <String, String>{'module': moduleName},
+              params: [moduleName],
             ),
           );        }
       }

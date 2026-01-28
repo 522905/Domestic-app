@@ -8,6 +8,7 @@ import 'package:lpg_distribution_app/utils/status_chip.dart';
 import '../../../core/models/deposit/deposit_data.dart';
 import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../blocs/inventory/inventory_event.dart';
 import '../../blocs/inventory/inventory_state.dart';
 import 'Inventory_detail_screen.dart';
@@ -71,18 +72,28 @@ class _InventoryPageState extends State<InventoryPage>
     });
 
     // Load requests immediately
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         context.read<InventoryBloc>().add(const RefreshInventoryRequests());
+        // Wait for refresh to complete, then apply current filter
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          _filterRequests(_currentFilter);
+        }
       }
     });
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.resumed && mounted) {
       // Always refresh when app comes back to foreground
       context.read<InventoryBloc>().add(const RefreshInventoryRequests());
+      // Wait for refresh to complete, then apply current filter
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        _filterRequests(_currentFilter);
+      }
     }
   }
 
@@ -151,9 +162,14 @@ class _InventoryPageState extends State<InventoryPage>
   }
 
   void _refreshOnFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         context.read<InventoryBloc>().add(const RefreshInventoryRequests());
+        // Wait for refresh to complete, then apply current filter
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          _filterRequests(_currentFilter);
+        }
       }
     });
   }
@@ -163,7 +179,7 @@ class _InventoryPageState extends State<InventoryPage>
     return Scaffold(
       drawer: GlobalDrawer.getDrawer(context),
       appBar: AppBar(
-        title: const Text('Inventory'),
+        title: Text(AppLocalizations.of(context)!.inventoryPageTitle),
         backgroundColor: const Color(0xFF0E5CA8),
         actions: [
           IconButton(
@@ -171,29 +187,47 @@ class _InventoryPageState extends State<InventoryPage>
                 Icons.refresh,
                 color: Colors.white
             ),
-            onPressed: () {
-              _loadData().then((_) {
-                if (mounted) {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (BuildContext context) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    },
-                  );
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    Navigator.of(context).pop(); // Close the dialog after 1 second
-                    context.read<InventoryBloc>().add(const RefreshInventoryRequests());
+            onPressed: () async {
+              if (!mounted) return;
 
-                    // Re-apply current tab filter after refresh
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      _filterRequests(_currentFilter);
-                    });
-                  });
+              // Show loading dialog
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                },
+              );
+
+              try {
+                // Load data first
+                await _loadData();
+
+                // Refresh requests
+                if (mounted) {
+                  context.read<InventoryBloc>().add(const RefreshInventoryRequests());
                 }
-              });
+
+                // Wait for data to load
+                await Future.delayed(const Duration(milliseconds: 600));
+
+                // Re-apply current tab filter
+                if (mounted) {
+                  _filterRequests(_currentFilter);
+                }
+
+                // Close loading dialog
+                await Future.delayed(const Duration(milliseconds: 100));
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              }
             },
           ),
         ],
@@ -208,7 +242,7 @@ class _InventoryPageState extends State<InventoryPage>
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by ID, Warehouse, or Person...',
+                hintText: AppLocalizations.of(context)!.inventorySearchHint,
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -252,19 +286,19 @@ class _InventoryPageState extends State<InventoryPage>
               tabs: [
                 Tab(
                   icon: Icon(Icons.list_alt, size: 20.sp),
-                  text: 'All',
+                  text: AppLocalizations.of(context)!.dialogOptionAll,
                 ),
                 Tab(
                   icon: Icon(Icons.pending_actions, size: 20.sp),
-                  text: 'Pending',
+                  text: AppLocalizations.of(context)!.statusPending,
                 ),
                 Tab(
                   icon: Icon(Icons.add_chart, size: 20.sp),
-                  text: 'Challan',
+                  text: AppLocalizations.of(context)!.dashboardChallanTitle,
                 ),
                 Tab(
                   icon: Icon(Icons.call_received, size: 20.sp),
-                  text: 'Deposit',
+                  text: AppLocalizations.of(context)!.inventoryDepositMaterialRequestTitle.split(' (')[0],
                 ),
               ],
             ),
@@ -309,14 +343,12 @@ class _InventoryPageState extends State<InventoryPage>
                               ),
                               SizedBox(height: 16.h),
                               Text(
-                                'No $status requests found',
+                                AppLocalizations.of(context)!.inventoryEmptyRequests,
                                 style: Theme.of(context).textTheme.headlineSmall,
                               ),
                               SizedBox(height: 8.h),
                               Text(
-                                status == 'All'
-                                    ? 'No requests available'
-                                    : 'No $status requests found',
+                                AppLocalizations.of(context)!.inventoryEmptyRequests,
                                 style: TextStyle(color: Colors.grey[600]),
                               ),
                             ],
@@ -329,10 +361,13 @@ class _InventoryPageState extends State<InventoryPage>
                           context
                               .read<InventoryBloc>()
                               .add(const RefreshInventoryRequests());
-                          await Future.delayed(const Duration(milliseconds: 200));
+                          // Wait longer for data to load before re-applying filter
+                          await Future.delayed(const Duration(milliseconds: 500));
 
                           // Re-apply current tab filter after refresh
-                          _filterRequests(_currentFilter);
+                          if (mounted) {
+                            _filterRequests(_currentFilter);
+                          }
                         },
                         child: ListView.builder(
                           padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -358,7 +393,7 @@ class _InventoryPageState extends State<InventoryPage>
                             ),
                             SizedBox(height: 16.h),
                             Text(
-                              'Failed to load requests',
+                              AppLocalizations.of(context)!.dialogFailedToLoadDataTitle,
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                             SizedBox(height: 8.h),
@@ -368,7 +403,7 @@ class _InventoryPageState extends State<InventoryPage>
                               onPressed: () => context
                                   .read<InventoryBloc>()
                                   .add(const RefreshInventoryRequests()),
-                              child: const Text('Try Again'),
+                              child: Text(AppLocalizations.of(context)!.buttonTryAgain),
                             ),
                           ],
                         ),
@@ -400,7 +435,7 @@ class _InventoryPageState extends State<InventoryPage>
         onPressed: _showInventoryOptionsBottomSheet,
         backgroundColor: const Color(0xFF0E5CA8),
         child: const Icon(Icons.add, color: Colors.white),
-        tooltip: 'Inventory Options',
+        tooltip: AppLocalizations.of(context)!.inventoryPageTitle,
       ),
     );
   }
@@ -423,7 +458,7 @@ class _InventoryPageState extends State<InventoryPage>
               ),
               child: Center(
                 child: Text(
-                  'No requests found',
+                  AppLocalizations.of(context)!.inventoryEmptyRequests,
                   style: TextStyle(
                     fontSize: 14.sp,
                     color: Colors.grey[600],
@@ -442,7 +477,7 @@ class _InventoryPageState extends State<InventoryPage>
             if (pendingCount > 0) {
               summaryRows.add(_buildSummaryRow(
                 icon: Icons.pending_actions,
-                label: 'Pending',
+                label: AppLocalizations.of(context)!.statusPending,
                 count: pendingCount,
                 color: Colors.amber,
               ));
@@ -454,7 +489,7 @@ class _InventoryPageState extends State<InventoryPage>
               }
               summaryRows.add(_buildSummaryRow(
                 icon: Icons.call_received,
-                label: 'Collect',
+                label: AppLocalizations.of(context)!.dashboardChallanTitle,
                 count: collectCount,
                 color: const Color(0xFFF7941D),
               ));
@@ -466,7 +501,7 @@ class _InventoryPageState extends State<InventoryPage>
               }
               summaryRows.add(_buildSummaryRow(
                 icon: Icons.call_made,
-                label: 'Deposit',
+                label: AppLocalizations.of(context)!.dashboardDepositItemsTitle.split(' ')[0],
                 count: depositCount,
                 color: const Color(0xFF0E5CA8),
               ));
@@ -475,7 +510,7 @@ class _InventoryPageState extends State<InventoryPage>
             // Show only Pending count
             summaryRows.add(_buildSummaryRow(
               icon: Icons.pending_actions,
-              label: 'Pending',
+              label: AppLocalizations.of(context)!.statusPending,
               count: pendingCount,
               color: Colors.amber,
             ));
@@ -483,7 +518,7 @@ class _InventoryPageState extends State<InventoryPage>
             // Show only Collect count
             summaryRows.add(_buildSummaryRow(
               icon: Icons.call_received,
-              label: 'Collect',
+              label: AppLocalizations.of(context)!.dashboardChallanTitle,
               count: collectCount,
               color: const Color(0xFFF7941D),
             ));
@@ -491,7 +526,7 @@ class _InventoryPageState extends State<InventoryPage>
             // Show only Deposit count
             summaryRows.add(_buildSummaryRow(
               icon: Icons.call_made,
-              label: 'Deposit',
+              label: AppLocalizations.of(context)!.dashboardDepositItemsTitle.split(' ')[0],
               count: depositCount,
               color: const Color(0xFF0E5CA8),
             ));
@@ -610,11 +645,11 @@ class _InventoryPageState extends State<InventoryPage>
     return Card(
       margin: EdgeInsets.only(bottom: 5.h, top: 4.h),
       child: InkWell(
-        onTap: () {
+        onTap: () async {
           if (request.status.toUpperCase() == 'PENDING' &&
               _userRole.contains('Warehouse Manager')) {
             // Show unified approval screen
-            Navigator.push(
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => InventoryDetailScreen(
@@ -624,12 +659,9 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
               ),
             );
-            if (mounted) {
-              context.read<InventoryBloc>().add(const RefreshInventoryRequests());
-            }
           } else {
             // Show your existing details page
-            Navigator.push(
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => InventoryDetailScreen(
@@ -639,8 +671,13 @@ class _InventoryPageState extends State<InventoryPage>
               ),
             );
           }
+          // Refresh and re-apply filter after returning from detail screen
           if (mounted) {
             context.read<InventoryBloc>().add(const RefreshInventoryRequests());
+            await Future.delayed(const Duration(milliseconds: 300));
+            if (mounted) {
+              _filterRequests(_currentFilter);
+            }
           }
         },
         borderRadius: BorderRadius.circular(8.r),
@@ -724,7 +761,7 @@ class _InventoryPageState extends State<InventoryPage>
                   ),
                   SizedBox(width: 4.w),
                   Text(
-                    'Req. By: ${request.requestedBy}',
+                    '${AppLocalizations.of(context)!.inventoryRequestedBy}: ${request.requestedBy}',
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 16.sp,
@@ -743,7 +780,7 @@ class _InventoryPageState extends State<InventoryPage>
                   ),
                   SizedBox(width: 4.w),
                   Text(
-                    'Warehouse: ${request.warehouse}',
+                    '${AppLocalizations.of(context)!.profileWarehouseLabel}: ${request.warehouse}',
                     style: TextStyle(
                       fontSize: 14.sp,
                       color: Colors.grey[600],
@@ -761,7 +798,7 @@ class _InventoryPageState extends State<InventoryPage>
                   ),
                   SizedBox(width: 4.w),
                   Text(
-                    'Vehicle Number: ${request.vehicle}',
+                    '${AppLocalizations.of(context)!.inventoryVehicleNumber}: ${request.vehicle ?? 'N/A'}',
                     style: TextStyle(
                       fontSize: 14.sp,
                       color: Colors.grey[600],
@@ -810,7 +847,7 @@ class _InventoryPageState extends State<InventoryPage>
                               ),
                               SizedBox(width: 4.w),
                               Text(
-                                'Needs Approval',
+                                AppLocalizations.of(context)!.notificationApprovalRequired.split(' ').last,
                                 style: TextStyle(
                                   fontSize: 10.sp,
                                   fontWeight: FontWeight.bold,
@@ -836,7 +873,7 @@ class _InventoryPageState extends State<InventoryPage>
                             ),
                             SizedBox(width: 4.w),
                             Text(
-                              'Cancelled',
+                              AppLocalizations.of(context)!.statusCancelled,
                               style: TextStyle(
                                 fontSize: 10.sp,
                                 color: Colors.grey[600],
@@ -883,7 +920,7 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
               ),
               Text(
-                'Inventory Options',
+                AppLocalizations.of(context)!.inventoryPageTitle,
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.bold,
@@ -892,8 +929,8 @@ class _InventoryPageState extends State<InventoryPage>
               if (_userRole.contains('Delivery Boy')) ...[
                 _buildBottomSheetOption(
                   icon: Icons.inventory_2_rounded,
-                  title: 'Deposit Inventory (Unlinked)',
-                  subtitle: 'Deposit items for warehouse',
+                  title: AppLocalizations.of(context)!.inventoryDepositUnlinkedTitle,
+                  subtitle: AppLocalizations.of(context)!.inventoryDepositUnlinkedSubtitle,
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToActionScreen(
@@ -905,8 +942,8 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
                 _buildBottomSheetOption(
                   icon: Icons.receipt_long,
-                  title: 'Deposit Inventory (Sale Order)',
-                  subtitle: 'Deposit items against sale orders',
+                  title: AppLocalizations.of(context)!.inventoryDepositSaleOrderTitle,
+                  subtitle: AppLocalizations.of(context)!.inventoryDepositSaleOrderSubtitle,
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToActionScreen(
@@ -918,8 +955,8 @@ class _InventoryPageState extends State<InventoryPage>
                 ),
                 _buildBottomSheetOption(
                   icon: Icons.assignment,
-                  title: 'Deposit Inventory (Material Request)',
-                  subtitle: 'Deposit items against material requests',
+                  title: AppLocalizations.of(context)!.inventoryDepositMaterialRequestTitle,
+                  subtitle: AppLocalizations.of(context)!.inventoryDepositMaterialRequestSubtitle,
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToActionScreen(
@@ -933,8 +970,8 @@ class _InventoryPageState extends State<InventoryPage>
               if (_userRole.contains('Delivery Boy'))
                 _buildBottomSheetOption(
                   icon: Icons.inventory,
-                  title: 'Create Challan',
-                  subtitle: 'Create a inventory challan',
+                  title: AppLocalizations.of(context)!.inventoryCreateChallanTitle,
+                  subtitle: AppLocalizations.of(context)!.inventoryCreateChallanSubtitle,
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToActionScreen(
@@ -945,8 +982,8 @@ class _InventoryPageState extends State<InventoryPage>
               if (_userRole.contains('Warehouse Manager'))
                 _buildBottomSheetOption(
                   icon: Icons.transfer_within_a_station,
-                  title: 'Inventory Transfer',
-                  subtitle: 'Transfer items to another warehouse',
+                  title: AppLocalizations.of(context)!.inventoryTransferTitle,
+                  subtitle: AppLocalizations.of(context)!.inventoryTransferSubtitle,
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToActionScreen(

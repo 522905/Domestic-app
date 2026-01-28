@@ -14,6 +14,7 @@ import '../main_container.dart';
 import '../profile/pan_verification_screen.dart';
 import 'forgot_password_screen.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/l10n_extensions.dart';
 import '../../../main.dart' show updateDeviceToken;
 
 class LoginScreen extends StatefulWidget {

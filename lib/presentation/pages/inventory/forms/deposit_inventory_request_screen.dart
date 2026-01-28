@@ -8,6 +8,8 @@ import '../../../../core/models/deposit/sales_order_deposit_data.dart';
 import '../../../../core/models/deposit/material_request_deposit_data.dart';
 import '../../../../core/models/deposit/selectable_deposit_item.dart';
 import '../../../../core/services/api_service_interface.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../l10n/l10n_extensions.dart';
 import '../../../blocs/inventory/inventory_bloc.dart';
 import '../../../blocs/inventory/inventory_event.dart';
 import '../../../blocs/vehicle/vehicle_bloc.dart';
@@ -104,7 +106,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
 
       if (mounted) {
         context.showErrorDialog(
-          title: 'Failed to Load Data',
+          title: AppLocalizations.of(context)!.dialogFailedToLoadDataTitle,
           error: e,
           onRetry: _loadData,
         );
@@ -141,16 +143,16 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
     }
   }
 
-  String get _depositTypeDisplayName {
+  String _getDepositTypeDisplayName(BuildContext context) {
     switch (widget.depositType) {
       case DepositData.unlinked:
-        return 'Unlinked';
+        return AppLocalizations.of(context)!.inventoryUnlinkedLabel;
       case DepositData.salesOrder:
-        return 'Sales Order';
+        return AppLocalizations.of(context)!.inventorySalesOrderLabel;
       case DepositData.materialRequest:
-        return 'Material Request';
+        return AppLocalizations.of(context)!.inventoryMaterialRequestLabel;
       default:
-        return 'Unknown';
+        return AppLocalizations.of(context)!.labelUnknown;
     }
   }
 
@@ -167,11 +169,24 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
     }
   }
 
+  String get _depositTypeDisplayName {
+    switch (widget.depositType) {
+      case DepositData.unlinked:
+        return context.l10n.depositUnlinked;
+      case DepositData.salesOrder:
+        return context.l10n.depositSalesOrder;
+      case DepositData.materialRequest:
+        return context.l10n.depositMaterialRequest;
+      default:
+        return 'Deposit';
+    }
+  }
+
   void _showVehicleSelectionDialog() async {
     final selectedVehicle = await VehicleSelectorDialog.show(
       context: context,
       vehicles: _vehicles,
-      title: 'Select vehicle',
+      title: AppLocalizations.of(context)!.dialogSelectVehicleTitle,
     );
 
     if (selectedVehicle != null) {
@@ -187,7 +202,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
     final selectedWarehouse = await WarehouseSelectorDialog.show(
       context: context,
       warehouses: _warehouses,
-      title: 'Select Warehouse',
+      title: AppLocalizations.of(context)!.dialogSelectWarehouseTitle,
     );
 
     if (selectedWarehouse != null) {
@@ -217,7 +232,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
       builder: (context, setPageState) {
         return Scaffold(
           appBar: AppBar(
-            title: Text('Select $_depositTypeDisplayName Items'),
+            title: Text('${AppLocalizations.of(context)!.depositSelectItemsTitle} ${_getDepositTypeDisplayName(context)} ${AppLocalizations.of(context)!.inventoryItemsLabel}'),
             backgroundColor: const Color(0xFF0E5CA8),
             foregroundColor: Colors.white,
             actions: [
@@ -232,7 +247,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                         borderRadius: BorderRadius.circular(15.r),
                       ),
                       child: Text(
-                        '${_selectedItems.length} items',
+                        '${_selectedItems.length} ${AppLocalizations.of(context)!.inventoryItemsLabel.toLowerCase()}',
                         style: TextStyle(
                           color: const Color(0xFF0E5CA8),
                           fontWeight: FontWeight.bold,
@@ -265,7 +280,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                       ),
                     ),
                     child: Text(
-                      'Back to Deposit Screen',
+                      AppLocalizations.of(context)!.depositBackToScreen,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16.sp,
@@ -324,7 +339,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
         );
       default:
         return Center(
-          child: Text('Unknown deposit type: ${widget.depositType}'),
+          child: Text('${AppLocalizations.of(context)!.labelUnknown} ${AppLocalizations.of(context)!.depositTypeLabel}: ${widget.depositType}'),
         );
     }
   }
@@ -336,7 +351,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
         : _selectedItems.isNotEmpty;
 
     if (!hasItems) {
-      context.showWarningSnackBar('Please add at least one item');
+      context.showWarningSnackBar(AppLocalizations.of(context)!.depositAddAtLeastOneItem);
       return;
     }
 
@@ -345,12 +360,12 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
         : _selectedItems.isEmpty)
 
     if (_selectedWarehouseId == null) {
-      context.showWarningSnackBar('Please select a warehouse');
+      context.showWarningSnackBar(AppLocalizations.of(context)!.depositSelectWarehouseWarning);
       return;
     }
 
     if (_selectedVehicleId == null) {
-      context.showWarningSnackBar('Please select a vehicle');
+      context.showWarningSnackBar(AppLocalizations.of(context)!.depositSelectVehicleWarning);
       return;
     }
 
@@ -373,7 +388,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '$_depositTypeDisplayName Deposit',
+                      '${_getDepositTypeDisplayName(context)} ${AppLocalizations.of(context)!.depositTitle}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -387,8 +402,8 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                 ),
                 const Divider(),
                 const SizedBox(height: 8),
-                const Text(
-                    'Are you sure you want to submit this deposit request?'
+                Text(
+                    AppLocalizations.of(context)!.depositConfirmSubmitMessage
                 ),
                 const SizedBox(height: 16),
                 Container(
@@ -401,19 +416,19 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Warehouse: $_selectedWarehouseName',
+                        '${AppLocalizations.of(context)!.profileWarehouseLabel}: $_selectedWarehouseName',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        'Vehicle: $_selectedVehicle',
+                        '${AppLocalizations.of(context)!.ordersFilterVehicle}: $_selectedVehicle',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        'Type: $_depositTypeDisplayName',
+                        '${AppLocalizations.of(context)!.depositTypeLabel}: ${_getDepositTypeDisplayName(context)}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-                      const Text('Items:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('${AppLocalizations.of(context)!.inventoryItemsLabel}:', style: const TextStyle(fontWeight: FontWeight.bold)),
                       ...summary.entries.map((e) => Padding(
                         padding: const EdgeInsets.only(left: 16, top: 4),
                         child: Text('• ${e.key}: ${e.value}'),
@@ -432,7 +447,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                           foregroundColor: const Color(0xFF0E5CA8),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        child: const Text('Cancel'),
+                        child: Text(AppLocalizations.of(context)!.buttonCancel),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -447,7 +462,7 @@ class _DepositInventoryScreenState extends State<DepositInventoryScreen> {
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        child: const Text('Confirm'),
+                        child: Text(AppLocalizations.of(context)!.buttonConfirm),
                       ),
                     ),
                   ],

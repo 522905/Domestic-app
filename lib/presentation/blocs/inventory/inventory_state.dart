@@ -79,3 +79,16 @@ class InventoryActionSuccess extends InventoryState {
   @override
   List<Object> get props => [message, requestId, action];
 }
+
+class InventoryCancelSuccess extends InventoryState {
+  final String message;
+  final String requestId;
+
+  const InventoryCancelSuccess({
+    required this.message,
+    required this.requestId,
+  });
+
+  @override
+  List<Object> get props => [message, requestId];
+}

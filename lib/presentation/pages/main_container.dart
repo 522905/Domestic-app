@@ -9,6 +9,7 @@ import 'package:lpg_distribution_app/presentation/widgets/version/version_update
 import '../../core/services/version_manager.dart';
 import 'inventory/inventory_screen.dart';
 import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../widgets/professional_snackbar.dart';
 
 class MainContainer extends StatefulWidget {
@@ -100,7 +101,7 @@ class _MainContainerState extends State<MainContainer>
       }
     } catch (e) {
       final l10n = context.l10n;
-      context.showErrorSnackBar(l10n.translate('Download failed: {error}', params: {'error': '$e'}));
+      context.showErrorSnackBar(l10n.translate('errorDownloadFailed', params: ['$e']));
     }
   }
 

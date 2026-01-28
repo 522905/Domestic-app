@@ -13,6 +13,8 @@ import 'package:lpg_distribution_app/presentation/blocs/inventory/inventory_bloc
 import 'package:lpg_distribution_app/presentation/blocs/orders/orders_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/sdms/create/sdms_create_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/sdms/transaction/sdms_transaction_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/digital_credit/digital_credit_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/quota/quota_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/vehicle/vehicle_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/defect_inspection/defect_inspection_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/splash_screen.dart';
@@ -30,6 +32,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_novu/generated/app_localizations.dart';
 import 'l10n/app_localizations.dart';
+import 'l10n/l10n_extensions.dart';
 import 'utils/localization/locale_notifier.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -163,6 +166,16 @@ void main() async {
               BlocProvider<SDMSCreateBloc>(
                 create: (context) => SDMSCreateBloc(apiService: context.read<ApiServiceInterface>()),
               ),
+              BlocProvider<DigitalCreditBloc>(
+                create: (context) => DigitalCreditBloc(
+                  apiService: context.read<ApiServiceInterface>(),
+                ),
+              ),
+              BlocProvider<QuotaBloc>(
+                create: (context) => QuotaBloc(
+                  apiService: context.read<ApiServiceInterface>(),
+                ),
+              ),
               BlocProvider<DefectInspectionBloc>(
                 create: (context) {
                   final apiServiceInterface = context.read<ApiServiceInterface>();
@@ -277,7 +290,39 @@ void _handleNotificationTap(String payload) {
   try {
     final data = jsonDecode(payload) as Map<String, dynamic>;
     final route = data['route'] as String?;
+    final type = data['type'] as String?;
 
+    // Digital Credit specific notifications
+    if (type != null) {
+      switch (type) {
+        case 'credit_ready':
+        case 'credit_auto_claimed':
+          final creditId = data['credit_id'] as String?;
+          if (creditId != null) {
+            // Navigate to credit detail
+            Navigator.pushNamed(context, '/digital-credit/$creditId');
+          }
+          break;
+
+        case 'claim_transfer_request':
+        case 'transfer_reminder':
+          // Navigate to Pending Approvals tab
+          Navigator.pushNamed(context, '/digital-credits?tab=3');
+          break;
+
+        case 'transfer_approved':
+        case 'transfer_rejected':
+        case 'transfer_auto_approved':
+          final creditId = data['credit_id'] as String?;
+          if (creditId != null) {
+            Navigator.pushNamed(context, '/digital-credit/$creditId');
+          }
+          break;
+      }
+      return; // Exit after handling digital credit notification
+    }
+
+    // Default route-based navigation (existing functionality)
     if (route != null) {
       AppRoutes.navigateWithCompanyCheck(context, route);
     }

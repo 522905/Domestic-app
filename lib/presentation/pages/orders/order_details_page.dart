@@ -338,6 +338,8 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
               separatorBuilder: (context, index) => Divider(height: 16.h),
               itemBuilder: (context, index) {
                 final item = detailedOrder.items[index];
+                final receivedQty = item.customCrrEmptyReceived;
+                final pendingQty = (item.quantity - receivedQty).clamp(0, double.infinity).toInt();
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -410,6 +412,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                         ),
                       ],
                     ),
+                    // SizedBox(height: 8.h),
                     if (item.warehouse.isNotEmpty || item.itemGroup.isNotEmpty) ...[
                       Text(
                         amountToWords(item.amount.toInt()),
@@ -419,7 +422,7 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                       ),
                       SizedBox(height: 2.h),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           if (item.itemGroup.isNotEmpty) ...[
                             Container(
@@ -450,31 +453,63 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
                           ],
                           if (userRole?.contains('Delivery Boy') ?? false) ...[
                             ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CashDepositPage(initialAmount: item.amount), // Navigate to cash page with deposit mode
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => CashDepositPage(initialAmount: item.amount), // Navigate to cash page with deposit mode
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0E5CA8),
+                                padding: EdgeInsets.symmetric(vertical: 2.h),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(6.0),
+                                child: Text(
+                                  'Cash Deposit',
+                                  style: TextStyle(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.bold),
                                 ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0E5CA8),
-                              padding: EdgeInsets.symmetric(vertical: 2.h),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(6.0),
-                              child: Text(
-                                'Cash Deposit',
-                                style: TextStyle(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.bold),
                               ),
                             ),
-                          ),
-                         ]
+                          ]
                         ],
                       ),
                     ],
+                    // Deposit/Pending with progress bar
+                    SizedBox(height: 8.h),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 10.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E5CA8).withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(color: const Color(0xFF0E5CA8).withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: LinearProgressIndicator(
+                              minHeight: 8.h,
+                              value: item.quantity > 0
+                                  ? (receivedQty.clamp(0, item.quantity) / item.quantity)
+                                  : 0,
+                              backgroundColor: Colors.grey.shade300,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade600),
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(
+                            '$receivedQty/${item.quantity.toInt()}',
+                            style: TextStyle(fontSize: 12.sp, color: const Color(0xFF0E5CA8), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 );
               },

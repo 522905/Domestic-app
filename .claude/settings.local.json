@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git log:*)",
       "Bash(flutter analyze:*)",
-      "Bash(gradlew.bat --stop:*)"
+      "Bash(gradlew.bat --stop:*)",
+      "Bash(flutter gen-l10n:*)"
     ],
     "deny": [],
     "ask": []

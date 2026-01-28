@@ -14,6 +14,7 @@ import '../../../core/services/service_provider.dart';
 import '../../../core/utils/global_drawer.dart';
 import '../../../domain/entities/cash/cash_transaction.dart';
 import '../../../domain/entities/cash/partner_balance.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../blocs/cash/cash_bloc.dart';
 import 'forms/bank_deposit_page.dart';
 import 'forms/handover_screen.dart';
@@ -306,14 +307,14 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
         controller: _searchController,
         autofocus: true,
         style: const TextStyle(color: Colors.white),
-        decoration: const InputDecoration(
-          hintText: 'Search by ID, name, reference...',
-          hintStyle: TextStyle(color: Colors.white70),
+        decoration: InputDecoration(
+          hintText: AppLocalizations.of(context)!.cashSearchHint,
+          hintStyle: const TextStyle(color: Colors.white70),
           border: InputBorder.none,
         ),
         onChanged: _performSearch,
       )
-          : const Text('Cash'),
+          : Text(AppLocalizations.of(context)!.cashPageTitle),
       centerTitle: !_isSearching,
       actions: [
         if (_isSearching)
@@ -414,7 +415,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                   children: [
                     Icon(Icons.error_outline, color: Colors.red),
                     SizedBox(width: 8.w),
-                    Text('Error'),
+                    Text(AppLocalizations.of(context)!.dialogErrorTitle),
                   ],
                 ),
                 content: Text(state.message),
@@ -424,11 +425,11 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                       Navigator.of(context).pop();
                       context.read<CashManagementBloc>().add(RefreshCashData());
                     },
-                    child: Text('Retry'),
+                    child: Text(AppLocalizations.of(context)!.buttonRetry),
                   ),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text('Close'),
+                    child: Text(AppLocalizations.of(context)!.buttonClose),
                   ),
                 ],
               ),
@@ -461,13 +462,13 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                   Icon(Icons.error_outline, size: 48.sp, color: Colors.red),
                   SizedBox(height: 16.h),
                   Text(
-                    'Error loading cash data: ${state.message}',
+                    '${AppLocalizations.of(context)!.cashLoadingError}: ${state.message}',
                     style: TextStyle(fontSize: 16.sp),
                   ),
                   SizedBox(height: 8.h),
                   ElevatedButton(
                     onPressed: () => context.read<CashManagementBloc>().add(RefreshCashData()),
-                    child: const Text('Retry'),
+                    child: Text(AppLocalizations.of(context)!.buttonRetry),
                   ),
                 ],
               ),
@@ -548,7 +549,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Account Balances',
+                      AppLocalizations.of(context)!.cashAccountBalancesTitle,
                       style: TextStyle(
                         fontSize: 16.sp,
                         fontWeight: FontWeight.w600,
@@ -565,7 +566,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                           ),
                           SizedBox(height: 12.h),
                           Text(
-                            'Data not available',
+                            AppLocalizations.of(context)!.cashDataNotAvailable,
                             style: TextStyle(
                               fontSize: 14.sp,
                               color: Colors.grey[600],
@@ -574,7 +575,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                           ),
                           SizedBox(height: 4.h),
                           Text(
-                            'Pull down to refresh',
+                            AppLocalizations.of(context)!.cashPullToRefresh,
                             style: TextStyle(
                               fontSize: 12.sp,
                               color: Colors.grey[500],
@@ -608,7 +609,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                 padding: EdgeInsets.all(16.w),
                 child: Center(
                   child: Text(
-                    'No account data available',
+                    AppLocalizations.of(context)!.cashNoAccountData,
                     style: TextStyle(
                       fontSize: 14.sp,
                       color: Colors.grey[600],
@@ -636,7 +637,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
       children: [
         SizedBox(height: 10.h),
         Text(
-          'Account Balances',
+          AppLocalizations.of(context)!.cashAccountBalancesTitle,
           style: TextStyle(
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
@@ -655,10 +656,10 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                 color: Colors.grey[100],
                 child: Row(
                   children: [
-                    Expanded(flex: 3, child: _buildTableHeaderCell('Account')),
-                    Expanded(flex: 2, child: _buildTableHeaderCell('Ledger')),
-                    Expanded(flex: 2, child: _buildTableHeaderCell('Open')),
-                    Expanded(flex: 2, child: _buildTableHeaderCell('Available')),
+                    Expanded(flex: 3, child: _buildTableHeaderCell(AppLocalizations.of(context)!.tableHeaderAccount)),
+                    Expanded(flex: 2, child: _buildTableHeaderCell(AppLocalizations.of(context)!.tableHeaderLedger)),
+                    Expanded(flex: 2, child: _buildTableHeaderCell(AppLocalizations.of(context)!.tableHeaderOpen)),
+                    Expanded(flex: 2, child: _buildTableHeaderCell(AppLocalizations.of(context)!.tableHeaderAvailable)),
                   ],
                 ),
               ),
@@ -785,11 +786,11 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
 
     if (userRole?.contains('Cashier') ?? false) {
       double availableBalance = state.cashData.cashInHand;
-      String accountName = 'Cash Account';
+      String accountName = AppLocalizations.of(context)!.cashAccountDefault;
       String? fullAccountName; // For API call
 
       if (state.cashData.cashierAccounts.isNotEmpty) {
-        accountName = state.cashData.cashierAccounts[0]['account_label'] ?? 'Cash Account';
+        accountName = state.cashData.cashierAccounts[0]['account_label'] ?? AppLocalizations.of(context)!.cashAccountDefault;
         fullAccountName = state.cashData.cashierAccounts[0]['account_name']; // Assuming this exists
       }
 
@@ -837,7 +838,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                               borderRadius: BorderRadius.circular(12.r),
                             ),
                             child: Text(
-                              'REFRESH',
+                              AppLocalizations.of(context)!.buttonRefresh,
                               style: TextStyle(
                                 fontSize: 12.sp,
                                 fontWeight: FontWeight.w500,
@@ -888,7 +889,7 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'View Transaction History',
+                        AppLocalizations.of(context)!.cashViewTransactionHistory,
                         style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w500,
@@ -976,8 +977,8 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
               if (userRole?.contains('Delivery Boy') ?? false)
                 _buildBottomSheetOption(
                   icon: Icons.inventory,
-                  title: 'Cash Deposit',
-                  subtitle: 'Deposit cash to Manager',
+                  title: AppLocalizations.of(context)!.cashDepositActionTitle,
+                  subtitle: AppLocalizations.of(context)!.cashDepositActionSubtitle,
                   onTap: () async {
                     Navigator.pop(context); // Close bottom sheet
 
@@ -1007,8 +1008,8 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
               if (userRole?.contains('Cashier') ?? false)
                 _buildBottomSheetOption(
                   icon: Icons.inventory_2_rounded,
-                  title: 'Handover Cash',
-                  subtitle: 'Handover cash to  Manager',
+                  title: AppLocalizations.of(context)!.cashHandoverActionTitle,
+                  subtitle: AppLocalizations.of(context)!.cashHandoverActionSubtitle,
                   onTap: () async {
                     Navigator.pop(context); // Close bottom sheet
 
@@ -1033,8 +1034,8 @@ class _CashPageState extends State<CashPage> with SingleTickerProviderStateMixin
               if (!(userRole?.contains('Delivery Boy') ?? false))
                 _buildBottomSheetOption(
                   icon: Icons.account_balance,
-                  title: 'Bank Deposit',
-                  subtitle: 'Deposit cash directly to bank',
+                  title: AppLocalizations.of(context)!.cashBankDepositActionTitle,
+                  subtitle: AppLocalizations.of(context)!.cashBankDepositActionSubtitle,
                   onTap: () async {
                     Navigator.pop(context); // Close bottom sheet
 

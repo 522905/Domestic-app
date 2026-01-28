@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../services/User.dart';
 import '../services/version_manager.dart';
 import 'api_endpoints.dart';
+import '../../main.dart' show NavKey;
 
 class ApiClient {
   late final Dio _dio;
@@ -56,7 +57,38 @@ class ApiClient {
         }
         handler.next(response);
       },
-      onError: (error, handler) {
+      onError: (error, handler) async {
+        // Handle 401 Unauthorized globally
+        if (error.response?.statusCode == 401) {
+          print('🔐 401 UNAUTHORIZED detected in interceptor. Logging out...');
+
+          // Clear tokens
+          await User().clearTokens();
+
+          // Clear dio auth header
+          _dio.options.headers.remove('Authorization');
+          _token = null;
+
+          // Navigate to login screen immediately
+          try {
+            print('🔐 Attempting to navigate to login...');
+            final navState = NavKey.currentState;
+            if (navState != null) {
+              print('🔐 Navigator state found, pushing to login');
+              // Use 'login' route (not '/login')
+              navState.pushNamedAndRemoveUntil('login', (route) => false);
+              print('🔐 Successfully navigated to login');
+            } else {
+              print('❌ Navigator state is null!');
+            }
+          } catch (e) {
+            print('❌ Error navigating to login: $e');
+          }
+
+          // Continue with error so BLoCs can handle it
+          handler.next(error);
+          return;
+        }
         handler.next(error);
       },
     ));

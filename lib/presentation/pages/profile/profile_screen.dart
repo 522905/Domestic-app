@@ -12,6 +12,7 @@ import '../../../core/services/version_manager.dart';
 import '../../../core/utils/global_drawer.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/l10n_extensions.dart';
 import '../../../utils/localization/locale_notifier.dart';
 import '../../widgets/professional_snackbar.dart';
 import '../../blocs/vehicle/vehicle_bloc.dart';
@@ -47,7 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   UserCompany? activeCompany;
 
   String _t(String key, {Map<String, String>? params}) =>
-      context.l10n.translate(key, params: params ?? <String, String>{});
+      context.l10n.translate(key, params: params?.values.toList());
 
   @override
   void initState() {
@@ -1241,7 +1242,7 @@ class _CompanySwitcherSheetState extends State<CompanySwitcherSheet> {
                                   ),
                                   SizedBox(height: 4.h),
                                   Text(
-                                    l10n.translate('profileCompanyCode', params: {'code': company.shortCode}),
+                                    l10n.translate('profileCompanyCode', params: [company.shortCode]),
                                     style: TextStyle(
                                       fontSize: 14.sp,
                                       color: Colors.grey[600],

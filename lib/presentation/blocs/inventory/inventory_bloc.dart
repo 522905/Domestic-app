@@ -77,9 +77,9 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
         action: 'approve',
       ));
 
-      // Trigger detail refresh after short delay
+      // Trigger detail refresh from server after short delay
       await Future.delayed(const Duration(milliseconds: 300));
-      add(LoadInventoryDetails(requestId: event.requestId));
+      add(LoadInventoryRequestDetail(requestId: event.requestId));
     } catch (e) {
       emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
@@ -118,9 +118,9 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
         action: 'reject',
       ));
 
-      // Trigger detail refresh after short delay
+      // Trigger detail refresh from server after short delay
       await Future.delayed(const Duration(milliseconds: 300));
-      add(LoadInventoryDetails(requestId: event.requestId));
+      add(LoadInventoryRequestDetail(requestId: event.requestId));
     } catch (e) {
       emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
@@ -130,6 +130,12 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       CancelInventoryRequest event,
       Emitter<InventoryState> emit,
       ) async {
+    // Emit loading state
+    emit(InventoryActionLoading(
+      requestId: event.requestId,
+      action: 'cancel',
+    ));
+
     try {
       // Call API to cancel the request
       final cancelledRequest = await _apiService.cancelInventoryRequest(
@@ -139,27 +145,22 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       // Update the cache with the cancelled request from API
       final updatedRequests = _allRequests.map((request) {
         if (request.id == event.requestId) {
-          return cancelledRequest; // Use the full response from API
+          return cancelledRequest;
         }
         return request;
       }).toList();
 
       _allRequests = updatedRequests;
 
-      // Update current view if state is already loaded
-      if (state is InventoryLoaded) {
-        final currentRequests = (state as InventoryLoaded).requests;
-        final updatedCurrentRequests = currentRequests.map((request) {
-          if (request.id == event.requestId) {
-            return cancelledRequest;
-          }
-          return request;
-        }).toList();
+      // Emit cancel success state
+      emit(InventoryCancelSuccess(
+        message: 'Request cancelled successfully',
+        requestId: event.requestId,
+      ));
 
-        emit(InventoryLoaded(requests: updatedCurrentRequests));
-      } else {
-        emit(InventoryLoaded(requests: updatedRequests));
-      }
+      // Trigger detail refresh from server
+      await Future.delayed(const Duration(milliseconds: 300));
+      add(LoadInventoryRequestDetail(requestId: event.requestId));
     } catch (e) {
       emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
@@ -220,9 +221,13 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       SearchInventoryRequests event,
       Emitter<InventoryState> emit
       ) {
-    if (_allRequests.isEmpty) return;
-
     final query = event.query.toLowerCase();
+
+    if (_allRequests.isEmpty) {
+      emit(InventoryLoaded(requests: []));
+      return;
+    }
+
     if (query.isEmpty) {
       emit(InventoryLoaded(requests: _allRequests));
       return;
@@ -241,10 +246,13 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       FilterInventoryRequests event,
       Emitter<InventoryState> emit
       ) {
-    if (_allRequests.isEmpty) return;
-
     final status = event.status;
     List<InventoryRequest> filteredRequests;
+
+    if (_allRequests.isEmpty) {
+      emit(InventoryLoaded(requests: []));
+      return;
+    }
 
     if (status == null) {
       filteredRequests = List.from(_allRequests);
@@ -262,7 +270,10 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     FilterInventoryRequestsByType event,
     Emitter<InventoryState> emit,
   ) {
-    if (_allRequests.isEmpty) return;
+    if (_allRequests.isEmpty) {
+      emit(InventoryLoaded(requests: []));
+      return;
+    }
 
     final filteredRequests = _allRequests.where((request) {
       return request.requestType == event.requestType;
@@ -276,7 +287,10 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     FilterInventoryRequestsByStatusAndType event,
     Emitter<InventoryState> emit,
   ) {
-    if (_allRequests.isEmpty) return;
+    if (_allRequests.isEmpty) {
+      emit(InventoryLoaded(requests: []));
+      return;
+    }
 
     final filteredRequests = _allRequests.where((request) {
       final matchesStatus = request.status == event.status;
@@ -377,15 +391,21 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     Emitter<InventoryState> emit,
   ) async {
     try {
-      // Find request in cached list
-      final request = _allRequests.firstWhere(
-        (r) => r.id == event.requestId,
-        orElse: () => throw Exception('Request not found'),
-      );
+      // Try to find request in cached list
+      final requestIndex = _allRequests.indexWhere((r) => r.id == event.requestId);
 
-      emit(InventoryDetailLoaded(request: request));
+      if (requestIndex != -1) {
+        // Found in cache, use it
+        emit(InventoryDetailLoaded(request: _allRequests[requestIndex]));
+      } else {
+        // Not in cache, fetch from server
+        final requestDetail = await _apiService.getInventoryRequestDetail(event.requestId);
+        // Update cache with the fetched request
+        _allRequests.add(requestDetail);
+        emit(InventoryDetailLoaded(request: requestDetail));
+      }
     } catch (e) {
-      emit(InventoryError(message: ErrorHandler.handleError(e)));
+      emit(InventoryDetailError(message: ErrorHandler.handleError(e)));
     }
   }
 }

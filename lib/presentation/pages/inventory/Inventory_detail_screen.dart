@@ -7,6 +7,7 @@ import 'package:lpg_distribution_app/presentation/blocs/inventory/inventory_even
 import 'package:lpg_distribution_app/presentation/blocs/inventory/inventory_state.dart';
 import 'package:lpg_distribution_app/utils/status_chip.dart';
 import '../../../../utils/swipeButton.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../utils/gatepass_dialog.dart';
 import '../../blocs/inventory/inventory_bloc.dart';
 import '../../widgets/professional_snackbar.dart';
@@ -35,29 +36,31 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   String? _selectedRejectionReason;
   String? _currentUserName;
 
-  final Map<String, List<String>> _rejectionReasons = {
-    'DEPOSIT': [
-      'Incorrect Count',
-      'Wrong Items',
-      'Deposit Already Processed',
-      'Defective item Missing'
-      'Other',
-    ],
-    'COLLECT': [
-      'Insufficient Stock',
-      'Orders Not Eligible',
-      'Vehicle Not Available',
-      'Warehouse Closed',
-      'Other',
-    ],
-    'TRANSFER': [
-      'Insufficient Stock at Source',
-      'Destination Warehouse Full',
-      'Vehicle Not Available',
-      'Transfer Route Blocked',
-      'Other',
-    ],
-  };
+  Map<String, List<String>> _getRejectionReasons(BuildContext context) {
+    return {
+      'DEPOSIT': [
+        AppLocalizations.of(context)!.rejectionReasonIncorrectCount,
+        AppLocalizations.of(context)!.rejectionReasonWrongItems,
+        AppLocalizations.of(context)!.rejectionReasonDepositProcessed,
+        AppLocalizations.of(context)!.rejectionReasonDefectiveMissing,
+        AppLocalizations.of(context)!.rejectionReasonOther,
+      ],
+      'COLLECT': [
+        AppLocalizations.of(context)!.rejectionReasonInsufficientStock,
+        AppLocalizations.of(context)!.rejectionReasonOrdersNotEligible,
+        AppLocalizations.of(context)!.rejectionReasonVehicleNotAvailable,
+        AppLocalizations.of(context)!.rejectionReasonWarehouseClosed,
+        AppLocalizations.of(context)!.rejectionReasonOther,
+      ],
+      'TRANSFER': [
+        AppLocalizations.of(context)!.rejectionReasonInsufficientStockSource,
+        AppLocalizations.of(context)!.rejectionReasonDestinationFull,
+        AppLocalizations.of(context)!.rejectionReasonVehicleNotAvailable,
+        AppLocalizations.of(context)!.rejectionReasonTransferBlocked,
+        AppLocalizations.of(context)!.rejectionReasonOther,
+      ],
+    };
+  }
 
   @override
   void initState() {
@@ -96,14 +99,14 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
       onWillPop: () async {
         // If processing, prevent back navigation
         if (_isProcessing) {
-          context.showWarningSnackBar('Please wait while processing...');
+          context.showWarningSnackBar(AppLocalizations.of(context)!.messagePleaseWait);
           return false;
         }
         return true;
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Request Details'),
+          title: Text(AppLocalizations.of(context)!.inventoryRequestDetailsTitle),
           backgroundColor: const Color(0xFF0E5CA8),
           actions: [
             IconButton(
@@ -133,6 +136,26 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                 // Don't navigate away - let the detail refresh happen
                 setState(() {
                   _isProcessing = false;
+                });
+              }
+            }
+
+            // Handle cancellation success
+            if (state is InventoryCancelSuccess) {
+              if (mounted) {
+                // Show success message
+                context.showInfoSnackBar(state.message);
+
+                // Reset processing state
+                setState(() {
+                  _isProcessing = false;
+                });
+
+                // Navigate back to list after successful cancellation
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                  }
                 });
               }
             }
@@ -253,7 +276,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
           ),
           SizedBox(height: 16.h),
           Text(
-            'Failed to load request details',
+            AppLocalizations.of(context)!.inventoryFailedToLoadDetails,
             style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 8.h),
@@ -271,7 +294,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                 );
               }
             },
-            child: const Text('Try Again'),
+            child: Text(AppLocalizations.of(context)!.buttonTryAgain),
           ),
         ],
       ),
@@ -356,15 +379,15 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
 
 
     Map<String, String> details = {
-      'Request ID': request.id,
-      'Request Type': request.requestType,
-      'Warehouse': request.warehouse,
-      'Requested By': request.requestedBy,
-      'Created At': _formatDateTime(request.timestamp),
-      'Status': request.status,
-      'Vehicle Number': request.vehicle ?? 'N/A',
+      AppLocalizations.of(context)!.inventoryRequestID: request.id,
+      AppLocalizations.of(context)!.inventoryRequestType: request.requestType,
+      AppLocalizations.of(context)!.profileWarehouseLabel: request.warehouse,
+      AppLocalizations.of(context)!.inventoryRequestedBy: request.requestedBy,
+      AppLocalizations.of(context)!.inventoryCreatedAt: _formatDateTime(request.timestamp),
+      AppLocalizations.of(context)!.orderStatusLabel: request.status,
+      AppLocalizations.of(context)!.inventoryVehicleNumber: request.vehicle ?? 'N/A',
       if (request.rejectionReason != null && request.rejectionReason!.isNotEmpty)
-      'Rejection Reason': request.rejectionReason!,
+      AppLocalizations.of(context)!.inventoryRejectionReason: request.rejectionReason!,
 
     };
 
@@ -373,7 +396,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
     // }
 
     if (request.remarks != null && request.remarks!.isNotEmpty) {
-      details['Notes'] = request.remarks!;
+      details[AppLocalizations.of(context)!.inventoryNotesLabel] = request.remarks!;
     }
 
     details.forEach((key, value) {
@@ -407,7 +430,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionHeader('Transfer Details', Icons.swap_horiz),
+            _sectionHeader(AppLocalizations.of(context)!.inventoryTransferDetailsTitle, Icons.swap_horiz),
             SizedBox(height: 16.h),
             // Source Warehouse
             Container(
@@ -426,7 +449,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'From (Source)',
+                          AppLocalizations.of(context)!.inventoryFromSource,
                           style: TextStyle(
                             fontSize: 12.sp,
                             color: Colors.red.shade600,
@@ -434,7 +457,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                           ),
                         ),
                         Text(
-                          request.sourceWarehouse ?? 'Unknown Warehouse',
+                          request.sourceWarehouse ?? AppLocalizations.of(context)!.inventoryUnknownWarehouse,
                           style: TextStyle(
                             fontSize: 14.sp,
                             fontWeight: FontWeight.w500,
@@ -479,7 +502,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'To (Destination)',
+                          AppLocalizations.of(context)!.inventoryToDestination,
                           style: TextStyle(
                             fontSize: 12.sp,
                             color: Colors.green.shade600,
@@ -487,7 +510,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                           ),
                         ),
                         Text(
-                          request.targetWarehouse ?? 'Unknown Warehouse',
+                          request.targetWarehouse ?? AppLocalizations.of(context)!.inventoryUnknownWarehouse,
                           style: TextStyle(
                             fontSize: 14.sp,
                             fontWeight: FontWeight.w500,
@@ -539,7 +562,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                 ),
                 SizedBox(width: 8.w),
                 Text(
-                  'Items (${items.length})',
+                  '${AppLocalizations.of(context)!.inventoryItemsLabel} (${items.length})',
                   style: TextStyle(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.bold,
@@ -550,25 +573,48 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
             ),
 
             // Common SO/MR reference
-            if (salesOrderRef.isNotEmpty || materialRequestRef.isNotEmpty) ...[
-              SizedBox(height: 12.h),
-              Container(
-                padding: EdgeInsets.all(10.w),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(6.r),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Column(
-                  children: [
-                    if (salesOrderRef.isNotEmpty)
-                      _buildReferenceRow(Icons.receipt_long, 'Sales Order', salesOrderRef),
-                    if (materialRequestRef.isNotEmpty)
-                      _buildReferenceRow(Icons.assignment, 'Material Request', materialRequestRef),
-                  ],
+            SizedBox(height: 12.h),
+            Container(
+              padding: EdgeInsets.all(10.w),
+              decoration: BoxDecoration(
+                color: (salesOrderRef.isEmpty && materialRequestRef.isEmpty)
+                    ? Colors.orange.shade50
+                    : Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(6.r),
+                border: Border.all(
+                  color: (salesOrderRef.isEmpty && materialRequestRef.isEmpty)
+                      ? Colors.orange.shade300
+                      : Colors.blue.shade200,
                 ),
               ),
-            ],
+              child: (salesOrderRef.isEmpty && materialRequestRef.isEmpty)
+                  ? Row(
+                      children: [
+                        Icon(
+                          Icons.link_off,
+                          size: 16.sp,
+                          color: Colors.orange.shade700,
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          AppLocalizations.of(context)!.inventoryUnlinkedLabel,
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            color: Colors.orange.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        if (salesOrderRef.isNotEmpty)
+                          _buildReferenceRow(Icons.receipt_long, AppLocalizations.of(context)!.inventorySalesOrderLabel, salesOrderRef),
+                        if (materialRequestRef.isNotEmpty)
+                          _buildReferenceRow(Icons.assignment, AppLocalizations.of(context)!.inventoryMaterialRequestLabel, materialRequestRef),
+                      ],
+                    ),
+            ),
 
             SizedBox(height: 12.h),
 
@@ -591,8 +637,8 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                   ),
                   children: [
                     _buildTableHeader('#'),
-                    _buildTableHeader('Item Details'),
-                    _buildTableHeader('Qty'),
+                    _buildTableHeader(AppLocalizations.of(context)!.inventoryItemDetailsHeader),
+                    _buildTableHeader(AppLocalizations.of(context)!.inventoryQtyHeader),
                   ],
                 ),
 
@@ -662,7 +708,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
 
               // Item Code
                 Text(
-                  'Code: $itemCode  -  $lineType',
+                  '${AppLocalizations.of(context)!.inventoryCodeLabel}: $itemCode  -  $lineType',
                   style: TextStyle(
                     fontSize: 11.sp,
                     color: Colors.grey[600],
@@ -678,7 +724,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                     borderRadius: BorderRadius.circular(3.r),
                   ),
                   child: Text(
-                    'DEFECTIVE  DETAILS ',
+                    AppLocalizations.of(context)!.inventoryDefectiveDetailsLabel,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 9.sp,
@@ -688,18 +734,18 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                 ),
                 SizedBox(height: 6.h),
 
-                _buildDefectiveDetail('Cylinder number', extra!['cylinder_number']),
-                _buildDefectiveDetail('Tare Wt', extra['tare_weight'] != null ? '${extra['tare_weight']} kg' : null),
-                _buildDefectiveDetail('Gross Wt', extra['gross_weight'] != null ? '${extra['gross_weight']} kg' : null),
-                _buildDefectiveDetail('Net Wt', extra['net_weight'] != null ? '${extra['net_weight']} kg' : null),
-                _buildDefectiveDetail('Fault', extra['fault_type']),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryCylinderNumber, extra!['cylinder_number']),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryTareWeight, extra['tare_weight'] != null ? '${extra['tare_weight']} kg' : null),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryGrossWeight, extra['gross_weight'] != null ? '${extra['gross_weight']} kg' : null),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryNetWeight, extra['net_weight'] != null ? '${extra['net_weight']} kg' : null),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryFaultType, extra['fault_type']),
 
                 SizedBox(height: 4.h),
                 Divider(color: Colors.orange.shade200, thickness: 1),
                 SizedBox(height: 4.h),
 
                 Text(
-                  'Consumer Details:',
+                  AppLocalizations.of(context)!.inventoryConsumerDetailsLabel,
                   style: TextStyle(
                     fontSize: 11.sp,
                     fontWeight: FontWeight.bold,
@@ -707,9 +753,9 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                   ),
                 ),
                 SizedBox(height: 4.h),
-                _buildDefectiveDetail('Number', extra['consumer_number']),
-                _buildDefectiveDetail('Name', extra['consumer_name']),
-                _buildDefectiveDetail('Mobile', extra['consumer_mobile_number']),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryConsumerNumber, extra['consumer_number']),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryConsumerName, extra['consumer_name']),
+                _buildDefectiveDetail(AppLocalizations.of(context)!.inventoryConsumerMobile, extra['consumer_mobile_number']),
               ],
             ],
           ),
@@ -810,13 +856,13 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionHeader('Remarks', Icons.comment),
+            _sectionHeader(AppLocalizations.of(context)!.inventoryRemarksLabel, Icons.comment),
             SizedBox(height: 12.h),
             TextField(
               controller: _commentController,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText: 'Add comments for approval/rejection...',
+                hintText: AppLocalizations.of(context)!.inventoryAddCommentsHint,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.r),
                 ),
@@ -853,15 +899,15 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
 
     switch (request.status.toUpperCase()) {
       case 'APPROVED':
-        message = 'This ${request.requestType.toLowerCase()} request has been approved';
+        message = AppLocalizations.of(context)!.inventoryStatusApprovedMessage(request.requestType.toLowerCase());
         icon = Icons.check_circle;
         break;
       case 'REJECTED':
-        message = 'This ${request.requestType.toLowerCase()} request has been rejected';
+        message = AppLocalizations.of(context)!.inventoryStatusRejectedMessage(request.requestType.toLowerCase());
         icon = Icons.cancel;
         break;
       default:
-        message = 'This ${request.requestType.toLowerCase()} request is pending approval';
+        message = AppLocalizations.of(context)!.inventoryStatusPendingMessage(request.requestType.toLowerCase());
         icon = Icons.hourglass_empty;
     }
 
@@ -995,14 +1041,14 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 24.sp),
             SizedBox(width: 8.w),
-            Text('Approve ${request.requestType}'),
+            Text('${AppLocalizations.of(context)!.buttonApprove} ${request.requestType}'),
           ],
         ),
-        content: Text('Are you sure you want to approve this ${request.requestType.toLowerCase()} request?'),
+        content: Text(AppLocalizations.of(context)!.inventoryApproveConfirmMessage(request.requestType.toLowerCase())),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.buttonCancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1012,7 +1058,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF4CAF50),
             ),
-            child: const Text('Approve', style: TextStyle(color: Colors.white)),
+            child: Text(AppLocalizations.of(context)!.buttonApprove, style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1020,8 +1066,8 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
   }
 
   void _showRejectionDialog(InventoryRequest request) {
-    List<String> reasons = _rejectionReasons[request.requestType.toUpperCase()] ??
-        _rejectionReasons['DEPOSIT']!;
+    List<String> reasons = _getRejectionReasons(context)[request.requestType.toUpperCase()] ??
+        _getRejectionReasons(context)['DEPOSIT']!;
 
     showDialog(
       context: context,
@@ -1031,7 +1077,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
             children: [
               Icon(Icons.cancel, color: Colors.red, size: 24.sp),
               SizedBox(width: 8.w),
-              Text('Reject ${request.requestType}'),
+              Text('${AppLocalizations.of(context)!.buttonReject} ${request.requestType}'),
             ],
           ),
           content: SizedBox(
@@ -1040,7 +1086,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Please select a rejection reason:'),
+                Text(AppLocalizations.of(context)!.inventorySelectRejectionReason),
                 SizedBox(height: 16.h),
                 Container(
                   height: 200.h,
@@ -1068,7 +1114,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
                 setState(() => _selectedRejectionReason = null);
                 Navigator.pop(context);
               },
-              child: const Text('Cancel'),
+              child: Text(AppLocalizations.of(context)!.buttonCancel),
             ),
             ElevatedButton(
               onPressed: _selectedRejectionReason == null
@@ -1080,7 +1126,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF44336),
               ),
-              child: const Text('Reject', style: TextStyle(color: Colors.white)),
+              child: Text(AppLocalizations.of(context)!.buttonReject, style: const TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -1165,7 +1211,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
               ),
               SizedBox(width: 12.w),
               Text(
-                'Cancel Request',
+                AppLocalizations.of(context)!.inventoryCancelRequestButton,
                 style: TextStyle(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.bold,
