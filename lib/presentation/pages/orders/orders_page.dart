@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/services/User.dart';
 import '../../../core/utils/global_drawer.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/l10n_extensions.dart';
 import '../../../utils/currency_utils.dart';
 import '../../blocs/orders/orders_bloc.dart';
 import '../../blocs/orders/orders_event.dart';
@@ -141,6 +142,7 @@ class _OrdersPageState extends State<OrdersPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: context.l10n.translate('commonRefreshTooltip'),
             onPressed: () {
               setState(() {
                 _selectedDeliveryStatus = null; // Clear delivery status on refresh
@@ -287,7 +289,7 @@ class _OrdersPageState extends State<OrdersPage> {
         child: Row(
           children: [
             _buildStaticFilterChip(
-              label: 'Delivery Status',
+              label: context.l10n.translate('ordersFilterDeliveryStatus'),
               value: _selectedDeliveryStatus,
               options: _deliveryStatusOptions,
               onSelected: (value) {
@@ -406,7 +408,7 @@ class _OrdersPageState extends State<OrdersPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  title: const Text('All'),
+                  title: Text(context.l10n.translate('ordersFilterAll')),
                   leading: Radio<String?>(
                     value: null,
                     groupValue: _selectedDeliveryStatus,
@@ -486,7 +488,7 @@ class _OrdersPageState extends State<OrdersPage> {
   }
 
   Widget _buildDateRangeFilterChip() {
-    String dateLabel = 'Date Range';
+    String dateLabel = context.l10n.translate('ordersFilterDateRange');
     if (_selectedStartDate != null && _selectedEndDate != null) {
       dateLabel = '${DateFormat('MMM d').format(_selectedStartDate!)} - ${DateFormat('MMM d').format(_selectedEndDate!)}';
     } else if (_selectedStartDate != null) {
@@ -643,7 +645,7 @@ class _OrdersPageState extends State<OrdersPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  title: const Text('All'),
+                  title: Text(context.l10n.translate('ordersFilterAll')),
                   leading: Radio<String?>(
                     value: null,
                     groupValue: filterType == 'Vehicle' ? _selectedVehicle :
@@ -790,7 +792,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Req By: ${order.customerName}',
+                      '${context.l10n.translate('ordersCardRequestedBy')} ${order.customerName}',
                       style: TextStyle(
                         fontSize: 15.sp,
                         fontWeight: FontWeight.bold,
@@ -845,7 +847,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       Icon(Icons.local_shipping, size: 14.sp, color: Colors.grey[600]),
                       SizedBox(width: 4.w),
                       Text(
-                        order.vehicle.isEmpty ? 'No Vehicle' : order.vehicle,  // Handle empty vehicle
+                        order.vehicle.isEmpty ? context.l10n.translate('ordersNoVehicle') : order.vehicle,  // Handle empty vehicle
                         style: TextStyle(
                           fontSize: 13.sp,
                           color: Colors.grey[600],
@@ -859,7 +861,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       Icon(Icons.warehouse, size: 14.sp, color: Colors.grey[600]),
                       SizedBox(width: 4.w),
                       Text(
-                        order.warehouse.isEmpty ? 'No Warehouse' : order.warehouse.split(' - ').first,  // Handle empty warehouse
+                        order.warehouse.isEmpty ? context.l10n.translate('ordersNoWarehouse') : order.warehouse.split(' - ').first,  // Handle empty warehouse
                         style: TextStyle(
                           fontSize: 13.sp,
                           color: Colors.grey[600],
@@ -877,7 +879,7 @@ class _OrdersPageState extends State<OrdersPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Qty: ${order.totalQty}',
+                        '${context.l10n.translate('ordersCardQuantity')} ${order.totalQty}',
                         style: TextStyle(
                           fontSize: 14.sp,
                           color: Colors.grey[900],
@@ -885,7 +887,7 @@ class _OrdersPageState extends State<OrdersPage> {
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        'Created: ${formatUpdatedAtAbsolute(order.creationDate)}',  // CHANGED: Show creation date
+                        '${context.l10n.translate('ordersCardCreatedDate')} ${formatUpdatedAtAbsolute(order.creationDate)}',  // CHANGED: Show creation date
                         style: TextStyle(
                           fontSize: 12.sp,
                           color: Colors.grey[600],

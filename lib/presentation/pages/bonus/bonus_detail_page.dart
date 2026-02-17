@@ -8,6 +8,7 @@ import '../../blocs/bonus_detail/bonus_detail_state.dart';
 import '../../widgets/bonus/bonus_urgency_badge.dart';
 import '../../widgets/bonus/bonus_progress_bar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/l10n_extensions.dart';
 import '../../../core/constants/app_colors.dart';
 
 /// Page to display detailed bonus information with calculation breakdown
@@ -31,6 +32,7 @@ class BonusDetailPage extends StatelessWidget {
               if (state is BonusDetailLoaded) {
                 return IconButton(
                   icon: Icon(Icons.refresh, size: 24.sp),
+                  tooltip: context.l10n.translate('commonRefreshTooltip'),
                   onPressed: () {
                     context.read<BonusDetailBloc>().add(RefreshBonusDetail(state.bonus.id));
                   },
@@ -72,11 +74,11 @@ class BonusDetailPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Hero Section
-                    _buildHeroSection(bonus),
+                    _buildHeroSection(context, bonus),
                     SizedBox(height: 24.h),
 
                     // Scheme Section
-                    if (bonus.strategy != null) _buildSchemeSection(bonus),
+                    if (bonus.strategy != null) _buildSchemeSection(context, bonus),
                     if (bonus.strategy != null) SizedBox(height: 24.h),
 
                     // Calculation Breakdown
@@ -93,7 +95,7 @@ class BonusDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHeroSection(bonus) {
+  Widget _buildHeroSection(BuildContext context, bonus) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16.w),
@@ -125,13 +127,13 @@ class BonusDetailPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: _buildInfoRow(
-                    'Earned',
+                    context.l10n.translate('bonusDetailEarned'),
                     DateFormat('dd MMM yyyy').format(bonus.earnedDate),
                   ),
                 ),
                 Expanded(
                   child: _buildInfoRow(
-                    'Expires',
+                    context.l10n.translate('bonusDetailExpires'),
                     DateFormat('dd MMM yyyy').format(bonus.expiryDate),
                   ),
                 ),
@@ -142,11 +144,11 @@ class BonusDetailPage extends StatelessWidget {
             // Quantities
             Row(
               children: [
-                _buildQuantityChip('Earned', bonus.quantityEarned, Colors.green),
+                _buildQuantityChip(context.l10n.translate('bonusDetailEarned'), bonus.quantityEarned, Colors.green),
                 SizedBox(width: 8.w),
-                _buildQuantityChip('Consumed', bonus.quantityConsumed, Colors.orange),
+                _buildQuantityChip(context.l10n.translate('bonusFilterConsumed'), bonus.quantityConsumed, Colors.orange),
                 SizedBox(width: 8.w),
-                _buildQuantityChip('Remaining', bonus.quantityRemaining, Colors.blue),
+                _buildQuantityChip(context.l10n.translate('bonusDetailChipRemaining'), bonus.quantityRemaining, Colors.blue),
               ],
             ),
             SizedBox(height: 16.h),
@@ -168,7 +170,7 @@ class BonusDetailPage extends StatelessWidget {
                 ),
                 if (bonus.daysUntilExpiry != null)
                   Text(
-                    '${bonus.daysUntilExpiry} days remaining',
+                    '${bonus.daysUntilExpiry} ${context.l10n.translate('bonusDetailDaysRemaining')}',
                     style: TextStyle(fontSize: 12.sp, color: Colors.grey),
                   ),
               ],
@@ -179,7 +181,7 @@ class BonusDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSchemeSection(bonus) {
+  Widget _buildSchemeSection(BuildContext context, bonus) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16.w),
@@ -187,7 +189,7 @@ class BonusDetailPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Bonus Scheme',
+              context.l10n.translate('bonusDetailSchemeTitle'),
               style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 12.h),
@@ -220,16 +222,16 @@ class BonusDetailPage extends StatelessWidget {
               style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16.h),
-            _buildMetricRow('Pickups', metrics.pickups.toString(), Icons.arrow_downward),
-            _buildMetricRow('Returns', metrics.returns.toString(), Icons.arrow_upward),
-            _buildMetricRow('Net Pickups', metrics.netPickups.toString(), Icons.inventory, highlight: true),
+            _buildMetricRow(context.l10n.translate('bonusMetricPickups'), metrics.pickups.toString(), Icons.arrow_downward),
+            _buildMetricRow(context.l10n.translate('bonusMetricReturns'), metrics.returns.toString(), Icons.arrow_upward),
+            _buildMetricRow(context.l10n.translate('bonusMetricNetPickups'), metrics.netPickups.toString(), Icons.inventory, highlight: true),
             Divider(height: 24.h),
-            _buildMetricRow('OTP Sales', metrics.otpSales.toString(), Icons.phone_android),
-            _buildMetricRow('Override Sales', metrics.overrideSales.toString(), Icons.verified),
-            _buildMetricRow('Confirmed Sales', metrics.confirmedSales.toString(), Icons.check_circle, highlight: true),
+            _buildMetricRow(context.l10n.translate('bonusMetricOtpSales'), metrics.otpSales.toString(), Icons.phone_android),
+            _buildMetricRow(context.l10n.translate('bonusMetricOverrideSales'), metrics.overrideSales.toString(), Icons.verified),
+            _buildMetricRow(context.l10n.translate('bonusMetricConfirmedSales'), metrics.confirmedSales.toString(), Icons.check_circle, highlight: true),
             Divider(height: 24.h),
-            _buildMetricRow('Posting Ratio', '${metrics.postingRatio.toStringAsFixed(2)}%', Icons.percent, highlight: true),
-            _buildMetricRow('Bonus Calculated', metrics.bonusCalculated.toString(), Icons.card_giftcard, highlight: true),
+            _buildMetricRow(context.l10n.translate('bonusMetricPostingRatio'), '${metrics.postingRatio.toStringAsFixed(2)}%', Icons.percent, highlight: true),
+            _buildMetricRow(context.l10n.translate('bonusMetricBonusCalculated'), metrics.bonusCalculated.toString(), Icons.card_giftcard, highlight: true),
           ],
         ),
       ),

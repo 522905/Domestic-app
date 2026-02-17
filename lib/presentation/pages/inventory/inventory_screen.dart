@@ -36,6 +36,7 @@ class _InventoryPageState extends State<InventoryPage>
   final List<String> _statusTabs = ['All', 'Pending', 'Collect', 'Deposit'];
   String _currentFilter = 'All';
   String _searchQuery = '';
+  bool _isSearching = false;  // Toggle search in app bar
   List<Map<String, dynamic>> warehouses = [];
   List<Map<String, dynamic>> vehicles = [];
   // TODO remove this simply
@@ -179,18 +180,51 @@ class _InventoryPageState extends State<InventoryPage>
     return Scaffold(
       drawer: GlobalDrawer.getDrawer(context),
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.inventoryPageTitle),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: AppLocalizations.of(context)!.inventorySearchHint,
+                  hintStyle: const TextStyle(color: Colors.white70),
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              )
+            : Text(AppLocalizations.of(context)!.inventoryPageTitle),
         backgroundColor: const Color(0xFF0E5CA8),
+        centerTitle: !_isSearching,
         actions: [
-          IconButton(
-            icon: const Icon(
-                Icons.refresh,
-                color: Colors.white
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _searchQuery = '';
+                });
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _isSearching = true;
+                });
+              },
             ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: () async {
               if (!mounted) return;
 
-              // Show loading dialog
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -202,23 +236,18 @@ class _InventoryPageState extends State<InventoryPage>
               );
 
               try {
-                // Load data first
                 await _loadData();
 
-                // Refresh requests
                 if (mounted) {
                   context.read<InventoryBloc>().add(const RefreshInventoryRequests());
                 }
 
-                // Wait for data to load
                 await Future.delayed(const Duration(milliseconds: 600));
 
-                // Re-apply current tab filter
                 if (mounted) {
                   _filterRequests(_currentFilter);
                 }
 
-                // Close loading dialog
                 await Future.delayed(const Duration(milliseconds: 100));
                 if (mounted) {
                   Navigator.of(context).pop();
@@ -236,40 +265,6 @@ class _InventoryPageState extends State<InventoryPage>
         children: [
           // Status summary cards
           _buildStatusSummaryCards(),
-          // Search bar
-          Padding(
-            padding: EdgeInsets.all(16.w),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: AppLocalizations.of(context)!.inventorySearchHint,
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _searchController.clear();
-                            _searchQuery = '';
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16.w,
-                  vertical: 12.h,
-                ),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-            ),
-          ),
           // Tab controller
           Container(
             decoration: const BoxDecoration(

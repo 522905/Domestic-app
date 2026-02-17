@@ -153,7 +153,7 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Select Date Range',
+            context.l10n.translate('quotaHistoryFilterTitle'),
             style: TextStyle(
               fontSize: 18.sp,
               fontWeight: FontWeight.bold,
@@ -161,13 +161,13 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
             ),
           ),
           SizedBox(height: 16.h),
-          _buildFilterButton('Last 7 Days', QuotaHistoryFilters.last7Days()),
+          _buildFilterButton(context.l10n.translate('quotaHistoryFilterLast7Days'), QuotaHistoryFilters.last7Days()),
           SizedBox(height: 8.h),
-          _buildFilterButton('Last 30 Days', QuotaHistoryFilters.last30Days()),
+          _buildFilterButton(context.l10n.translate('quotaHistoryFilterLast30Days'), QuotaHistoryFilters.last30Days()),
           SizedBox(height: 8.h),
-          _buildFilterButton('This Month', QuotaHistoryFilters.thisMonth()),
+          _buildFilterButton(context.l10n.translate('quotaHistoryFilterThisMonth'), QuotaHistoryFilters.thisMonth()),
           SizedBox(height: 8.h),
-          _buildFilterButton('Last Month', QuotaHistoryFilters.lastMonth()),
+          _buildFilterButton(context.l10n.translate('quotaHistoryFilterLastMonth'), QuotaHistoryFilters.lastMonth()),
           SizedBox(height: 16.h),
           Divider(color: AppColors.lightGray),
           SizedBox(height: 8.h),
@@ -242,7 +242,7 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
       },
       icon: Icon(Icons.date_range, size: 20.sp),
       label: Text(
-        'Custom Range...',
+        context.l10n.translate('quotaHistoryFilterCustomRange'),
         style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
       ),
       style: OutlinedButton.styleFrom(
@@ -310,8 +310,8 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
                     pinned: true,
                     delegate: _SummaryHeaderDelegate(
                       aggregates: state.aggregates,
-                      minHeight: 140.h,
-                      maxHeight: 140.h,
+                      minHeight: 200.h,
+                      maxHeight: 200.h,
                     ),
                   ),
 
@@ -387,7 +387,7 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
             ),
             SizedBox(height: 16.h),
             Text(
-              'Failed to load history',
+              context.l10n.translate('quotaHistoryErrorLoadFailed'),
               style: TextStyle(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.bold,
@@ -410,7 +410,7 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
                 context.read<QuotaHistoryBloc>().add(const LoadQuotaHistory());
               },
               icon: Icon(Icons.refresh, size: 20.sp),
-              label: Text('Retry', style: TextStyle(fontSize: 15.sp)),
+              label: Text(context.l10n.translate('commonRetryButton'), style: TextStyle(fontSize: 15.sp)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.brandBlue,
                 foregroundColor: Colors.white,
@@ -440,7 +440,7 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
             ),
             SizedBox(height: 16.h),
             Text(
-              'No history found',
+              context.l10n.translate('quotaHistoryEmptyTitle'),
               style: TextStyle(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.bold,
@@ -449,7 +449,7 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
             ),
             SizedBox(height: 8.h),
             Text(
-              'No quota history available for this period',
+              context.l10n.translate('quotaHistoryEmptyMessage'),
               style: TextStyle(
                 fontSize: 14.sp,
                 color: AppColors.secondaryText,

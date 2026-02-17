@@ -8,8 +8,10 @@ import 'package:lpg_distribution_app/presentation/blocs/quota/quota_event.dart';
 import 'package:lpg_distribution_app/presentation/blocs/quota/quota_state.dart';
 import 'package:lpg_distribution_app/presentation/blocs/quota_history/quota_history_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/quota/quota_history_page.dart';
+import 'package:lpg_distribution_app/presentation/pages/credit_extension/extension_list_page.dart';
 import 'package:lpg_distribution_app/presentation/widgets/dashboard/bonus_summary_card.dart';
 import 'package:lpg_distribution_app/domain/entities/quota/quota_snapshot.dart';
+import 'package:lpg_distribution_app/l10n/app_localizations.dart';
 import 'package:lpg_distribution_app/l10n/l10n_extensions.dart';
 
 class QuotaSnapshotPage extends StatelessWidget {
@@ -20,7 +22,7 @@ class QuotaSnapshotPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text('Quota Status', style: TextStyle(fontSize: 20.sp)),
+        title: Text(context.l10n.translate('quotaSnapshotTitle'), style: TextStyle(fontSize: 20.sp)),
         backgroundColor: AppColors.brandBlue,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -51,6 +53,7 @@ class QuotaSnapshotPage extends StatelessWidget {
           SizedBox(width: 58.h),
           IconButton(
             icon: Icon(Icons.refresh, size: 24.sp),
+            tooltip: context.l10n.translate('commonRefreshTooltip'),
             onPressed: () {
               context.read<QuotaBloc>().add(RefreshQuotaSnapshot());
             },
@@ -67,7 +70,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                   CircularProgressIndicator(color: AppColors.brandBlue),
                   SizedBox(height: 16.h),
                   Text(
-                    'Loading quota data...',
+                    context.l10n.translate('quotaSnapshotLoading'),
                     style: TextStyle(
                       fontSize: 16.sp,
                       color: AppColors.secondaryText,
@@ -234,7 +237,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                         SizedBox(width: 12.w),
                         Expanded(
                           child: Text(
-                            'Syncing with SDMS...',
+                            context.l10n.translate('quotaSnapshotSyncing'),
                             style: TextStyle(
                               fontSize: 14.sp,
                               color: AppColors.infoBlue,
@@ -245,6 +248,35 @@ class QuotaSnapshotPage extends StatelessWidget {
                       ],
                     ),
                   ),
+
+                // Credit Extension Button
+                Container(
+                  margin: EdgeInsets.only(bottom: 12.h),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ExtensionListPage(),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.request_quote, size: 18.sp),
+                    label: Text(
+                      context.l10n.translate('quotaSnapshotRequestCreditExtension'),
+                      style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
 
                 // Items Section Header
                 Padding(
@@ -366,7 +398,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                                           ),
                                           SizedBox(width: 4.w),
                                           Text(
-                                            'View History',
+                                            context.l10n.translate('quotaSnapshotViewHistory'),
                                             style: TextStyle(
                                               fontSize: 11.sp,
                                               color: AppColors.brandBlue,
@@ -390,7 +422,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(20.r),
                                   ),
                                   child: Text(
-                                    'BLOCKED',
+                                    context.l10n.translate('quotaSnapshotBlocked'),
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 11.sp,
@@ -409,7 +441,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(20.r),
                                   ),
                                   child: Text(
-                                    'NO Quota Available ',
+                                    context.l10n.translate('quotaSnapshotNoQuotaAvailable'),
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 11.sp,
@@ -436,7 +468,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                                       Icon(Icons.account_balance_wallet, size: 20.sp, color: AppColors.brandBlue),
                                       SizedBox(width: 8.w),
                                       Text(
-                                        'KEY BALANCES',
+                                        context.l10n.translate('quotaSnapshotKeyBalancesTitle'),
                                         style: TextStyle(
                                           fontSize: 12.sp,
                                           fontWeight: FontWeight.bold,
@@ -529,7 +561,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                                       Icon(Icons.timeline, size: 20.sp, color: AppColors.primaryText),
                                       SizedBox(width: 8.w),
                                       Text(
-                                        'TRANSACTION DETAILS',
+                                        context.l10n.translate('quotaSnapshotTransactionDetailsTitle'),
                                         style: TextStyle(
                                           fontSize: 14.sp,
                                           fontWeight: FontWeight.bold,
@@ -545,43 +577,43 @@ class QuotaSnapshotPage extends StatelessWidget {
                                   // Transaction rows
                                   _buildTransactionRow(
                                     icon: Icons.start,
-                                    label: 'Opening',
+                                    label: context.l10n.translate('quotaSnapshotOpening'),
                                     value: item.opening,
                                     color: Colors.blue,
                                   ),
                                   _buildTransactionRow(
                                     icon: Icons.tune,
-                                    label: 'Adjustment',
+                                    label: context.l10n.translate('quotaSnapshotAdjustment'),
                                     value: item.adjustment,
                                     color: item.adjustment >= 0 ? AppColors.successGreen : AppColors.errorRed,
                                   ),
                                   _buildTransactionRow(
                                     icon: Icons.shopping_cart,
-                                    label: 'Orders',
+                                    label: context.l10n.translate('quotaSnapshotOrders'),
                                     value: item.orders,
                                     color: item.orders < 0 ? AppColors.errorRed : AppColors.secondaryText,
                                   ),
                                   _buildTransactionRow(
                                     icon: Icons.local_shipping,
-                                    label: 'Pickups',
+                                    label: context.l10n.translate('quotaSnapshotPickups'),
                                     value: item.pickups,
                                     color: item.pickups < 0 ? AppColors.errorRed : AppColors.secondaryText,
                                   ),
                                   _buildTransactionRow(
                                     icon: Icons.keyboard_return,
-                                    label: 'Returns',
+                                    label: context.l10n.translate('quotaSnapshotReturns'),
                                     value: item.returns,
                                     color: item.returns > 0 ? AppColors.successGreen : AppColors.secondaryText,
                                   ),
                                   _buildTransactionRow(
                                     icon: Icons.point_of_sale,
-                                    label: 'SDMS Sales',
+                                    label: context.l10n.translate('quotaSnapshotSdmsSales'),
                                     value: item.sdmsSales,
                                     color: item.sdmsSales > 0 ? AppColors.successGreen : AppColors.secondaryText,
                                   ),
                                   _buildTransactionRow(
                                     icon: Icons.inventory,
-                                    label: 'Closing',
+                                    label: context.l10n.translate('quotaSnapshotClosing'),
                                     value: item.closing,
                                     color: Colors.blue,
                                     isBold: true,
@@ -603,7 +635,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                                       Icon(Icons.info_outline, size: 18.sp, color: Colors.blue[700]),
                                       SizedBox(width: 8.w),
                                       Text(
-                                        'HOW IT\'S CALCULATED',
+                                        context.l10n.translate('quotaSnapshotHowCalculated'),
                                         style: TextStyle(
                                           fontSize: 13.sp,
                                           fontWeight: FontWeight.bold,
@@ -694,7 +726,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                 SizedBox(height: 16.h),
 
                 // Sync Status Card (at bottom)
-                _buildSyncStatusCard(snapshot),
+                _buildSyncStatusCard(context, snapshot),
 
                 SizedBox(height: 16.h), // Bottom spacing
               ],
@@ -703,7 +735,7 @@ class QuotaSnapshotPage extends StatelessWidget {
 
           return Center(
             child: Text(
-              'No data available',
+              context.l10n.translate('quotaSnapshotNoData'),
               style: TextStyle(
                 fontSize: 16.sp,
                 color: AppColors.secondaryText,
@@ -819,7 +851,7 @@ class QuotaSnapshotPage extends StatelessWidget {
   }
 
   // Build the overall sync status card
-  Widget _buildSyncStatusCard(snapshot) {
+  Widget _buildSyncStatusCard(BuildContext context, snapshot) {
     final syncColor = _getSyncStatusColor(snapshot.lastSync);
     final relativeTime = _getRelativeTime(snapshot.lastSync);
     final isStale = snapshot.isStale;
@@ -857,7 +889,7 @@ class QuotaSnapshotPage extends StatelessWidget {
               ),
               SizedBox(width: 2.w),
               Text(
-                'SYNC STATUS',
+                context.l10n.translate('quotaSnapshotSyncStatusTitle'),
                 style: TextStyle(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.bold,
@@ -910,7 +942,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                                   context,
                                   {
                                     'success': false,
-                                    'message': 'Sync failed',
+                                    'message': context.l10n.translate('quotaSnapshotStatusFailed'),
                                     'error': e.toString(),
                                   },
                                 );
@@ -928,7 +960,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                           )
                         : Icon(Icons.sync, size: 14.sp),
                     label: Text(
-                      isSyncing ? 'Syncing...' : 'Sync SDMS',
+                      isSyncing ? context.l10n.translate('quotaSnapshotSyncingButton') : context.l10n.translate('quotaSnapshotSyncButton'),
                       style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -954,7 +986,7 @@ class QuotaSnapshotPage extends StatelessWidget {
               Icon(Icons.access_time, size: 16.sp, color: AppColors.secondaryText),
               SizedBox(width: 8.w),
               Text(
-                'Last synced: ',
+                context.l10n.translate('quotaSnapshotLastSyncedLabel'),
                 style: TextStyle(
                   fontSize: 13.sp,
                   color: AppColors.secondaryText,
@@ -977,7 +1009,7 @@ class QuotaSnapshotPage extends StatelessWidget {
             Divider(color: Colors.grey[300]),
             SizedBox(height: 8.h),
             Text(
-              'Company Sync Details',
+              context.l10n.translate('quotaSnapshotCompanySyncDetailsTitle'),
               style: TextStyle(
                 fontSize: 12.sp,
                 fontWeight: FontWeight.w600,
@@ -985,7 +1017,7 @@ class QuotaSnapshotPage extends StatelessWidget {
               ),
             ),
             SizedBox(height: 12.h),
-            ...snapshot.syncStatus.map((company) => _buildCompanySyncItem(company)),
+            ...snapshot.syncStatus.map((company) => _buildCompanySyncItem(context, company)),
           ],
         ],
       ),
@@ -993,7 +1025,7 @@ class QuotaSnapshotPage extends StatelessWidget {
   }
 
   // Build individual company sync item
-  Widget _buildCompanySyncItem(company) {
+  Widget _buildCompanySyncItem(BuildContext context, company) {
     final canSync = company.canSync;
     final syncColor = canSync ? Colors.green : Colors.orange;
     final relativeTime = _getRelativeTime(company.lastSync);
@@ -1079,7 +1111,7 @@ class QuotaSnapshotPage extends StatelessWidget {
                     SizedBox(width: 4.w),
                     Text(
                       canSync
-                          ? 'Can sync now'
+                          ? context.l10n.translate('quotaSnapshotCanSyncNow')
                           : 'Wait ${company.secondsUntilSync}s',
                       style: TextStyle(
                         fontSize: 10.sp,
@@ -1119,7 +1151,7 @@ class QuotaSnapshotPage extends StatelessWidget {
             SizedBox(width: 12.w),
             Expanded(
               child: Text(
-                'SDMS Sync Response',
+                context.l10n.translate('quotaSnapshotSyncResponseTitle'),
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.bold,
@@ -1155,7 +1187,13 @@ class QuotaSnapshotPage extends StatelessWidget {
                     SizedBox(width: 8.w),
                     Expanded(
                       child: Text(
-                        _formatOverallStatus(status),
+                        status == 'all_synced'
+                            ? context.l10n.translate('quotaSnapshotStatusAllSynced')
+                            : status == 'partial'
+                                ? context.l10n.translate('quotaSnapshotStatusPartial')
+                                : status == 'failed'
+                                    ? context.l10n.translate('quotaSnapshotStatusFailed')
+                                    : status,
                         style: TextStyle(
                           fontSize: 13.sp,
                           fontWeight: FontWeight.w600,
@@ -1171,7 +1209,7 @@ class QuotaSnapshotPage extends StatelessWidget {
               if (companies.isNotEmpty) ...[
                 SizedBox(height: 16.h),
                 Text(
-                  'Company Status:',
+                  context.l10n.translate('quotaSnapshotCompanyStatusLabel'),
                   style: TextStyle(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w600,

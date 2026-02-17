@@ -5,6 +5,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/api_service_interface.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../l10n/l10n_extensions.dart';
 
 class VehicleHistoryScreen extends StatefulWidget {
   final String vehicleNo;
@@ -156,17 +158,17 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                         SizedBox(width: 2.w),
                         Expanded(
                           child: Text(
-                            driver['phone_number'] ?? 'N/A',
+                            driver['phone_number'] ?? context.l10n.translate('commonNotAvailableText'),
                             style: TextStyle(fontSize: 14.sp, color: Color(0xFF666666)),
                           ),
                         ),
                         IconButton(
                           icon: Icon(Icons.copy, size: 16.w),
                           onPressed: () {
-                            final number = driver['phone_number'] ?? 'N/A';
+                            final number = driver['phone_number'] ?? context.l10n.translate('commonNotAvailableText');
                             Clipboard.setData(ClipboardData(text: number));
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("Copied")),
+                              SnackBar(content: Text(context.l10n.translate('vehicleHistoryPhoneCopied'))),
                             );
                           },
                         ),
@@ -185,7 +187,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                         ),
                         SizedBox(width: 2.w),
                         Text(
-                          'Last visit: ${dateFormat.format(visitDate)}',
+                          '${context.l10n.translate('vehicleHistoryLastVisitLabel')} ${dateFormat.format(visitDate)}',
                           style: TextStyle(
                             fontSize: 12.sp,
                             color: const Color(0xFF666666),
@@ -267,6 +269,13 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: context.l10n.translate('commonRefreshTooltip'),
+            onPressed: _loadVehicleHistory,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(
@@ -288,7 +297,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
               ),
               SizedBox(height: 16.h),
               Text(
-                'Error loading history',
+                context.l10n.translate('vehicleHistoryErrorTitle'),
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.w600,
@@ -311,7 +320,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                   backgroundColor: const Color(0xFF0E5CA8),
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Retry'),
+                child: Text(context.l10n.translate('commonRetryButton')),
               ),
             ],
           ),
@@ -331,7 +340,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
               ),
               SizedBox(height: 16.h),
               Text(
-                'No history found',
+                context.l10n.translate('vehicleHistoryEmptyTitle'),
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.w600,
@@ -340,7 +349,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
               ),
               SizedBox(height: 8.h),
               Text(
-                'This vehicle has no previous visits recorded',
+                context.l10n.translate('vehicleHistoryEmptyMessage'),
                 style: TextStyle(
                   fontSize: 14.sp,
                   color: const Color(0xFF666666),
@@ -381,7 +390,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Vehicle Summary',
+                        context.l10n.translate('vehicleHistorySummaryTitle'),
                         style: TextStyle(
                           fontSize: 18.sp,
                           fontWeight: FontWeight.w600,
@@ -416,7 +425,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                                 ),
                               ),
                               Text(
-                                'Total Visits',
+                                context.l10n.translate('vehicleHistoryTotalVisitsLabel'),
                                 style: TextStyle(
                                   fontSize: 12.sp,
                                   color: Colors.white.withOpacity(0.8),
@@ -448,7 +457,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                                 ),
                               ),
                               Text(
-                                'Unique Drivers',
+                                context.l10n.translate('vehicleHistoryUniqueDriversLabel'),
                                 style: TextStyle(
                                   fontSize: 12.sp,
                                   color: Colors.white.withOpacity(0.8),
@@ -471,7 +480,7 @@ class _VehicleHistoryScreenState extends State<VehicleHistoryScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Driver History',
+                    context.l10n.translate('vehicleHistoryDriverHistoryTitle'),
                     style: TextStyle(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.w600,
@@ -531,7 +540,7 @@ class DriverDetailsDialog extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Driver Details',
+                  context.l10n.translate('vehicleHistoryDriverDetailsTitle'),
                   style: TextStyle(
                     fontSize: 20.sp,
                     fontWeight: FontWeight.w600,
@@ -594,8 +603,8 @@ class DriverDetailsDialog extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildDetailRow('Name:', driver['name'] ?? 'N/A'),
-                  _buildDetailRow('Phone:', driver['phone_number'] ?? 'N/A'),
+                  _buildDetailRow('Name:', driver['name'] ?? context.l10n.translate('commonNotAvailableText')),
+                  _buildDetailRow('Phone:', driver['phone_number'] ?? context.l10n.translate('commonNotAvailableText')),
                   _buildDetailRow('Total Visits for this Vehicle:', visitInfo['total_visits']?.toString() ?? '0'),
                   _buildDetailRow('Overall Visit Count:', driver['visit_count']?.toString() ?? '0'),
                   _buildDetailRow(
@@ -603,14 +612,14 @@ class DriverDetailsDialog extends StatelessWidget {
                     visitInfo['latest_visit'] != null
                         ? DateFormat('dd-MMM-yyyy HH:mm').format(
                         DateTime.parse(visitInfo['latest_visit']))
-                        : 'N/A',
+                        : context.l10n.translate('commonNotAvailableText'),
                   ),
                   _buildDetailRow(
                     'Last Seen (Overall):',
                     driver['last_seen_date'] != null
                         ? DateFormat('dd-MMM-yyyy HH:mm').format(
                         DateTime.parse(driver['last_seen_date']))
-                        : 'N/A',
+                        : context.l10n.translate('commonNotAvailableText'),
                   ),
                 ],
               ),

@@ -6,6 +6,7 @@ import '../../blocs/bonus_schemes/bonus_schemes_event.dart';
 import '../../blocs/bonus_schemes/bonus_schemes_state.dart';
 import '../../widgets/bonus/bonus_scheme_card.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/l10n_extensions.dart';
 import '../../../core/constants/app_colors.dart';
 
 /// Page to display available bonus schemes
@@ -54,7 +55,7 @@ class BonusSchemesPage extends StatelessWidget {
                       context.read<BonusSchemesBloc>().add(const LoadBonusSchemes());
                     },
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
+                    label: Text(context.l10n.translate('commonRetryButton')),
                   ),
                 ],
               ),
@@ -68,7 +69,7 @@ class BonusSchemesPage extends StatelessWidget {
                     Icon(Icons.info_outline, size: 60.sp, color: Colors.grey),
                     SizedBox(height: 16.h),
                     Text(
-                      'No bonus schemes available',
+                      context.l10n.translate('bonusSchemesEmpty'),
                       style: TextStyle(fontSize: 14.sp, color: Colors.grey),
                     ),
                   ],

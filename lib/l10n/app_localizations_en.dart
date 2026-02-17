@@ -1584,4 +1584,703 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bonusStatusVoided => 'Voided';
+
+  @override
+  String get commonRetryButton => 'Retry';
+
+  @override
+  String get commonCancelButton => 'Cancel';
+
+  @override
+  String get commonApproveButton => 'Approve';
+
+  @override
+  String get commonRejectButton => 'Reject';
+
+  @override
+  String get commonRefreshTooltip => 'Refresh';
+
+  @override
+  String get commonSearchingStatus => 'Searching...';
+
+  @override
+  String get commonSubmittingStatus => 'Submitting...';
+
+  @override
+  String get commonNotAvailableText => 'N/A';
+
+  @override
+  String get commonItemLabel => 'Item';
+
+  @override
+  String get commonCodeLabel => 'Code';
+
+  @override
+  String get commonQuantityLabel => 'Quantity';
+
+  @override
+  String get commonJustificationLabel => 'Justification';
+
+  @override
+  String get commonCreatedAtLabel => 'Created At';
+
+  @override
+  String get commonPartnerDetailsLabel => 'Partner Details';
+
+  @override
+  String get commonUnknownPartnerName => 'Unknown Partner';
+
+  @override
+  String get commonAvailableBalanceLabel => 'Available Balance';
+
+  @override
+  String get commonItemNameLabel => 'Item Name';
+
+  @override
+  String get commonItemCodeLabel => 'Item Code';
+
+  @override
+  String get commonReasonLabel => 'Reason:';
+
+  @override
+  String get commonEnterQuantityHintText => 'Enter quantity';
+
+  @override
+  String get sdmsClaimsFilterOrdersTitle => 'Filter Orders';
+
+  @override
+  String get sdmsClaimsMyPartnerOrdersLabel => 'My Partner Orders';
+
+  @override
+  String get sdmsClaimsMyPartnerOrdersDescription => 'Show only orders where my partner received the credit';
+
+  @override
+  String get sdmsClaimsClearFilterButton => 'Clear Filter';
+
+  @override
+  String get sdmsClaimsMyOrdersTitle => 'My Orders';
+
+  @override
+  String get sdmsClaimsActiveTabLabel => 'Active';
+
+  @override
+  String get sdmsClaimsHistoryTabLabel => 'History';
+
+  @override
+  String get sdmsClaimsSearchHintText => 'Search by order ID, consumer name, or REL ID';
+
+  @override
+  String get sdmsClaimsNewOrderButtonLabel => 'New Order';
+
+  @override
+  String get sdmsClaimsNoActiveOrdersEmptyTitle => 'No Active Orders';
+
+  @override
+  String get sdmsClaimsNoActiveOrdersEmptyDescription => 'You have no active orders at the moment';
+
+  @override
+  String get sdmsClaimsNoOrderHistoryEmptyTitle => 'No Order History';
+
+  @override
+  String get sdmsClaimsNoOrderHistoryEmptyDescription => 'No completed orders found';
+
+  @override
+  String get sdmsClaimsMyPartnerBadgeLabel => 'My Partner';
+
+  @override
+  String get sdmsClaimsOrderDetailsAppBarTitle => 'Order Details';
+
+  @override
+  String get sdmsClaimsOrderDetailsCardTitle => 'Order Details';
+
+  @override
+  String get sdmsClaimsRejectTransferDialogTitle => 'Reject Transfer';
+
+  @override
+  String get sdmsClaimsRejectTransferConfirmationText => 'Are you sure you want to reject this transfer request?';
+
+  @override
+  String get sdmsClaimsRejectTransferReasonHintText => 'Reason (optional)';
+
+  @override
+  String get sdmsClaimsOrderNotFoundErrorText => 'Order not found';
+
+  @override
+  String get sdmsClaimsServiceOrderItemsCardTitle => 'Service Order Items';
+
+  @override
+  String get sdmsClaimsClaimOrderButtonText => 'Claim This Order';
+
+  @override
+  String get sdmsClaimsSwitchCompanyButtonText => 'Switch Company';
+
+  @override
+  String get sdmsClaimsRetryCurrentCompanyButtonText => 'Retry in Current Company';
+
+  @override
+  String get sdmsClaimsPartnerInformationCardTitle => 'Partner Information';
+
+  @override
+  String get sdmsClaimsClaimedByLabel => 'Claimed By';
+
+  @override
+  String get sdmsClaimsUnclaimedStatus => 'Unclaimed';
+
+  @override
+  String get sdmsClaimsYouAreBeneficiaryMessage => 'You are the beneficiary for this order';
+
+  @override
+  String get sdmsClaimsTransferHistoryCardTitle => 'Transfer History';
+
+  @override
+  String get sdmsClaimsTransferRequestCardTitle => 'Transfer Request';
+
+  @override
+  String get sdmsClaimsWantsToClaimOrderText => 'wants to claim this order';
+
+  @override
+  String get sdmsClaimsTimeRemainingLabel => 'remaining';
+
+  @override
+  String get sdmsClaimsPendingApprovalFromPartnerMessage => 'Pending approval from partner';
+
+  @override
+  String get sdmsClaimsErpStatusCardTitle => 'ERP Status';
+
+  @override
+  String get sdmsClaimsErpAccrualLabel => 'Accrual';
+
+  @override
+  String get sdmsClaimsErpAllocationLabel => 'Allocation';
+
+  @override
+  String get sdmsClaimsErpSettlementLabel => 'Settlement';
+
+  @override
+  String get sdmsClaimsNewOrderPageTitle => 'SDMS Claims - New Order';
+
+  @override
+  String get sdmsClaimsOrderDetailsHeaderLabel => 'Order Details';
+
+  @override
+  String get sdmsClaimsConsumerIdLabel => 'Consumer ID';
+
+  @override
+  String get sdmsClaimsConsumerIdHintText => 'Enter 16-digit consumer ID';
+
+  @override
+  String get sdmsClaimsConsumerIdRequiredError => 'Consumer ID is required';
+
+  @override
+  String get sdmsClaimsConsumerIdFormatError => 'Must be exactly 16 digits';
+
+  @override
+  String get sdmsClaimsOrderIdLabel => 'SDMS Order ID';
+
+  @override
+  String get sdmsClaimsOrderIdHintText => 'e.g., 2-005443212575 (full 12-digit format)';
+
+  @override
+  String get sdmsClaimsOrderIdRequiredError => 'Order ID is required';
+
+  @override
+  String get sdmsClaimsOrderIdFormatError => 'Invalid format. Must be full 12-digit format (e.g., 2-005443212575)';
+
+  @override
+  String get sdmsClaimsOrderIdInfoMessage => 'Enter full 12-digit order ID. Short formats like 2-005 are not accepted.';
+
+  @override
+  String get sdmsClaimsClaimingForMyselfLabel => 'Claiming for myself';
+
+  @override
+  String get sdmsClaimsClaimingForMyselfHelpText => 'Check this if you are claiming the order for yourself';
+
+  @override
+  String get sdmsClaimsOrDividerText => 'OR';
+
+  @override
+  String get sdmsClaimsPartnerDeliveryBoyHeaderLabel => 'Partner / Delivery Boy';
+
+  @override
+  String get sdmsClaimsPartnerSearchLabel => 'Search partner or delivery boy';
+
+  @override
+  String get sdmsClaimsPartnerSearchHintText => 'Type to search...';
+
+  @override
+  String get sdmsClaimsSelectedPartnerLabel => 'Selected Partner';
+
+  @override
+  String get sdmsClaimsSelectPartnerValidationMessage => 'Please select a partner or delivery boy to continue';
+
+  @override
+  String get sdmsClaimsSubmitOrderButtonText => 'Submit Order';
+
+  @override
+  String get sdmsClaimsDigitalToggleLabel => 'Digital';
+
+  @override
+  String get sdmsClaimsNcDbcToggleLabel => 'NC & DBC';
+
+  @override
+  String get sdmsClaimsDigitalBadgeText => 'DIGITAL';
+
+  @override
+  String get sdmsClaimsOrderTypesLabel => 'Order Types:';
+
+  @override
+  String get sdmsClaimsUnclaimedSearchHintText => 'Search by order ID, consumer, or delivery boy';
+
+  @override
+  String get sdmsClaimsUnclaimedOrdersInfoBannerText => 'These orders are available for claiming across the company';
+
+  @override
+  String get sdmsClaimsNoUnclaimedOrdersEmptyTitle => 'No Unclaimed Orders';
+
+  @override
+  String get sdmsClaimsNoUnclaimedOrdersEmptyDescription => 'All orders have been claimed! Check back later.';
+
+  @override
+  String get sdmsClaimsReadyToClaimStatus => 'Ready to claim';
+
+  @override
+  String get sdmsClaimsClaimButtonText => 'Claim';
+
+  @override
+  String get creditExtensionMyExtensionsTitle => 'My Extensions';
+
+  @override
+  String get creditExtensionRequestExtensionButtonLabel => 'Request Extension';
+
+  @override
+  String get creditExtensionAllStatusFilterLabel => 'All';
+
+  @override
+  String get creditExtensionPendingStatusFilterLabel => 'Pending';
+
+  @override
+  String get creditExtensionApprovedStatusFilterLabel => 'Approved';
+
+  @override
+  String get creditExtensionRejectedStatusFilterLabel => 'Rejected';
+
+  @override
+  String get creditExtensionNoExtensionsEmptyTitle => 'No extension requests yet';
+
+  @override
+  String get creditExtensionNoExtensionsEmptyDescription => 'Request one to continue operations during low quota.';
+
+  @override
+  String get creditExtensionDetailPageTitle => 'Extension Details';
+
+  @override
+  String get creditExtensionNotFoundMessage => 'Extension not found';
+
+  @override
+  String get creditExtensionItemDetailsCardTitle => 'Item Details';
+
+  @override
+  String get creditExtensionRequestInfoCardTitle => 'Request Information';
+
+  @override
+  String get creditExtensionRequestedQuantityLabel => 'Requested Quantity';
+
+  @override
+  String get creditExtensionJustificationLabel => 'Justification:';
+
+  @override
+  String get creditExtensionVoiceRecordingLabel => 'Voice Recording';
+
+  @override
+  String get creditExtensionNoWrittenJustificationMessage => 'No written justification provided';
+
+  @override
+  String get creditExtensionApprovalDetailsCardTitle => 'Approval Details';
+
+  @override
+  String get creditExtensionApprovedQuantityLabel => 'Approved Quantity';
+
+  @override
+  String get creditExtensionApprovedByLabel => 'Approved By';
+
+  @override
+  String get creditExtensionApprovedAtLabel => 'Approved At';
+
+  @override
+  String get creditExtensionValidUntilLabel => 'Valid Until';
+
+  @override
+  String get creditExtensionUsageBreakdownLabel => 'Usage Breakdown';
+
+  @override
+  String get creditExtensionReservedLabel => 'Reserved';
+
+  @override
+  String get creditExtensionConsumedLabel => 'Consumed';
+
+  @override
+  String get creditExtensionRemainingLabel => 'Remaining';
+
+  @override
+  String get creditExtensionRejectionDetailsCardTitle => 'Rejection Details';
+
+  @override
+  String get creditExtensionCreateRequestPageTitle => 'Request Credit Extension';
+
+  @override
+  String get creditExtensionSelectItemCardTitle => 'Select Item';
+
+  @override
+  String get creditExtensionSelectItemHintText => 'Choose an item';
+
+  @override
+  String get creditExtensionSelectItemValidationMessage => 'Please select an item';
+
+  @override
+  String get creditExtensionQuotaInformationCardTitle => 'Quota Information';
+
+  @override
+  String get creditExtensionAvailableBalanceLabel => 'Available Balance';
+
+  @override
+  String get creditExtensionCreditLimitLabel => 'Credit Limit';
+
+  @override
+  String get creditExtensionMaxRequestableLabel => 'Max Requestable';
+
+  @override
+  String get creditExtensionQuantityHintText => 'Enter quantity';
+
+  @override
+  String get creditExtensionQuantityRequiredError => 'Please enter quantity';
+
+  @override
+  String get creditExtensionQuantityGreaterThanZeroError => 'Quantity must be greater than 0';
+
+  @override
+  String get creditExtensionAudioJustificationLabel => 'Audio Justification (Required)';
+
+  @override
+  String get creditExtensionRecordButtonLabel => 'Record';
+
+  @override
+  String get creditExtensionStopButtonLabel => 'Stop';
+
+  @override
+  String get creditExtensionPlayButtonLabel => 'Play';
+
+  @override
+  String get creditExtensionPauseButtonLabel => 'Pause';
+
+  @override
+  String get creditExtensionDeleteAudioTooltip => 'Delete audio';
+
+  @override
+  String get creditExtensionRecordingStatus => 'Recording...';
+
+  @override
+  String get creditExtensionAudioRecordedSuccessMessage => 'Audio recorded successfully';
+
+  @override
+  String get creditExtensionTextJustificationLabel => 'Text Justification (Required)';
+
+  @override
+  String get creditExtensionTextJustificationHintText => 'Explain why you need this extension';
+
+  @override
+  String get creditExtensionTextJustificationRequiredError => 'Text justification is required';
+
+  @override
+  String get creditExtensionTextJustificationMinError => 'Please provide at least 10 characters';
+
+  @override
+  String get creditExtensionListeningStatus => 'Listening... Tap microphone to stop';
+
+  @override
+  String get creditExtensionSubmitRequestButtonText => 'Submit Request';
+
+  @override
+  String get gmCreditApprovalsPendingApprovalsTitle => 'Pending Approvals';
+
+  @override
+  String get gmCreditApprovalsNoApprovalsEmptyTitle => 'No Pending Approvals';
+
+  @override
+  String get gmCreditApprovalsAllProcessedEmptyDescription => 'All credit extension requests have been processed';
+
+  @override
+  String get gmCreditExtensionDetailPageTitle => 'Credit Extension Request';
+
+  @override
+  String get gmCreditExtensionRequestSummaryCardTitle => 'Request Summary';
+
+  @override
+  String get gmCreditExtensionLiveQuotaSnapshotCardTitle => 'Live Quota Snapshot';
+
+  @override
+  String get gmCreditExtensionQuotaHistoryCardTitle => '7-Day Quota History';
+
+  @override
+  String get gmCreditExtensionExtensionHistoryCardTitle => 'Extension History (Same Item)';
+
+  @override
+  String get gmCreditExtensionApproveRequestDialogTitle => 'Approve Request';
+
+  @override
+  String get gmCreditExtensionApproveRequestDescription => 'Set approved quantity and expiry date:';
+
+  @override
+  String get gmCreditExtensionValidUntilDialogLabel => 'Valid Until (Optional)';
+
+  @override
+  String get gmCreditExtensionSelectDatePlaceholder => 'Select date';
+
+  @override
+  String get gmCreditExtensionRejectRequestDialogTitle => 'Reject Request';
+
+  @override
+  String get gmCreditExtensionSelectRejectionReasonDescription => 'Select rejection reason:';
+
+  @override
+  String get quotaSnapshotTitle => 'Quota Status';
+
+  @override
+  String get quotaSnapshotLoading => 'Loading quota data...';
+
+  @override
+  String get quotaSnapshotSyncing => 'Syncing with SDMS...';
+
+  @override
+  String get quotaSnapshotRequestCreditExtension => 'Request Credit Extension';
+
+  @override
+  String get quotaSnapshotViewHistory => 'View History';
+
+  @override
+  String get quotaSnapshotBlocked => 'BLOCKED';
+
+  @override
+  String get quotaSnapshotNoQuotaAvailable => 'NO Quota Available';
+
+  @override
+  String get quotaSnapshotKeyBalancesTitle => 'KEY BALANCES';
+
+  @override
+  String get quotaSnapshotTransactionDetailsTitle => 'TRANSACTION DETAILS';
+
+  @override
+  String get quotaSnapshotOpening => 'Opening';
+
+  @override
+  String get quotaSnapshotAdjustment => 'Adjustment';
+
+  @override
+  String get quotaSnapshotOrders => 'Orders';
+
+  @override
+  String get quotaSnapshotPickups => 'Pickups';
+
+  @override
+  String get quotaSnapshotReturns => 'Returns';
+
+  @override
+  String get quotaSnapshotSdmsSales => 'SDMS Sales';
+
+  @override
+  String get quotaSnapshotClosing => 'Closing';
+
+  @override
+  String get quotaSnapshotHowCalculated => 'HOW IT\'S CALCULATED';
+
+  @override
+  String get quotaSnapshotNoData => 'No data available';
+
+  @override
+  String get quotaSnapshotSyncButton => 'Sync SDMS';
+
+  @override
+  String get quotaSnapshotSyncingButton => 'Syncing...';
+
+  @override
+  String get quotaSnapshotLastSyncedLabel => 'Last synced:';
+
+  @override
+  String get quotaSnapshotSyncStatusTitle => 'SYNC STATUS';
+
+  @override
+  String get quotaSnapshotCompanySyncDetailsTitle => 'Company Sync Details';
+
+  @override
+  String get quotaSnapshotCanSyncNow => 'Can sync now';
+
+  @override
+  String get quotaSnapshotSyncResponseTitle => 'SDMS Sync Response';
+
+  @override
+  String get quotaSnapshotCompanyStatusLabel => 'Company Status:';
+
+  @override
+  String get quotaSnapshotStatusAllSynced => 'All companies processed';
+
+  @override
+  String get quotaSnapshotStatusPartial => 'Partial sync - some companies have issues';
+
+  @override
+  String get quotaSnapshotStatusFailed => 'Sync failed';
+
+  @override
+  String get bonusFilterAll => 'All';
+
+  @override
+  String get bonusFilterActive => 'Active';
+
+  @override
+  String get bonusFilterConsumed => 'Consumed';
+
+  @override
+  String get bonusFilterExpired => 'Expired';
+
+  @override
+  String get bonusEmptyActive => 'No active bonuses';
+
+  @override
+  String get bonusEmptyConsumed => 'No consumed bonuses';
+
+  @override
+  String get bonusEmptyExpired => 'No expired bonuses';
+
+  @override
+  String get bonusEmptyGeneric => 'No bonuses found';
+
+  @override
+  String get bonusDetailEarned => 'Earned';
+
+  @override
+  String get bonusDetailExpires => 'Expires';
+
+  @override
+  String get bonusDetailChipRemaining => 'Remaining';
+
+  @override
+  String get bonusDetailDaysRemaining => 'days remaining';
+
+  @override
+  String get bonusDetailSchemeTitle => 'Bonus Scheme';
+
+  @override
+  String get bonusMetricPickups => 'Pickups';
+
+  @override
+  String get bonusMetricReturns => 'Returns';
+
+  @override
+  String get bonusMetricNetPickups => 'Net Pickups';
+
+  @override
+  String get bonusMetricOtpSales => 'OTP Sales';
+
+  @override
+  String get bonusMetricOverrideSales => 'Override Sales';
+
+  @override
+  String get bonusMetricConfirmedSales => 'Confirmed Sales';
+
+  @override
+  String get bonusMetricPostingRatio => 'Posting Ratio';
+
+  @override
+  String get bonusMetricBonusCalculated => 'Bonus Calculated';
+
+  @override
+  String get bonusSchemesEmpty => 'No bonus schemes available';
+
+  @override
+  String get quotaHistoryFilterLast7Days => 'Last 7 Days';
+
+  @override
+  String get quotaHistoryFilterLast30Days => 'Last 30 Days';
+
+  @override
+  String get quotaHistoryFilterThisMonth => 'This Month';
+
+  @override
+  String get quotaHistoryFilterLastMonth => 'Last Month';
+
+  @override
+  String get quotaHistoryFilterCustomRange => 'Custom Range...';
+
+  @override
+  String get quotaHistoryErrorLoadFailed => 'Failed to load history';
+
+  @override
+  String get quotaHistoryEmptyTitle => 'No history found';
+
+  @override
+  String get quotaHistoryEmptyMessage => 'No quota history available for this period';
+
+  @override
+  String get inventoryFilterAll => 'All';
+
+  @override
+  String get inventoryFilterPending => 'Pending';
+
+  @override
+  String get inventoryFilterCollect => 'Collect';
+
+  @override
+  String get inventoryFilterDeposit => 'Deposit';
+
+  @override
+  String get ordersFilterNotDelivered => 'Not Delivered';
+
+  @override
+  String get ordersFilterAll => 'All';
+
+  @override
+  String get ordersFilterDateRange => 'Date Range';
+
+  @override
+  String get ordersCardRequestedBy => 'Req By:';
+
+  @override
+  String get ordersNoVehicle => 'No Vehicle';
+
+  @override
+  String get ordersNoWarehouse => 'No Warehouse';
+
+  @override
+  String get ordersCardQuantity => 'Qty:';
+
+  @override
+  String get ordersCardCreatedDate => 'Created:';
+
+  @override
+  String get vehicleHistoryPhoneCopied => 'Copied';
+
+  @override
+  String get vehicleHistoryLastVisitLabel => 'Last visit:';
+
+  @override
+  String get vehicleHistoryErrorTitle => 'Error loading history';
+
+  @override
+  String get vehicleHistoryEmptyTitle => 'No history found';
+
+  @override
+  String get vehicleHistoryEmptyMessage => 'This vehicle has no previous visits recorded';
+
+  @override
+  String get vehicleHistorySummaryTitle => 'Vehicle Summary';
+
+  @override
+  String get vehicleHistoryTotalVisitsLabel => 'Total Visits';
+
+  @override
+  String get vehicleHistoryUniqueDriversLabel => 'Unique Drivers';
+
+  @override
+  String get vehicleHistoryDriverHistoryTitle => 'Driver History';
+
+  @override
+  String get vehicleHistoryDriverDetailsTitle => 'Driver Details';
 }

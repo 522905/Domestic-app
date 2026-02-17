@@ -3100,6 +3100,1404 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voided'**
   String get bonusStatusVoided;
+
+  /// No description provided for @commonRetryButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get commonRetryButton;
+
+  /// No description provided for @commonCancelButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get commonCancelButton;
+
+  /// No description provided for @commonApproveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get commonApproveButton;
+
+  /// No description provided for @commonRejectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get commonRejectButton;
+
+  /// No description provided for @commonRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get commonRefreshTooltip;
+
+  /// No description provided for @commonSearchingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching...'**
+  String get commonSearchingStatus;
+
+  /// No description provided for @commonSubmittingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting...'**
+  String get commonSubmittingStatus;
+
+  /// No description provided for @commonNotAvailableText.
+  ///
+  /// In en, this message translates to:
+  /// **'N/A'**
+  String get commonNotAvailableText;
+
+  /// No description provided for @commonItemLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item'**
+  String get commonItemLabel;
+
+  /// No description provided for @commonCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get commonCodeLabel;
+
+  /// No description provided for @commonQuantityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get commonQuantityLabel;
+
+  /// No description provided for @commonJustificationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Justification'**
+  String get commonJustificationLabel;
+
+  /// No description provided for @commonCreatedAtLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Created At'**
+  String get commonCreatedAtLabel;
+
+  /// No description provided for @commonPartnerDetailsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner Details'**
+  String get commonPartnerDetailsLabel;
+
+  /// No description provided for @commonUnknownPartnerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Partner'**
+  String get commonUnknownPartnerName;
+
+  /// No description provided for @commonAvailableBalanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Balance'**
+  String get commonAvailableBalanceLabel;
+
+  /// No description provided for @commonItemNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item Name'**
+  String get commonItemNameLabel;
+
+  /// No description provided for @commonItemCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item Code'**
+  String get commonItemCodeLabel;
+
+  /// No description provided for @commonReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason:'**
+  String get commonReasonLabel;
+
+  /// No description provided for @commonEnterQuantityHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter quantity'**
+  String get commonEnterQuantityHintText;
+
+  /// No description provided for @sdmsClaimsFilterOrdersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter Orders'**
+  String get sdmsClaimsFilterOrdersTitle;
+
+  /// No description provided for @sdmsClaimsMyPartnerOrdersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'My Partner Orders'**
+  String get sdmsClaimsMyPartnerOrdersLabel;
+
+  /// No description provided for @sdmsClaimsMyPartnerOrdersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Show only orders where my partner received the credit'**
+  String get sdmsClaimsMyPartnerOrdersDescription;
+
+  /// No description provided for @sdmsClaimsClearFilterButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Filter'**
+  String get sdmsClaimsClearFilterButton;
+
+  /// No description provided for @sdmsClaimsMyOrdersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My Orders'**
+  String get sdmsClaimsMyOrdersTitle;
+
+  /// No description provided for @sdmsClaimsActiveTabLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get sdmsClaimsActiveTabLabel;
+
+  /// No description provided for @sdmsClaimsHistoryTabLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get sdmsClaimsHistoryTabLabel;
+
+  /// No description provided for @sdmsClaimsSearchHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by order ID, consumer name, or REL ID'**
+  String get sdmsClaimsSearchHintText;
+
+  /// No description provided for @sdmsClaimsNewOrderButtonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New Order'**
+  String get sdmsClaimsNewOrderButtonLabel;
+
+  /// No description provided for @sdmsClaimsNoActiveOrdersEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Active Orders'**
+  String get sdmsClaimsNoActiveOrdersEmptyTitle;
+
+  /// No description provided for @sdmsClaimsNoActiveOrdersEmptyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no active orders at the moment'**
+  String get sdmsClaimsNoActiveOrdersEmptyDescription;
+
+  /// No description provided for @sdmsClaimsNoOrderHistoryEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Order History'**
+  String get sdmsClaimsNoOrderHistoryEmptyTitle;
+
+  /// No description provided for @sdmsClaimsNoOrderHistoryEmptyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'No completed orders found'**
+  String get sdmsClaimsNoOrderHistoryEmptyDescription;
+
+  /// No description provided for @sdmsClaimsMyPartnerBadgeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'My Partner'**
+  String get sdmsClaimsMyPartnerBadgeLabel;
+
+  /// No description provided for @sdmsClaimsOrderDetailsAppBarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Details'**
+  String get sdmsClaimsOrderDetailsAppBarTitle;
+
+  /// No description provided for @sdmsClaimsOrderDetailsCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Details'**
+  String get sdmsClaimsOrderDetailsCardTitle;
+
+  /// No description provided for @sdmsClaimsRejectTransferDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject Transfer'**
+  String get sdmsClaimsRejectTransferDialogTitle;
+
+  /// No description provided for @sdmsClaimsRejectTransferConfirmationText.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to reject this transfer request?'**
+  String get sdmsClaimsRejectTransferConfirmationText;
+
+  /// No description provided for @sdmsClaimsRejectTransferReasonHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get sdmsClaimsRejectTransferReasonHintText;
+
+  /// No description provided for @sdmsClaimsOrderNotFoundErrorText.
+  ///
+  /// In en, this message translates to:
+  /// **'Order not found'**
+  String get sdmsClaimsOrderNotFoundErrorText;
+
+  /// No description provided for @sdmsClaimsServiceOrderItemsCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Service Order Items'**
+  String get sdmsClaimsServiceOrderItemsCardTitle;
+
+  /// No description provided for @sdmsClaimsClaimOrderButtonText.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim This Order'**
+  String get sdmsClaimsClaimOrderButtonText;
+
+  /// No description provided for @sdmsClaimsSwitchCompanyButtonText.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Company'**
+  String get sdmsClaimsSwitchCompanyButtonText;
+
+  /// No description provided for @sdmsClaimsRetryCurrentCompanyButtonText.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry in Current Company'**
+  String get sdmsClaimsRetryCurrentCompanyButtonText;
+
+  /// No description provided for @sdmsClaimsPartnerInformationCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner Information'**
+  String get sdmsClaimsPartnerInformationCardTitle;
+
+  /// No description provided for @sdmsClaimsClaimedByLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Claimed By'**
+  String get sdmsClaimsClaimedByLabel;
+
+  /// No description provided for @sdmsClaimsUnclaimedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Unclaimed'**
+  String get sdmsClaimsUnclaimedStatus;
+
+  /// No description provided for @sdmsClaimsYouAreBeneficiaryMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You are the beneficiary for this order'**
+  String get sdmsClaimsYouAreBeneficiaryMessage;
+
+  /// No description provided for @sdmsClaimsTransferHistoryCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer History'**
+  String get sdmsClaimsTransferHistoryCardTitle;
+
+  /// No description provided for @sdmsClaimsTransferRequestCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer Request'**
+  String get sdmsClaimsTransferRequestCardTitle;
+
+  /// No description provided for @sdmsClaimsWantsToClaimOrderText.
+  ///
+  /// In en, this message translates to:
+  /// **'wants to claim this order'**
+  String get sdmsClaimsWantsToClaimOrderText;
+
+  /// No description provided for @sdmsClaimsTimeRemainingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'remaining'**
+  String get sdmsClaimsTimeRemainingLabel;
+
+  /// No description provided for @sdmsClaimsPendingApprovalFromPartnerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approval from partner'**
+  String get sdmsClaimsPendingApprovalFromPartnerMessage;
+
+  /// No description provided for @sdmsClaimsErpStatusCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ERP Status'**
+  String get sdmsClaimsErpStatusCardTitle;
+
+  /// No description provided for @sdmsClaimsErpAccrualLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Accrual'**
+  String get sdmsClaimsErpAccrualLabel;
+
+  /// No description provided for @sdmsClaimsErpAllocationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocation'**
+  String get sdmsClaimsErpAllocationLabel;
+
+  /// No description provided for @sdmsClaimsErpSettlementLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement'**
+  String get sdmsClaimsErpSettlementLabel;
+
+  /// No description provided for @sdmsClaimsNewOrderPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'SDMS Claims - New Order'**
+  String get sdmsClaimsNewOrderPageTitle;
+
+  /// No description provided for @sdmsClaimsOrderDetailsHeaderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Details'**
+  String get sdmsClaimsOrderDetailsHeaderLabel;
+
+  /// No description provided for @sdmsClaimsConsumerIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumer ID'**
+  String get sdmsClaimsConsumerIdLabel;
+
+  /// No description provided for @sdmsClaimsConsumerIdHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 16-digit consumer ID'**
+  String get sdmsClaimsConsumerIdHintText;
+
+  /// No description provided for @sdmsClaimsConsumerIdRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumer ID is required'**
+  String get sdmsClaimsConsumerIdRequiredError;
+
+  /// No description provided for @sdmsClaimsConsumerIdFormatError.
+  ///
+  /// In en, this message translates to:
+  /// **'Must be exactly 16 digits'**
+  String get sdmsClaimsConsumerIdFormatError;
+
+  /// No description provided for @sdmsClaimsOrderIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SDMS Order ID'**
+  String get sdmsClaimsOrderIdLabel;
+
+  /// No description provided for @sdmsClaimsOrderIdHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g., 2-005443212575 (full 12-digit format)'**
+  String get sdmsClaimsOrderIdHintText;
+
+  /// No description provided for @sdmsClaimsOrderIdRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Order ID is required'**
+  String get sdmsClaimsOrderIdRequiredError;
+
+  /// No description provided for @sdmsClaimsOrderIdFormatError.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid format. Must be full 12-digit format (e.g., 2-005443212575)'**
+  String get sdmsClaimsOrderIdFormatError;
+
+  /// No description provided for @sdmsClaimsOrderIdInfoMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter full 12-digit order ID. Short formats like 2-005 are not accepted.'**
+  String get sdmsClaimsOrderIdInfoMessage;
+
+  /// No description provided for @sdmsClaimsClaimingForMyselfLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Claiming for myself'**
+  String get sdmsClaimsClaimingForMyselfLabel;
+
+  /// No description provided for @sdmsClaimsClaimingForMyselfHelpText.
+  ///
+  /// In en, this message translates to:
+  /// **'Check this if you are claiming the order for yourself'**
+  String get sdmsClaimsClaimingForMyselfHelpText;
+
+  /// No description provided for @sdmsClaimsOrDividerText.
+  ///
+  /// In en, this message translates to:
+  /// **'OR'**
+  String get sdmsClaimsOrDividerText;
+
+  /// No description provided for @sdmsClaimsPartnerDeliveryBoyHeaderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner / Delivery Boy'**
+  String get sdmsClaimsPartnerDeliveryBoyHeaderLabel;
+
+  /// No description provided for @sdmsClaimsPartnerSearchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search partner or delivery boy'**
+  String get sdmsClaimsPartnerSearchLabel;
+
+  /// No description provided for @sdmsClaimsPartnerSearchHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Type to search...'**
+  String get sdmsClaimsPartnerSearchHintText;
+
+  /// No description provided for @sdmsClaimsSelectedPartnerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Partner'**
+  String get sdmsClaimsSelectedPartnerLabel;
+
+  /// No description provided for @sdmsClaimsSelectPartnerValidationMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a partner or delivery boy to continue'**
+  String get sdmsClaimsSelectPartnerValidationMessage;
+
+  /// No description provided for @sdmsClaimsSubmitOrderButtonText.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Order'**
+  String get sdmsClaimsSubmitOrderButtonText;
+
+  /// No description provided for @sdmsClaimsDigitalToggleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Digital'**
+  String get sdmsClaimsDigitalToggleLabel;
+
+  /// No description provided for @sdmsClaimsNcDbcToggleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'NC & DBC'**
+  String get sdmsClaimsNcDbcToggleLabel;
+
+  /// No description provided for @sdmsClaimsDigitalBadgeText.
+  ///
+  /// In en, this message translates to:
+  /// **'DIGITAL'**
+  String get sdmsClaimsDigitalBadgeText;
+
+  /// No description provided for @sdmsClaimsOrderTypesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Types:'**
+  String get sdmsClaimsOrderTypesLabel;
+
+  /// No description provided for @sdmsClaimsUnclaimedSearchHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by order ID, consumer, or delivery boy'**
+  String get sdmsClaimsUnclaimedSearchHintText;
+
+  /// No description provided for @sdmsClaimsUnclaimedOrdersInfoBannerText.
+  ///
+  /// In en, this message translates to:
+  /// **'These orders are available for claiming across the company'**
+  String get sdmsClaimsUnclaimedOrdersInfoBannerText;
+
+  /// No description provided for @sdmsClaimsNoUnclaimedOrdersEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Unclaimed Orders'**
+  String get sdmsClaimsNoUnclaimedOrdersEmptyTitle;
+
+  /// No description provided for @sdmsClaimsNoUnclaimedOrdersEmptyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'All orders have been claimed! Check back later.'**
+  String get sdmsClaimsNoUnclaimedOrdersEmptyDescription;
+
+  /// No description provided for @sdmsClaimsReadyToClaimStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to claim'**
+  String get sdmsClaimsReadyToClaimStatus;
+
+  /// No description provided for @sdmsClaimsClaimButtonText.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim'**
+  String get sdmsClaimsClaimButtonText;
+
+  /// No description provided for @creditExtensionMyExtensionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My Extensions'**
+  String get creditExtensionMyExtensionsTitle;
+
+  /// No description provided for @creditExtensionRequestExtensionButtonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Extension'**
+  String get creditExtensionRequestExtensionButtonLabel;
+
+  /// No description provided for @creditExtensionAllStatusFilterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get creditExtensionAllStatusFilterLabel;
+
+  /// No description provided for @creditExtensionPendingStatusFilterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get creditExtensionPendingStatusFilterLabel;
+
+  /// No description provided for @creditExtensionApprovedStatusFilterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get creditExtensionApprovedStatusFilterLabel;
+
+  /// No description provided for @creditExtensionRejectedStatusFilterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get creditExtensionRejectedStatusFilterLabel;
+
+  /// No description provided for @creditExtensionNoExtensionsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No extension requests yet'**
+  String get creditExtensionNoExtensionsEmptyTitle;
+
+  /// No description provided for @creditExtensionNoExtensionsEmptyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Request one to continue operations during low quota.'**
+  String get creditExtensionNoExtensionsEmptyDescription;
+
+  /// No description provided for @creditExtensionDetailPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Extension Details'**
+  String get creditExtensionDetailPageTitle;
+
+  /// No description provided for @creditExtensionNotFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Extension not found'**
+  String get creditExtensionNotFoundMessage;
+
+  /// No description provided for @creditExtensionItemDetailsCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Item Details'**
+  String get creditExtensionItemDetailsCardTitle;
+
+  /// No description provided for @creditExtensionRequestInfoCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Information'**
+  String get creditExtensionRequestInfoCardTitle;
+
+  /// No description provided for @creditExtensionRequestedQuantityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested Quantity'**
+  String get creditExtensionRequestedQuantityLabel;
+
+  /// No description provided for @creditExtensionJustificationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Justification:'**
+  String get creditExtensionJustificationLabel;
+
+  /// No description provided for @creditExtensionVoiceRecordingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice Recording'**
+  String get creditExtensionVoiceRecordingLabel;
+
+  /// No description provided for @creditExtensionNoWrittenJustificationMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No written justification provided'**
+  String get creditExtensionNoWrittenJustificationMessage;
+
+  /// No description provided for @creditExtensionApprovalDetailsCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval Details'**
+  String get creditExtensionApprovalDetailsCardTitle;
+
+  /// No description provided for @creditExtensionApprovedQuantityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved Quantity'**
+  String get creditExtensionApprovedQuantityLabel;
+
+  /// No description provided for @creditExtensionApprovedByLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved By'**
+  String get creditExtensionApprovedByLabel;
+
+  /// No description provided for @creditExtensionApprovedAtLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved At'**
+  String get creditExtensionApprovedAtLabel;
+
+  /// No description provided for @creditExtensionValidUntilLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid Until'**
+  String get creditExtensionValidUntilLabel;
+
+  /// No description provided for @creditExtensionUsageBreakdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Breakdown'**
+  String get creditExtensionUsageBreakdownLabel;
+
+  /// No description provided for @creditExtensionReservedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserved'**
+  String get creditExtensionReservedLabel;
+
+  /// No description provided for @creditExtensionConsumedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumed'**
+  String get creditExtensionConsumedLabel;
+
+  /// No description provided for @creditExtensionRemainingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get creditExtensionRemainingLabel;
+
+  /// No description provided for @creditExtensionRejectionDetailsCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection Details'**
+  String get creditExtensionRejectionDetailsCardTitle;
+
+  /// No description provided for @creditExtensionCreateRequestPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Credit Extension'**
+  String get creditExtensionCreateRequestPageTitle;
+
+  /// No description provided for @creditExtensionSelectItemCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Item'**
+  String get creditExtensionSelectItemCardTitle;
+
+  /// No description provided for @creditExtensionSelectItemHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an item'**
+  String get creditExtensionSelectItemHintText;
+
+  /// No description provided for @creditExtensionSelectItemValidationMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select an item'**
+  String get creditExtensionSelectItemValidationMessage;
+
+  /// No description provided for @creditExtensionQuotaInformationCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quota Information'**
+  String get creditExtensionQuotaInformationCardTitle;
+
+  /// No description provided for @creditExtensionAvailableBalanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Balance'**
+  String get creditExtensionAvailableBalanceLabel;
+
+  /// No description provided for @creditExtensionCreditLimitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit Limit'**
+  String get creditExtensionCreditLimitLabel;
+
+  /// No description provided for @creditExtensionMaxRequestableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Requestable'**
+  String get creditExtensionMaxRequestableLabel;
+
+  /// No description provided for @creditExtensionQuantityHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter quantity'**
+  String get creditExtensionQuantityHintText;
+
+  /// No description provided for @creditExtensionQuantityRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter quantity'**
+  String get creditExtensionQuantityRequiredError;
+
+  /// No description provided for @creditExtensionQuantityGreaterThanZeroError.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity must be greater than 0'**
+  String get creditExtensionQuantityGreaterThanZeroError;
+
+  /// No description provided for @creditExtensionAudioJustificationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Justification (Required)'**
+  String get creditExtensionAudioJustificationLabel;
+
+  /// No description provided for @creditExtensionRecordButtonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Record'**
+  String get creditExtensionRecordButtonLabel;
+
+  /// No description provided for @creditExtensionStopButtonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get creditExtensionStopButtonLabel;
+
+  /// No description provided for @creditExtensionPlayButtonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get creditExtensionPlayButtonLabel;
+
+  /// No description provided for @creditExtensionPauseButtonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get creditExtensionPauseButtonLabel;
+
+  /// No description provided for @creditExtensionDeleteAudioTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete audio'**
+  String get creditExtensionDeleteAudioTooltip;
+
+  /// No description provided for @creditExtensionRecordingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording...'**
+  String get creditExtensionRecordingStatus;
+
+  /// No description provided for @creditExtensionAudioRecordedSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio recorded successfully'**
+  String get creditExtensionAudioRecordedSuccessMessage;
+
+  /// No description provided for @creditExtensionTextJustificationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Text Justification (Required)'**
+  String get creditExtensionTextJustificationLabel;
+
+  /// No description provided for @creditExtensionTextJustificationHintText.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain why you need this extension'**
+  String get creditExtensionTextJustificationHintText;
+
+  /// No description provided for @creditExtensionTextJustificationRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Text justification is required'**
+  String get creditExtensionTextJustificationRequiredError;
+
+  /// No description provided for @creditExtensionTextJustificationMinError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please provide at least 10 characters'**
+  String get creditExtensionTextJustificationMinError;
+
+  /// No description provided for @creditExtensionListeningStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening... Tap microphone to stop'**
+  String get creditExtensionListeningStatus;
+
+  /// No description provided for @creditExtensionSubmitRequestButtonText.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Request'**
+  String get creditExtensionSubmitRequestButtonText;
+
+  /// No description provided for @gmCreditApprovalsPendingApprovalsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Approvals'**
+  String get gmCreditApprovalsPendingApprovalsTitle;
+
+  /// No description provided for @gmCreditApprovalsNoApprovalsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Pending Approvals'**
+  String get gmCreditApprovalsNoApprovalsEmptyTitle;
+
+  /// No description provided for @gmCreditApprovalsAllProcessedEmptyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'All credit extension requests have been processed'**
+  String get gmCreditApprovalsAllProcessedEmptyDescription;
+
+  /// No description provided for @gmCreditExtensionDetailPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit Extension Request'**
+  String get gmCreditExtensionDetailPageTitle;
+
+  /// No description provided for @gmCreditExtensionRequestSummaryCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Summary'**
+  String get gmCreditExtensionRequestSummaryCardTitle;
+
+  /// No description provided for @gmCreditExtensionLiveQuotaSnapshotCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Quota Snapshot'**
+  String get gmCreditExtensionLiveQuotaSnapshotCardTitle;
+
+  /// No description provided for @gmCreditExtensionQuotaHistoryCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'7-Day Quota History'**
+  String get gmCreditExtensionQuotaHistoryCardTitle;
+
+  /// No description provided for @gmCreditExtensionExtensionHistoryCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Extension History (Same Item)'**
+  String get gmCreditExtensionExtensionHistoryCardTitle;
+
+  /// No description provided for @gmCreditExtensionApproveRequestDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve Request'**
+  String get gmCreditExtensionApproveRequestDialogTitle;
+
+  /// No description provided for @gmCreditExtensionApproveRequestDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Set approved quantity and expiry date:'**
+  String get gmCreditExtensionApproveRequestDescription;
+
+  /// No description provided for @gmCreditExtensionValidUntilDialogLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid Until (Optional)'**
+  String get gmCreditExtensionValidUntilDialogLabel;
+
+  /// No description provided for @gmCreditExtensionSelectDatePlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date'**
+  String get gmCreditExtensionSelectDatePlaceholder;
+
+  /// No description provided for @gmCreditExtensionRejectRequestDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject Request'**
+  String get gmCreditExtensionRejectRequestDialogTitle;
+
+  /// No description provided for @gmCreditExtensionSelectRejectionReasonDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Select rejection reason:'**
+  String get gmCreditExtensionSelectRejectionReasonDescription;
+
+  /// No description provided for @quotaSnapshotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quota Status'**
+  String get quotaSnapshotTitle;
+
+  /// No description provided for @quotaSnapshotLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading quota data...'**
+  String get quotaSnapshotLoading;
+
+  /// No description provided for @quotaSnapshotSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing with SDMS...'**
+  String get quotaSnapshotSyncing;
+
+  /// No description provided for @quotaSnapshotRequestCreditExtension.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Credit Extension'**
+  String get quotaSnapshotRequestCreditExtension;
+
+  /// No description provided for @quotaSnapshotViewHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'View History'**
+  String get quotaSnapshotViewHistory;
+
+  /// No description provided for @quotaSnapshotBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'BLOCKED'**
+  String get quotaSnapshotBlocked;
+
+  /// No description provided for @quotaSnapshotNoQuotaAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'NO Quota Available'**
+  String get quotaSnapshotNoQuotaAvailable;
+
+  /// No description provided for @quotaSnapshotKeyBalancesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'KEY BALANCES'**
+  String get quotaSnapshotKeyBalancesTitle;
+
+  /// No description provided for @quotaSnapshotTransactionDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'TRANSACTION DETAILS'**
+  String get quotaSnapshotTransactionDetailsTitle;
+
+  /// No description provided for @quotaSnapshotOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get quotaSnapshotOpening;
+
+  /// No description provided for @quotaSnapshotAdjustment.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment'**
+  String get quotaSnapshotAdjustment;
+
+  /// No description provided for @quotaSnapshotOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders'**
+  String get quotaSnapshotOrders;
+
+  /// No description provided for @quotaSnapshotPickups.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickups'**
+  String get quotaSnapshotPickups;
+
+  /// No description provided for @quotaSnapshotReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'Returns'**
+  String get quotaSnapshotReturns;
+
+  /// No description provided for @quotaSnapshotSdmsSales.
+  ///
+  /// In en, this message translates to:
+  /// **'SDMS Sales'**
+  String get quotaSnapshotSdmsSales;
+
+  /// No description provided for @quotaSnapshotClosing.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing'**
+  String get quotaSnapshotClosing;
+
+  /// No description provided for @quotaSnapshotHowCalculated.
+  ///
+  /// In en, this message translates to:
+  /// **'HOW IT\'S CALCULATED'**
+  String get quotaSnapshotHowCalculated;
+
+  /// No description provided for @quotaSnapshotNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data available'**
+  String get quotaSnapshotNoData;
+
+  /// No description provided for @quotaSnapshotSyncButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync SDMS'**
+  String get quotaSnapshotSyncButton;
+
+  /// No description provided for @quotaSnapshotSyncingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing...'**
+  String get quotaSnapshotSyncingButton;
+
+  /// No description provided for @quotaSnapshotLastSyncedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced:'**
+  String get quotaSnapshotLastSyncedLabel;
+
+  /// No description provided for @quotaSnapshotSyncStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'SYNC STATUS'**
+  String get quotaSnapshotSyncStatusTitle;
+
+  /// No description provided for @quotaSnapshotCompanySyncDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Sync Details'**
+  String get quotaSnapshotCompanySyncDetailsTitle;
+
+  /// No description provided for @quotaSnapshotCanSyncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Can sync now'**
+  String get quotaSnapshotCanSyncNow;
+
+  /// No description provided for @quotaSnapshotSyncResponseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'SDMS Sync Response'**
+  String get quotaSnapshotSyncResponseTitle;
+
+  /// No description provided for @quotaSnapshotCompanyStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Status:'**
+  String get quotaSnapshotCompanyStatusLabel;
+
+  /// No description provided for @quotaSnapshotStatusAllSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'All companies processed'**
+  String get quotaSnapshotStatusAllSynced;
+
+  /// No description provided for @quotaSnapshotStatusPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial sync - some companies have issues'**
+  String get quotaSnapshotStatusPartial;
+
+  /// No description provided for @quotaSnapshotStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed'**
+  String get quotaSnapshotStatusFailed;
+
+  /// No description provided for @bonusFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get bonusFilterAll;
+
+  /// No description provided for @bonusFilterActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get bonusFilterActive;
+
+  /// No description provided for @bonusFilterConsumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumed'**
+  String get bonusFilterConsumed;
+
+  /// No description provided for @bonusFilterExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get bonusFilterExpired;
+
+  /// No description provided for @bonusEmptyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'No active bonuses'**
+  String get bonusEmptyActive;
+
+  /// No description provided for @bonusEmptyConsumed.
+  ///
+  /// In en, this message translates to:
+  /// **'No consumed bonuses'**
+  String get bonusEmptyConsumed;
+
+  /// No description provided for @bonusEmptyExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'No expired bonuses'**
+  String get bonusEmptyExpired;
+
+  /// No description provided for @bonusEmptyGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'No bonuses found'**
+  String get bonusEmptyGeneric;
+
+  /// No description provided for @bonusDetailEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned'**
+  String get bonusDetailEarned;
+
+  /// No description provided for @bonusDetailExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires'**
+  String get bonusDetailExpires;
+
+  /// No description provided for @bonusDetailChipRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get bonusDetailChipRemaining;
+
+  /// No description provided for @bonusDetailDaysRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'days remaining'**
+  String get bonusDetailDaysRemaining;
+
+  /// No description provided for @bonusDetailSchemeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus Scheme'**
+  String get bonusDetailSchemeTitle;
+
+  /// No description provided for @bonusMetricPickups.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickups'**
+  String get bonusMetricPickups;
+
+  /// No description provided for @bonusMetricReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'Returns'**
+  String get bonusMetricReturns;
+
+  /// No description provided for @bonusMetricNetPickups.
+  ///
+  /// In en, this message translates to:
+  /// **'Net Pickups'**
+  String get bonusMetricNetPickups;
+
+  /// No description provided for @bonusMetricOtpSales.
+  ///
+  /// In en, this message translates to:
+  /// **'OTP Sales'**
+  String get bonusMetricOtpSales;
+
+  /// No description provided for @bonusMetricOverrideSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Override Sales'**
+  String get bonusMetricOverrideSales;
+
+  /// No description provided for @bonusMetricConfirmedSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed Sales'**
+  String get bonusMetricConfirmedSales;
+
+  /// No description provided for @bonusMetricPostingRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Posting Ratio'**
+  String get bonusMetricPostingRatio;
+
+  /// No description provided for @bonusMetricBonusCalculated.
+  ///
+  /// In en, this message translates to:
+  /// **'Bonus Calculated'**
+  String get bonusMetricBonusCalculated;
+
+  /// No description provided for @bonusSchemesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No bonus schemes available'**
+  String get bonusSchemesEmpty;
+
+  /// No description provided for @quotaHistoryFilterLast7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 Days'**
+  String get quotaHistoryFilterLast7Days;
+
+  /// No description provided for @quotaHistoryFilterLast30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 Days'**
+  String get quotaHistoryFilterLast30Days;
+
+  /// No description provided for @quotaHistoryFilterThisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This Month'**
+  String get quotaHistoryFilterThisMonth;
+
+  /// No description provided for @quotaHistoryFilterLastMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Month'**
+  String get quotaHistoryFilterLastMonth;
+
+  /// No description provided for @quotaHistoryFilterCustomRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Range...'**
+  String get quotaHistoryFilterCustomRange;
+
+  /// No description provided for @quotaHistoryErrorLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load history'**
+  String get quotaHistoryErrorLoadFailed;
+
+  /// No description provided for @quotaHistoryEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No history found'**
+  String get quotaHistoryEmptyTitle;
+
+  /// No description provided for @quotaHistoryEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No quota history available for this period'**
+  String get quotaHistoryEmptyMessage;
+
+  /// No description provided for @inventoryFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get inventoryFilterAll;
+
+  /// No description provided for @inventoryFilterPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get inventoryFilterPending;
+
+  /// No description provided for @inventoryFilterCollect.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect'**
+  String get inventoryFilterCollect;
+
+  /// No description provided for @inventoryFilterDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit'**
+  String get inventoryFilterDeposit;
+
+  /// No description provided for @ordersFilterNotDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Delivered'**
+  String get ordersFilterNotDelivered;
+
+  /// No description provided for @ordersFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get ordersFilterAll;
+
+  /// No description provided for @ordersFilterDateRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Date Range'**
+  String get ordersFilterDateRange;
+
+  /// No description provided for @ordersCardRequestedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Req By:'**
+  String get ordersCardRequestedBy;
+
+  /// No description provided for @ordersNoVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Vehicle'**
+  String get ordersNoVehicle;
+
+  /// No description provided for @ordersNoWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'No Warehouse'**
+  String get ordersNoWarehouse;
+
+  /// No description provided for @ordersCardQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty:'**
+  String get ordersCardQuantity;
+
+  /// No description provided for @ordersCardCreatedDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Created:'**
+  String get ordersCardCreatedDate;
+
+  /// No description provided for @vehicleHistoryPhoneCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get vehicleHistoryPhoneCopied;
+
+  /// No description provided for @vehicleHistoryLastVisitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last visit:'**
+  String get vehicleHistoryLastVisitLabel;
+
+  /// No description provided for @vehicleHistoryErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading history'**
+  String get vehicleHistoryErrorTitle;
+
+  /// No description provided for @vehicleHistoryEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No history found'**
+  String get vehicleHistoryEmptyTitle;
+
+  /// No description provided for @vehicleHistoryEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This vehicle has no previous visits recorded'**
+  String get vehicleHistoryEmptyMessage;
+
+  /// No description provided for @vehicleHistorySummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle Summary'**
+  String get vehicleHistorySummaryTitle;
+
+  /// No description provided for @vehicleHistoryTotalVisitsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Visits'**
+  String get vehicleHistoryTotalVisitsLabel;
+
+  /// No description provided for @vehicleHistoryUniqueDriversLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique Drivers'**
+  String get vehicleHistoryUniqueDriversLabel;
+
+  /// No description provided for @vehicleHistoryDriverHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver History'**
+  String get vehicleHistoryDriverHistoryTitle;
+
+  /// No description provided for @vehicleHistoryDriverDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver Details'**
+  String get vehicleHistoryDriverDetailsTitle;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

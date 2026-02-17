@@ -7,6 +7,7 @@ import '../../blocs/bonus_list/bonus_list_state.dart';
 import '../../widgets/bonus/bonus_list_item_card.dart';
 import '../../widgets/bonus/bonus_summary_stats_card.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../l10n/l10n_extensions.dart';
 import '../../../presentation/routes/app_routes.dart';
 import '../../../core/constants/app_colors.dart';
 
@@ -29,10 +30,10 @@ class _BonusListPageState extends State<BonusListPage> with SingleTickerProvider
   String _selectedStatus = 'all';
 
   final List<Map<String, String>> _statusTabs = [
-    {'status': 'all', 'label': 'All'},
-    {'status': 'active', 'label': 'Active'},
-    {'status': 'consumed', 'label': 'Consumed'},
-    {'status': 'expired', 'label': 'Expired'},
+    {'status': 'all', 'labelKey': 'bonusFilterAll'},
+    {'status': 'active', 'labelKey': 'bonusFilterActive'},
+    {'status': 'consumed', 'labelKey': 'bonusFilterConsumed'},
+    {'status': 'expired', 'labelKey': 'bonusFilterExpired'},
   ];
 
   @override
@@ -118,7 +119,7 @@ class _BonusListPageState extends State<BonusListPage> with SingleTickerProvider
             fontSize: 14.sp,
             fontWeight: FontWeight.normal,
           ),
-          tabs: _statusTabs.map((tab) => Tab(text: tab['label'])).toList(),
+          tabs: _statusTabs.map((tab) => Tab(text: context.l10n.translate(tab['labelKey']!))).toList(),
         ),
       ),
       body: BlocBuilder<BonusListBloc, BonusListState>(
@@ -143,7 +144,7 @@ class _BonusListPageState extends State<BonusListPage> with SingleTickerProvider
                       context.read<BonusListBloc>().add(const LoadBonusList());
                     },
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
+                    label: Text(context.l10n.translate('commonRetryButton')),
                   ),
                 ],
               ),
@@ -174,7 +175,7 @@ class _BonusListPageState extends State<BonusListPage> with SingleTickerProvider
                             Icon(Icons.inbox_outlined, size: 60.sp, color: Colors.grey),
                             SizedBox(height: 16.h),
                             Text(
-                              _getEmptyMessage(_selectedStatus),
+                              _getEmptyMessage(context, _selectedStatus),
                               style: TextStyle(fontSize: 14.sp, color: Colors.grey),
                             ),
                           ],
@@ -226,16 +227,16 @@ class _BonusListPageState extends State<BonusListPage> with SingleTickerProvider
     );
   }
 
-  String _getEmptyMessage(String status) {
+  String _getEmptyMessage(BuildContext context, String status) {
     switch (status) {
       case 'active':
-        return 'No active bonuses';
+        return context.l10n.translate('bonusEmptyActive');
       case 'consumed':
-        return 'No consumed bonuses';
+        return context.l10n.translate('bonusEmptyConsumed');
       case 'expired':
-        return 'No expired bonuses';
+        return context.l10n.translate('bonusEmptyExpired');
       default:
-        return 'No bonuses found';
+        return context.l10n.translate('bonusEmptyGeneric');
     }
   }
 }
