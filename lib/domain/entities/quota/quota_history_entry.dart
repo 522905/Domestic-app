@@ -45,6 +45,27 @@ class QuotaHistoryEntry extends Equatable {
   /// Confirmed sales = OTP + Override
   int get confirmedSales => otpSales + overrideSales;
 
+  /// Calculate posting ratio for this day
+  /// Posting ratio = What % of net pickups were confirmed as OTP sales
+  /// Formula: (OTP Sales / Net Pickups) * 100
+  /// ALWAYS calculates from daily data (ignores backend value which may be incorrect)
+  double? get calculatedPostingRatio {
+    // ALWAYS calculate from daily data (backend values are incorrect)
+    final netPickupCount = netPickups; // pickups - returns
+
+    // If no pickups, return 0%
+    if (netPickupCount <= 0) {
+      return 0.0;
+    }
+
+    // Calculate ratio using OTP sales (confirmed sales)
+    // Based on data: Feb 7 (0 OTP / 20 pickups = 0%), Feb 6 (1 OTP / 19 pickups = 5%)
+    final ratio = (otpSales / netPickupCount) * 100;
+
+    // Cap at 100% to avoid display issues
+    return ratio > 100 ? 100.0 : ratio;
+  }
+
   /// Formatted date string (e.g., "Jan 20, 2026")
   String get formattedDate => DateFormat('MMM d, yyyy').format(entryDate);
 
@@ -53,9 +74,10 @@ class QuotaHistoryEntry extends Equatable {
 
   /// Posting ratio color indicator
   PostingRatioColor get ratioColor {
-    if (postingRatio == null) return PostingRatioColor.neutral;
-    if (postingRatio! >= 90.0) return PostingRatioColor.good;
-    if (postingRatio! >= 80.0) return PostingRatioColor.moderate;
+    final ratio = calculatedPostingRatio;
+    if (ratio == null) return PostingRatioColor.neutral;
+    if (ratio >= 90.0) return PostingRatioColor.good;
+    if (ratio >= 80.0) return PostingRatioColor.moderate;
     return PostingRatioColor.poor;
   }
 

@@ -17,6 +17,71 @@ class QuotaBadge extends StatelessWidget {
     final status = quota.status;
     final config = _getBadgeConfig(status);
 
+    // Check if extension indicator should be shown
+    if (quota.hasActiveExtension && quota.extensionAvailable > 0) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Regular quota badge
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+            decoration: BoxDecoration(
+              color: config.backgroundColor,
+              borderRadius: BorderRadius.circular(4.r),
+              border: Border.all(
+                color: config.borderColor,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  config.icon,
+                  size: 12.sp,
+                  color: config.textColor,
+                ),
+                SizedBox(width: 4.w),
+                Text(
+                  config.text,
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                    color: config.textColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 4.w),
+          // Extension indicator
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade700,
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.card_giftcard, color: Colors.white, size: 10.sp),
+                SizedBox(width: 3.w),
+                Text(
+                  '+${quota.extensionAvailable}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Regular badge without extension
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
       decoration: BoxDecoration(

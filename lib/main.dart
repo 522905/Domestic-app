@@ -14,13 +14,17 @@ import 'package:lpg_distribution_app/presentation/blocs/orders/orders_bloc.dart'
 import 'package:lpg_distribution_app/presentation/blocs/sdms/create/sdms_create_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/sdms/transaction/sdms_transaction_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/digital_credit/digital_credit_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/sdms_claims/sdms_claims_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/quota/quota_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/vehicle/vehicle_bloc.dart';
 import 'package:lpg_distribution_app/presentation/blocs/defect_inspection/defect_inspection_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/credit_extension/credit_extension_list_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/active_extensions/active_extensions_bloc.dart';
+import 'package:lpg_distribution_app/presentation/blocs/gm_credit_approvals/gm_credit_approvals_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/splash_screen.dart';
 import 'package:lpg_distribution_app/presentation/routes/app_routes.dart';
 import 'package:lpg_distribution_app/core/services/defect_service.dart';
-import 'package:lpg_distribution_app/core/network/api_client.dart';
+// import 'package:lpg_distribution_app/core/network/api_client.dart';  // Unused
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -171,6 +175,11 @@ void main() async {
                   apiService: context.read<ApiServiceInterface>(),
                 ),
               ),
+              BlocProvider<SdmsClaimsBloc>(
+                create: (context) => SdmsClaimsBloc(
+                  apiService: context.read<ApiServiceInterface>(),
+                ),
+              ),
               BlocProvider<QuotaBloc>(
                 create: (context) => QuotaBloc(
                   apiService: context.read<ApiServiceInterface>(),
@@ -184,6 +193,21 @@ void main() async {
                   final defectService = DefectService(apiClient);
                   return DefectInspectionBloc(defectService: defectService);
                 },
+              ),
+              BlocProvider<CreditExtensionListBloc>(
+                create: (context) => CreditExtensionListBloc(
+                  apiService: context.read<ApiServiceInterface>(),
+                ),
+              ),
+              BlocProvider<ActiveExtensionsBloc>(
+                create: (context) => ActiveExtensionsBloc(
+                  apiService: context.read<ApiServiceInterface>(),
+                ),
+              ),
+              BlocProvider<GmCreditApprovalsBloc>(
+                create: (context) => GmCreditApprovalsBloc(
+                  apiService: context.read<ApiServiceInterface>(),
+                ),
               ),
             ],
             child: const MyApp(),

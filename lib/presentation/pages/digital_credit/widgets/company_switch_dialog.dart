@@ -124,10 +124,7 @@ class CompanySwitchDialog extends StatelessWidget {
                       color: canSwitch ? const Color(0xFF0E5CA8) : Colors.grey,
                     ),
                     onTap: canSwitch
-                        ? () {
-                            Navigator.pop(context);
-                            onSwitch(companyId);
-                          }
+                        ? () => onSwitch(companyId)
                         : null,
                   ),
                 );

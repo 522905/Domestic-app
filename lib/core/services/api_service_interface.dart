@@ -1,14 +1,16 @@
 // lib/core/services/api_service_interface.dart
-import 'dart:ffi';
+// import 'dart:ffi';  // Unused
+// import 'dart:io';  // Unused
 
 import '../../data/models/sdms/sdms_transaction.dart';
-import '../../domain/entities/warehouse.dart';
+// import '../../domain/entities/warehouse.dart';  // Unused
 import '../../domain/entities/quota/quota_snapshot.dart';
+import '../../domain/entities/credit_extension/credit_extension_context.dart';
 import '../models/inventory/inventory_request.dart';
 import '../models/purchase_invoice/api_response.dart';
-import '../models/purchase_invoice/driver.dart';
+// import '../models/purchase_invoice/driver.dart';  // Unused
 import '../models/purchase_invoice/purchase_invoice.dart';
-import '../models/purchase_invoice/vehicle_history.dart';
+// import '../models/purchase_invoice/vehicle_history.dart';  // Unused
 import 'User.dart';
 
 abstract class ApiServiceInterface {
@@ -103,11 +105,13 @@ abstract class ApiServiceInterface {
   Future<List<int>> thermalPrintStockRequest(
     String requestId,
     String formatType,
-    String deviceMacAddress,
+    String deviceIdentifier,
+    int paperWidthMm,
   );
   Future<List<int>> thermalPrintPaymentRequest(
     String transactionId,
-    String deviceMacAddress,
+    String deviceIdentifier,
+    int paperWidthMm,
   );
 
   // Document methods
@@ -223,6 +227,44 @@ abstract class ApiServiceInterface {
   Future<Map<String, dynamic>> approveClaimTransfer(String id);
   Future<Map<String, dynamic>> rejectClaimTransfer(String id, {String? reason});
 
+  // SDMS Claims methods (Draft v3)
+  // Hot fix 2026-02-12: Added isBeneficiary filter parameter
+  Future<Map<String, dynamic>> getSdmsOrders({
+    String tab = 'active',
+    int page = 1,
+    String? search,
+    bool? isBeneficiary,
+  });
+
+  // Backwards compatibility - filter methods for unclaimed browse
+  Future<Map<String, dynamic>> getSdmsClaimsOrders({
+    String? orderCategory,
+    String? dataStatus,
+    String? claimStatus,
+    String? settlementStatus,
+    String? source,
+    String? fromDate,
+    String? toDate,
+    bool? isMine,
+  });
+
+  Future<Map<String, dynamic>> getSdmsClaimsOrderDetail(String id);
+  Future<Map<String, dynamic>> createSdmsClaimsOrder({
+    required String orderId,
+    bool claimForSelf = true,
+    int? intendedPartner,
+    String? consumerNumber,
+  });
+  Future<Map<String, dynamic>> claimSdmsOrder(String id);
+  Future<Map<String, dynamic>> retrySdmsOrder(String id);
+  Future<Map<String, dynamic>> switchOrderCompany(String id, int companyId);
+
+  // Draft v3: Order-level transfer actions
+  Future<Map<String, dynamic>> approveOrderTransfer(String orderId);
+  Future<Map<String, dynamic>> rejectOrderTransfer(String orderId, {String? reason});
+
+  Future<Map<String, dynamic>> getPartners({String? search});
+
   // Quota methods
   Future<QuotaSnapshot> getQuotaSnapshot();
   Future<Map<String, dynamic>> triggerQuotaSync();
@@ -251,6 +293,42 @@ abstract class ApiServiceInterface {
     int pageSize = 20,
   });
   Future<Map<String, dynamic>> getBonusDetail(int id);
+
+  // Credit Extension methods - Partner
+  Future<Map<String, dynamic>> createCreditExtension({
+    required String itemCode,
+    required int requestedQuantity,
+    required String justification,
+    String? audioPath,  // Optional audio file path
+  });
+
+  Future<Map<String, dynamic>> getCreditExtensions({
+    String? status,
+    int page = 1,
+    int pageSize = 20,
+  });
+
+  Future<Map<String, dynamic>> getCreditExtensionDetail(int id);
+  Future<Map<String, dynamic>> getActiveCreditExtensions();
+
+  // Credit Extension methods - GM
+  Future<Map<String, dynamic>> getPendingCreditExtensions({
+    int? partnerId,
+    String? itemCode,
+  });
+
+  Future<Map<String, dynamic>> approveCreditExtension({
+    required int extensionId,
+    required int approvedQuantity,
+    DateTime? validUntil,
+  });
+
+  Future<Map<String, dynamic>> rejectCreditExtension({
+    required int extensionId,
+    required String rejectionReason,
+  });
+
+  Future<CreditExtensionContext> getCreditExtensionContext(int id);
 
   Future<Map<String, dynamic>> checkAppVersion();
   Future<Map<String, dynamic>> getWarehouseStock({String? warehouseId});

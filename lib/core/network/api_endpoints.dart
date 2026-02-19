@@ -1,10 +1,10 @@
-import 'package:dio/dio.dart';
+// import 'package:dio/dio.dart';  // Unused
 
 class ApiEndpoints {
   final String baseUrl;
 
-  final String tempUrl = 'https://lpg.ops.arungas.com';
-  // final String tempUrl = 'http://192.168.171.24:9900';
+  // final String tempUrl = 'https://lpg.ops.arungas.com';
+  final String tempUrl = 'http://192.168.171.59:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
@@ -134,6 +134,45 @@ class ApiEndpoints {
   String claimTransferApprove(String id) => '$tempUrl/sdms-ops/api/claim-transfers/$id/approve/';
   String claimTransferReject(String id) => '$tempUrl/sdms-ops/api/claim-transfers/$id/reject/';
 
+  // SDMS Claims endpoints (Draft v3)
+  // Hot fix 2026-02-12: Added isBeneficiary filter parameter
+  String sdmsOrders({
+    String tab = 'active',
+    int page = 1,
+    String? search,
+    bool? isBeneficiary,
+  }) {
+    final params = <String, String>{};
+    params['tab'] = tab;
+
+    if (tab == 'history') {
+      params['page'] = page.toString();
+    }
+
+    if (search != null && search.isNotEmpty) {
+      params['search'] = search;
+    }
+
+    if (isBeneficiary != null) {
+      params['is_beneficiary'] = isBeneficiary.toString();
+    }
+
+    final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    return '$tempUrl/api/sdms-claims/orders/?$query';
+  }
+
+  String sdmsClaimsOrderDetail(String id) => '$tempUrl/api/sdms-claims/orders/$id/';
+  String sdmsClaimsOrderClaim(String id) => '$tempUrl/api/sdms-claims/orders/$id/claim/';
+  String sdmsClaimsOrderRetry(String id) => '$tempUrl/api/sdms-claims/orders/$id/retry/';
+  String sdmsClaimsSwitchCompany(String id) => '$tempUrl/api/sdms-claims/orders/$id/switch-company/';
+
+  // Draft v3: Order-level transfer actions
+  String approveOrderTransfer(String orderId) => '$tempUrl/api/sdms-claims/orders/$orderId/approve-transfer/';
+  String rejectOrderTransfer(String orderId) => '$tempUrl/api/sdms-claims/orders/$orderId/reject-transfer/';
+  String cancelOrderTransfer(String orderId) => '$tempUrl/api/sdms-claims/orders/$orderId/cancel-transfer/'; // For future use
+
+  String get sdmsClaimsPartners => '$tempUrl/api/users/api/masters/partners/';
+
   // Quota endpoints
   String get quotaLiveSnapshot => '$tempUrl/api/quotas/live-snapshot/';
   String get quotaSync => '$tempUrl/api/quotas/sync/';
@@ -146,6 +185,15 @@ class ApiEndpoints {
   String get bonusSchemes => '$tempUrl/api/quotas/bonus-schemes/';
   String bonusDetail(int id) => '$tempUrl/api/quotas/bonuses/$id/';
   String get bonuses => '$tempUrl/api/quotas/bonuses/';
+
+  // Credit Extension endpoints
+  String get creditExtensions => '$tempUrl/api/quotas/credit-extensions/';
+  String creditExtensionDetail(int id) => '$tempUrl/api/quotas/credit-extensions/$id/';
+  String get creditExtensionsActive => '$tempUrl/api/quotas/credit-extensions/active/';
+  String get creditExtensionsPending => '$tempUrl/api/quotas/credit-extensions/pending/';
+  String creditExtensionApprove(int id) => '$tempUrl/api/quotas/credit-extensions/$id/approve/';
+  String creditExtensionReject(int id) => '$tempUrl/api/quotas/credit-extensions/$id/reject/';
+  String creditExtensionContext(int id) => '$tempUrl/api/quotas/credit-extensions/$id/context/';
 
   // In your endpoints class
   String get warehouseStock => '$tempUrl/api/stocks/warehouse-balance/';

@@ -11,6 +11,7 @@ import '../models/inventory/inventory_request.dart';
 import '../models/purchase_invoice/api_response.dart';
 import '../models/purchase_invoice/purchase_invoice.dart';
 import '../../domain/entities/quota/quota_snapshot.dart';
+import '../../domain/entities/credit_extension/credit_extension_context.dart';
 import '../network/api_client.dart';
 import 'api_service_interface.dart';
 
@@ -597,33 +598,19 @@ class ApiService implements ApiServiceInterface {
       if ( response.statusCode == 200) {
         final data = response.data;
 
-        // Update tokens with new access token (refresh stays same)
-        await User().saveTokens(
-          token: data['access'],
-          refreshToken: refreshToken, // Keep existing refresh token
+        // Use saveSession to update all user data including photo_url
+        await User().saveSession(
+          access: data['access'],
+          refresh: refreshToken, // Keep existing refresh token
+          user: Map<String, dynamic>.from(data['user']),
+          company: Map<String, dynamic>.from(data['company']),
+          novu: data['novu'],
         );
-
-        // Save company info from API response (not selectedCompany)
-        await User().saveCompany(
-          companyId: data['company']['id'],
-          companyName: data['company']['name'],
-          companyShortCode: data['company']['short_code'],
-          sdmsUserCode: data['company']['sdms_user_code'],
-        );
-
-        // After saving company info, add this if novu exists in response
-        if (data.containsKey('novu') && data['novu'] != null) {
-          await User().saveNovu(
-            applicationIdentifier: data['novu']['applicationIdentifier'] ?? '',
-            subscriberId: data['novu']['subscriberId'] ?? '',
-            subscriberHash: data['novu']['subscriberHash'],
-          );
-        }
 
         // Update API client token for future requests
         await apiClient.setToken(data['access']);
       } else {
-        throw Exception('Failed to switch company: ${response?.statusMessage}');
+        throw Exception('Failed to switch company: ${response.statusMessage}');
       }
     } catch (e) {
       // Let the calling widget handle UI error display
@@ -1406,7 +1393,6 @@ class ApiService implements ApiServiceInterface {
   }
 
   // In ApiService.dart
-  @override
   Future<Map<String, dynamic>> updateOrderStatus(String orderId, Map<String, dynamic> statusData) async {
     try {
       final response = await apiClient.put(
@@ -1476,7 +1462,6 @@ class ApiService implements ApiServiceInterface {
 
   @override
   Future<InventoryRequest> updateInventoryRequestObject(String id, InventoryRequest request) {
-    // TODO: implement updateInventoryRequestObject
     throw UnimplementedError();
   }
 
@@ -1962,6 +1947,207 @@ class ApiService implements ApiServiceInterface {
   }
 
   // ============================================================================
+  // SDMS CLAIMS METHODS (Draft v3)
+  // ============================================================================
+
+  @override
+  Future<Map<String, dynamic>> getSdmsOrders({
+    String tab = 'active',
+    int page = 1,
+    String? search,
+    bool? isBeneficiary,
+  }) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.sdmsOrders(
+          tab: tab,
+          page: page,
+          search: search,
+          isBeneficiary: isBeneficiary,
+        ),
+      );
+
+      // API returns array directly, wrap it in a Map with 'results' key
+      if (response.data is List) {
+        return {'results': response.data};
+      }
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  // Backwards compatibility - keep old method for unclaimed browse
+  @override
+  Future<Map<String, dynamic>> getSdmsClaimsOrders({
+    String? orderCategory,
+    String? dataStatus,
+    String? claimStatus,
+    String? settlementStatus,
+    String? source,
+    String? fromDate,
+    String? toDate,
+    bool? isMine,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (orderCategory != null) queryParams['order_category'] = orderCategory;
+      if (dataStatus != null) queryParams['data_status'] = dataStatus;
+      if (claimStatus != null) queryParams['claim_status'] = claimStatus;
+      if (settlementStatus != null) queryParams['settlement_status'] = settlementStatus;
+      if (source != null) queryParams['source'] = source;
+      if (fromDate != null) queryParams['from_date'] = fromDate;
+      if (toDate != null) queryParams['to_date'] = toDate;
+      if (isMine != null) queryParams['is_mine'] = isMine.toString();
+
+      final response = await apiClient.get(
+        apiClient.endpoints.sdmsOrders(),
+        queryParameters: queryParams,
+      );
+
+      // API returns array directly, wrap it in a Map with 'results' key
+      if (response.data is List) {
+        return {'results': response.data};
+      }
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getSdmsClaimsOrderDetail(String id) async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.sdmsClaimsOrderDetail(id));
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> createSdmsClaimsOrder({
+    required String orderId,
+    bool claimForSelf = true,
+    int? intendedPartner,
+    String? consumerNumber,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'order_id': orderId,
+        'claim_for_self': claimForSelf,
+      };
+      if (!claimForSelf && intendedPartner != null) {
+        data['intended_partner'] = intendedPartner;
+      }
+      if (consumerNumber != null && consumerNumber.isNotEmpty) {
+        data['consumer_number'] = consumerNumber;
+      }
+
+      final response = await apiClient.post(
+        apiClient.endpoints.sdmsOrders(),
+        data: data,
+      );
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> claimSdmsOrder(String id) async {
+    try {
+      final response = await apiClient.post(apiClient.endpoints.sdmsClaimsOrderClaim(id));
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> retrySdmsOrder(String id) async {
+    try {
+      final response = await apiClient.post(apiClient.endpoints.sdmsClaimsOrderRetry(id));
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> switchOrderCompany(String id, int companyId) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.sdmsClaimsSwitchCompany(id),
+        data: {'company_id': companyId},
+      );
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  // Draft v3: Order-level transfer actions
+  @override
+  Future<Map<String, dynamic>> approveOrderTransfer(String orderId) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.approveOrderTransfer(orderId),
+        data: {},
+      );
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> rejectOrderTransfer(String orderId, {String? reason}) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.rejectOrderTransfer(orderId),
+        data: reason != null ? {'reason': reason} : {},
+      );
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getPartners({String? search}) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+
+      final response = await apiClient.get(
+        apiClient.endpoints.sdmsClaimsPartners,
+        queryParameters: queryParams,
+      );
+
+      // API returns array directly, wrap in 'results' key
+      if (response.data is List) {
+        return {'results': response.data};
+      }
+      return response.data;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  // ============================================================================
   // QUOTA METHODS
   // ============================================================================
 
@@ -2148,6 +2334,221 @@ class ApiService implements ApiServiceInterface {
     }
   }
 
+  // ============================================================================
+  // CREDIT EXTENSION METHODS
+  // ============================================================================
+
+  @override
+  Future<Map<String, dynamic>> createCreditExtension({
+    required String itemCode,
+    required int requestedQuantity,
+    required String justification,
+    String? audioPath,
+  }) async {
+    try {
+      dynamic data;
+
+      if (audioPath != null && audioPath.isNotEmpty) {
+        // Use FormData for multipart upload when audio is provided
+        data = FormData.fromMap({
+          'item_code': itemCode,
+          'requested_quantity': requestedQuantity,
+          'justification': justification,
+          'justification_audio': await MultipartFile.fromFile(
+            audioPath,
+            filename: 'audio_${DateTime.now().millisecondsSinceEpoch}.m4a',
+          ),
+        });
+      } else {
+        // Use regular JSON data when no audio
+        data = {
+          'item_code': itemCode,
+          'requested_quantity': requestedQuantity,
+          'justification': justification,
+        };
+      }
+
+      final response = await apiClient.post(
+        apiClient.endpoints.creditExtensions,
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getCreditExtensions({
+    String? status,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
+
+      if (status != null) {
+        queryParams['status'] = status;
+      }
+
+      final response = await apiClient.get(
+        apiClient.endpoints.creditExtensions,
+        queryParameters: queryParams,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getCreditExtensionDetail(int id) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.creditExtensionDetail(id),
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getActiveCreditExtensions() async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.creditExtensionsActive,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getPendingCreditExtensions({
+    int? partnerId,
+    String? itemCode,
+  }) async {
+    try {
+      final queryParams = <String, String>{};
+
+      if (partnerId != null) {
+        queryParams['partner_id'] = partnerId.toString();
+      }
+      if (itemCode != null) {
+        queryParams['item_code'] = itemCode;
+      }
+
+      final response = await apiClient.get(
+        apiClient.endpoints.creditExtensionsPending,
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> approveCreditExtension({
+    required int extensionId,
+    required int approvedQuantity,
+    DateTime? validUntil,
+  }) async {
+    try {
+      final Map<String, dynamic> data = {
+        'approved_quantity': approvedQuantity,
+      };
+
+      if (validUntil != null) {
+        data['valid_until'] = _formatDate(validUntil);
+      }
+
+      final endpoint = apiClient.endpoints.creditExtensionApprove(extensionId);
+      debugPrint('🔵 API CALL: Approve Credit Extension');
+      debugPrint('📍 Endpoint: $endpoint');
+      debugPrint('📤 Data: $data');
+
+      final response = await apiClient.post(
+        endpoint,
+        data: data,
+      );
+
+      debugPrint('✅ Success: ${response.statusCode}');
+      debugPrint('📥 Response: ${response.data}');
+
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      debugPrint('❌ Approve Credit Extension Error: $error');
+      if (error is DioException) {
+        debugPrint('📍 Failed Endpoint: ${error.requestOptions.uri}');
+        debugPrint('📤 Request Data: ${error.requestOptions.data}');
+        debugPrint('📥 Response: ${error.response?.data}');
+        debugPrint('🔢 Status Code: ${error.response?.statusCode}');
+      }
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> rejectCreditExtension({
+    required int extensionId,
+    required String rejectionReason,
+  }) async {
+    try {
+      final data = {
+        'reason': rejectionReason,
+      };
+
+      final endpoint = apiClient.endpoints.creditExtensionReject(extensionId);
+      debugPrint('🔴 API CALL: Reject Credit Extension');
+      debugPrint('📍 Endpoint: $endpoint');
+      debugPrint('📤 Data: $data');
+
+      final response = await apiClient.post(
+        endpoint,
+        data: data,
+      );
+
+      debugPrint('✅ Success: ${response.statusCode}');
+      debugPrint('📥 Response: ${response.data}');
+
+      return response.data as Map<String, dynamic>;
+    } catch (error) {
+      debugPrint('❌ Reject Credit Extension Error: $error');
+      if (error is DioException) {
+        debugPrint('📍 Failed Endpoint: ${error.requestOptions.uri}');
+        debugPrint('📤 Request Data: ${error.requestOptions.data}');
+        debugPrint('📥 Response: ${error.response?.data}');
+        debugPrint('🔢 Status Code: ${error.response?.statusCode}');
+      }
+      _handleError(error);
+      rethrow;
+    }
+  }
+
+  Future<CreditExtensionContext> getCreditExtensionContext(int id) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.creditExtensionContext(id),
+      );
+      return CreditExtensionContext.fromJson(response.data);
+    } catch (error) {
+      _handleError(error);
+      rethrow;
+    }
+  }
+
   // @override
   Future<Map<String, dynamic>> getERVCalculation({
     required String supplierGstin,
@@ -2181,14 +2582,21 @@ class ApiService implements ApiServiceInterface {
   Future<List<int>> thermalPrintStockRequest(
     String requestId,
     String formatType,
-    String deviceMacAddress,
+    String deviceIdentifier, // Can be MAC address OR device ID like 'SUNMI-V2S'
+    int paperWidthMm, // 58mm for Sunmi, 80mm for MLP 360
   ) async {
     try {
+      // Determine printer profile based on device identifier
+      final printerProfile = deviceIdentifier.toUpperCase().contains('SUNMI')
+          ? 'sunmi_v2s'
+          : 'tvs_mlp360';
+
       final response = await apiClient.post(
         apiClient.endpoints.thermalPrintStockRequest(requestId),
         data: {
           'format_type': formatType,
-          'device_mac_address': deviceMacAddress,
+          'device_mac_address': deviceIdentifier.toUpperCase().contains('SUNMI') ? "" : deviceIdentifier,
+          'printer_profile': printerProfile,
         },
         options: Options(
           responseType: ResponseType.bytes,
@@ -2233,13 +2641,15 @@ class ApiService implements ApiServiceInterface {
   @override
   Future<List<int>> thermalPrintPaymentRequest(
     String transactionId,
-    String deviceMacAddress,
+    String deviceIdentifier, // Can be MAC address OR device ID like 'SUNMI-V2S'
+    int paperWidthMm, // 58mm for Sunmi, 80mm for MLP 360
   ) async {
     try {
       final response = await apiClient.post(
         apiClient.endpoints.thermalPrintPaymentRequest(transactionId),
         data: {
-          'device_mac_address': deviceMacAddress,
+          'device_id': deviceIdentifier,
+          'paper_width_mm': paperWidthMm,
         },
         options: Options(
           responseType: ResponseType.bytes,

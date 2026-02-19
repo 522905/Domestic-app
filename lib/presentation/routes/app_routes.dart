@@ -17,12 +17,16 @@ import '../pages/purchase_invoice/purchase_invoice_details_screen.dart';
 import '../pages/purchase_invoice/purchase_invoice_screen.dart';
 import '../pages/digital_credit/digital_credits_list_page.dart';
 import '../pages/digital_credit/credit_detail_page.dart';
+import '../pages/sdms_claims/sdms_claims_main_page.dart';
+import '../pages/sdms_claims/order_entry_page.dart';
+import '../pages/sdms_claims/order_detail_page.dart';
 import '../pages/quota/quota_snapshot_page.dart';
 import '../pages/bonus/bonus_schemes_page.dart';
 import '../pages/bonus/bonus_list_page.dart';
 import '../pages/bonus/bonus_detail_page.dart';
 import '../blocs/orders/orders_bloc.dart';
 import '../blocs/digital_credit/digital_credit_bloc.dart';
+import '../blocs/sdms_claims/sdms_claims_bloc.dart';
 import '../blocs/bonus_schemes/bonus_schemes_bloc.dart';
 import '../blocs/bonus_schemes/bonus_schemes_event.dart';
 import '../blocs/bonus_list/bonus_list_bloc.dart';
@@ -64,6 +68,9 @@ class AppRoutes {
   static const String bonusSchemes = 'bonus-schemes';
   static const String bonusList = 'bonus-list';
   static const String bonusDetail = 'bonus-detail';
+
+  // Profile route
+  static const String profile = '/profile';
 
   // Company-aware navigation handler
   static Future<void> navigateWithCompanyCheck(
@@ -389,10 +396,46 @@ class AppRoutes {
         }
         return _errorRoute();
 
+      // SDMS CLAIMS ROUTES
+      case 'sdms-claims':
+        if (segments.length == 1) {
+          // /sdms-claims → Main tabbed page
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<SdmsClaimsBloc>(context),
+              child: const SdmsClaimsMainPage(),
+            ),
+          );
+        } else if (segments[1] == 'entry') {
+          // /sdms-claims/entry → Order Entry Page
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<SdmsClaimsBloc>(context),
+              child: const OrderEntryPage(),
+            ),
+          );
+        } else if (segments[1] == 'order' && segments.length == 3) {
+          // /sdms-claims/order/abc123 → Order Detail
+          final orderId = segments[2];
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider.value(
+              value: BlocProvider.of<SdmsClaimsBloc>(context),
+              child: OrderDetailPage(orderId: orderId),
+            ),
+          );
+        }
+        return _errorRoute();
+
       case 'quota':
         // /quota → Quota Snapshot Page
         return MaterialPageRoute(
           builder: (_) => const QuotaSnapshotPage(),
+        );
+
+      case 'profile':
+        // /profile → MainContainer with profile tab (index 4)
+        return MaterialPageRoute(
+          builder: (_) => const MainContainer(initialTab: 4),
         );
 
       // BONUS ROUTES

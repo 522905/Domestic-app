@@ -13,6 +13,9 @@ class ApiClient {
 
   final VersionManager _versionManager = VersionManager();
 
+  // Expose Dio instance for services that need direct access (like transcription)
+  Dio get dio => _dio;
+
   Future<void> init(String baseUrl) async {
     if (_isInitialized) return;
 

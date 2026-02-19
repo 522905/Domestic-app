@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:intl/intl.dart';
 import 'package:lpg_distribution_app/core/models/inventory/inventory_request.dart';
-import 'package:lpg_distribution_app/core/services/printer_service.dart';
+import 'package:lpg_distribution_app/core/services/printer/printer_manager.dart';
+import 'package:lpg_distribution_app/core/services/printer/printer_interface.dart';
+import 'package:lpg_distribution_app/core/services/printer/printer_type.dart';
+import 'package:lpg_distribution_app/core/services/printer/bluetooth_printer_service.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
 
-import '../core/services/User.dart';
 import '../core/services/api_service_interface.dart';
 import '../core/services/service_provider.dart';
 import '../presentation/widgets/professional_snackbar.dart';
@@ -24,7 +25,10 @@ class GatepassDialog extends StatefulWidget {
 }
 
 class _GatepassDialogState extends State<GatepassDialog> {
-  final PrinterService _printerService = PrinterService();
+  final PrinterManager _printerManager = PrinterManager();
+  PrinterInterface? _printer;
+  PrinterType? _printerType;
+  bool _isInitializing = true;
   bool _isThermalPrintingChallan = false;
   bool _isThermalPrintingSlip = false;
   late ApiServiceInterface _apiService;
@@ -38,7 +42,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
   @override
   void initState() {
     super.initState();
-    _checkConnectionStatus();
+    _initPrinter();
     _listenToAdapterState();
     _initApiService();
   }
@@ -47,32 +51,101 @@ class _GatepassDialogState extends State<GatepassDialog> {
     _apiService = await ServiceProvider.getApiService();
   }
 
+  Future<void> _initPrinter() async {
+    if (!mounted) return;
+    setState(() => _isInitializing = true);
+
+    try {
+      await _printerManager.initialize();
+      _printer = await _printerManager.getPrinter();
+
+      if (_printer == null) {
+        debugPrint('GatepassDialog: Printer initialization failed - printer is null');
+        if (mounted) {
+          setState(() => _isInitializing = false);
+        }
+        return;
+      }
+
+      _printerType = _printer!.printerType;
+      debugPrint('GatepassDialog: Detected printer type: $_printerType');
+
+      // For Sunmi, auto-connect
+      if (_printerType == PrinterType.sunmi) {
+        final connected = await _printer!.connect();
+        if (mounted) {
+          setState(() {
+            _isConnected = connected;
+          });
+        }
+        debugPrint('GatepassDialog: Sunmi printer connected: $connected');
+      } else {
+        // For Bluetooth, check existing connection
+        _checkConnectionStatus();
+      }
+    } catch (e) {
+      debugPrint('GatepassDialog: Printer initialization error: $e');
+      if (mounted) {
+        setState(() {
+          _printer = null;
+          _printerType = null;
+          _isConnected = false;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
+    }
+  }
+
+  void _checkConnectionStatus() {
+    // Only for Bluetooth
+    if (_printer is BluetoothPrinterService) {
+      setState(() {
+        _isConnected = (_printer as BluetoothPrinterService).isConnected;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _scanSubscription?.cancel();
     _adapterStateSubscription?.cancel();
-    FlutterBluePlus.stopScan();
+    // Only stop Bluetooth scan if we were using Bluetooth
+    if (_printerType != PrinterType.sunmi) {
+      try {
+        FlutterBluePlus.stopScan();
+      } catch (e) {
+        debugPrint('GatepassDialog: Error stopping Bluetooth scan: $e');
+      }
+    }
     super.dispose();
   }
 
   void _listenToAdapterState() {
+    // Only listen to Bluetooth adapter state if we're not on Sunmi
+    // Sunmi devices don't need Bluetooth monitoring
     _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
+      if (_printerType == PrinterType.sunmi) return; // Skip for Sunmi
       if (state != BluetoothAdapterState.on && _isScanning) {
-        setState(() {
-          _isScanning = false;
-          _printers.clear();
-        });
+        if (mounted) {
+          setState(() {
+            _isScanning = false;
+            _printers.clear();
+          });
+        }
       }
     });
   }
 
-  void _checkConnectionStatus() {
-    setState(() {
-      _isConnected = _printerService.isConnected;
-    });
-  }
-
   Future<void> _scanForPrinters({StateSetter? dialogSetState}) async {
+    // Don't scan if we're on Sunmi device
+    if (_printerType == PrinterType.sunmi) {
+      debugPrint('GatepassDialog: Scan not available on Sunmi device');
+      return;
+    }
+
     if (_isScanning) return;
 
     void refreshDialog() {
@@ -172,7 +245,24 @@ class _GatepassDialogState extends State<GatepassDialog> {
         setState(() => _isScanning = false);
       }
 
+      // Check if printer is available and is Bluetooth type
+      if (_printer == null) {
+        if (mounted) {
+          context.showErrorSnackBar('Printer not initialized');
+        }
+        return;
+      }
+
+      if (_printer is! BluetoothPrinterService) {
+        debugPrint('GatepassDialog: Printer is not BluetoothPrinterService, type: ${_printer.runtimeType}');
+        if (mounted) {
+          context.showErrorSnackBar('Cannot connect: Wrong printer type');
+        }
+        return;
+      }
+
       // Show loading
+      if (!mounted) return;
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -181,16 +271,20 @@ class _GatepassDialogState extends State<GatepassDialog> {
         ),
       );
 
-      final success = await _printerService.connectToPrinter(device);
+      // Safe cast to BluetoothPrinterService
+      final bluetoothPrinter = _printer as BluetoothPrinterService;
+      final success = await bluetoothPrinter.connectToPrinter(device);
 
       // Close loading dialog
       if (mounted) Navigator.pop(context);
 
       if (success) {
-        setState(() {
-          _isConnected = true;
-          _connectedDevice = device;
-        });
+        if (mounted) {
+          setState(() {
+            _isConnected = true;
+            _connectedDevice = device;
+          });
+        }
 
         // Close printer selection dialog
         if (mounted) Navigator.pop(context);
@@ -205,9 +299,15 @@ class _GatepassDialogState extends State<GatepassDialog> {
       }
     } catch (e) {
       // Close loading dialog if still open
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        try {
+          Navigator.pop(context);
+        } catch (_) {
+          // Dialog already closed
+        }
+      }
 
-      debugPrint('Connection error: $e');
+      debugPrint('GatepassDialog: Connection error: $e');
       if (mounted) {
         context.showErrorSnackBar('Connection error: $e');
       }
@@ -215,6 +315,12 @@ class _GatepassDialogState extends State<GatepassDialog> {
   }
 
   void _showPrinterDialog() {
+    // Don't show printer dialog on Sunmi devices (they auto-connect)
+    if (_printerType == PrinterType.sunmi) {
+      debugPrint('GatepassDialog: Printer dialog not needed on Sunmi device');
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -303,7 +409,9 @@ class _GatepassDialogState extends State<GatepassDialog> {
   }
 
   Future<void> _disconnectPrinter() async {
-    await _printerService.disconnectPrinter();
+    if (_printer != null) {
+      await _printer!.disconnect();
+    }
     setState(() {
       _isConnected = false;
       _connectedDevice = null;
@@ -322,36 +430,42 @@ class _GatepassDialogState extends State<GatepassDialog> {
       return;
     }
 
-    // Check printer connection
-    if (!_printerService.isConnected) {
+    // Check printer availability
+    if (_printer == null) {
+      if (mounted) {
+        context.showErrorSnackBar('Printer not initialized');
+      }
+      return;
+    }
+
+    // Check connection
+    if (!_printer!.currentStatus.isConnected) {
       if (mounted) {
         context.showErrorSnackBar('Please connect to printer first');
       }
       return;
     }
 
-    final macAddress = _printerService.connectedDeviceMacAddress;
-    if (macAddress == null) {
-      if (mounted) {
-        context.showErrorSnackBar('Unable to get printer MAC address');
-      }
-      return;
-    }
-
+    if (!mounted) return;
     setState(() => _isThermalPrintingChallan = true);
 
     try {
-      // Step 1: Fetch binary ESC/POS data from API
+      debugPrint('GatepassDialog: Printing challan via ${_printer!.printerType}');
+      debugPrint('GatepassDialog: Device ID: ${_printer!.deviceIdentifier}');
+      debugPrint('GatepassDialog: Paper width: ${_printer!.paperWidthMm}mm');
+
+      // Fetch binary data from API with device info
       final binaryData = await _apiService.thermalPrintStockRequest(
         widget.request.id,
         'gatepass',
-        macAddress,
+        _printer!.deviceIdentifier,
+        _printer!.paperWidthMm,
       );
 
-      debugPrint('Received ${binaryData.length} bytes from API');
+      debugPrint('GatepassDialog: Received ${binaryData.length} bytes from API');
 
-      // Step 2: Send binary data to printer
-      final success = await _printerService.printBinaryData(binaryData);
+      // Print via current printer (Bluetooth or Sunmi)
+      final success = await _printer!.printBinaryData(binaryData);
 
       if (mounted) {
         if (success) {
@@ -361,6 +475,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
         }
       }
     } catch (e) {
+      debugPrint('GatepassDialog: Print error: $e');
       if (mounted) {
         context.showErrorSnackBar(
           'Failed to print: ${e.toString().replaceAll('Exception: ', '')}'
@@ -382,36 +497,42 @@ class _GatepassDialogState extends State<GatepassDialog> {
       return;
     }
 
-    // Check printer connection
-    if (!_printerService.isConnected) {
+    // Check printer availability
+    if (_printer == null) {
+      if (mounted) {
+        context.showErrorSnackBar('Printer not initialized');
+      }
+      return;
+    }
+
+    // Check connection
+    if (!_printer!.currentStatus.isConnected) {
       if (mounted) {
         context.showErrorSnackBar('Please connect to printer first');
       }
       return;
     }
 
-    final macAddress = _printerService.connectedDeviceMacAddress;
-    if (macAddress == null) {
-      if (mounted) {
-        context.showErrorSnackBar('Unable to get printer MAC address');
-      }
-      return;
-    }
-
+    if (!mounted) return;
     setState(() => _isThermalPrintingSlip = true);
 
     try {
-      // Step 1: Fetch binary ESC/POS data from API
+      debugPrint('GatepassDialog: Printing slip via ${_printer!.printerType}');
+      debugPrint('GatepassDialog: Device ID: ${_printer!.deviceIdentifier}');
+      debugPrint('GatepassDialog: Paper width: ${_printer!.paperWidthMm}mm');
+
+      // Fetch binary data from API with device info
       final binaryData = await _apiService.thermalPrintStockRequest(
         widget.request.id,
         'warehouse_slip',
-        macAddress,
+        _printer!.deviceIdentifier,
+        _printer!.paperWidthMm,
       );
 
-      debugPrint('Received ${binaryData.length} bytes from API');
+      debugPrint('GatepassDialog: Received ${binaryData.length} bytes from API');
 
-      // Step 2: Send binary data to printer
-      final success = await _printerService.printBinaryData(binaryData);
+      // Print via current printer (Bluetooth or Sunmi)
+      final success = await _printer!.printBinaryData(binaryData);
 
       if (mounted) {
         if (success) {
@@ -421,6 +542,7 @@ class _GatepassDialogState extends State<GatepassDialog> {
         }
       }
     } catch (e) {
+      debugPrint('GatepassDialog: Print error: $e');
       if (mounted) {
         context.showErrorSnackBar(
           'Failed to print: ${e.toString().replaceAll('Exception: ', '')}'
@@ -435,6 +557,62 @@ class _GatepassDialogState extends State<GatepassDialog> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitializing) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // If printer initialization failed completely
+    if (_printer == null || _printerType == null) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 48.sp,
+                color: Colors.orange,
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                'Printer Initialization Failed',
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade900,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                'Unable to detect printer. Please restart the app.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              ElevatedButton.icon(
+                onPressed: () => _initPrinter(),
+                icon: Icon(Icons.refresh, size: 18.sp),
+                label: Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0E5CA8),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.all(16.w),
@@ -443,76 +621,177 @@ class _GatepassDialogState extends State<GatepassDialog> {
           children: [
             Row(
               children: [
-                    Icon(
-                        Icons.print,
-                        size: 20.sp,
-                        color: const Color(0xFF0E5CA8),
+                Icon(
+                  Icons.print,
+                  size: 20.sp,
+                  color: const Color(0xFF0E5CA8),
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  'Print Gatepass',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0E5CA8),
                   ),
-                  SizedBox(width: 8.w),
-                      Text(
-                          'Print Gatepass',
-                          style: TextStyle(
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF0E5CA8),
-                          ),
-                      ),
-                  ],
+                ),
+              ],
             ),
             SizedBox(height: 10.h),
-            Container(
-              padding: EdgeInsets.all(6.w),
-              decoration: BoxDecoration(
-                color: _isConnected ? Colors.green.shade50 : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(
-                  color: _isConnected ? Colors.green.shade200 : Colors.grey.shade300,
+            // Route based on printer type
+            if (_printerType == PrinterType.sunmi)
+              _buildSunmiPrintUI()
+            else
+              _buildBluetoothPrintUI(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSunmiPrintUI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Sunmi status indicator
+        Container(
+          padding: EdgeInsets.all(12.w),
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(color: Colors.green.shade200),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.print, size: 20.sp, color: Colors.green),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  'Sunmi Built-in Printer Ready',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-                    size: 20.sp,
-                    color: _isConnected ? Colors.green : Colors.grey,
-                  ),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: Text(
-                      _isConnected
-                          ? 'Connected to ${_connectedDevice?.platformName ?? "Printer"}'
-                          : 'Printer not connected',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: _isConnected ? Colors.green.shade700 : Colors.grey.shade700,
-                      ),
-                    ),
-                  ),
-                  OutlinedButton(
-                    onPressed: _isConnected ? _disconnectPrinter : _showPrinterDialog,
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16.r),
-                      ),
-                    ),
-                    child: Text(
-                      _isConnected ? 'Disconnect' : 'Connect',
-                      style: TextStyle(fontSize: 11.sp),
-                    ),
-                  ),
-                ],
-              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 16.h),
+        // Print buttons based on request type
+        _buildPrintButtons(),
+      ],
+    );
+  }
+
+  Widget _buildBluetoothPrintUI() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Connection status container
+        Container(
+          padding: EdgeInsets.all(6.w),
+          decoration: BoxDecoration(
+            color: _isConnected ? Colors.green.shade50 : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(
+              color: _isConnected ? Colors.green.shade200 : Colors.grey.shade300,
             ),
-            SizedBox(height: 16.h),
-            // Show different buttons based on request type
-            if (widget.request.requestType.toUpperCase() == 'DEPOSIT')
-              // Single button for DEPOSIT requests
-              SizedBox(
-                width: double.infinity,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                size: 20.sp,
+                color: _isConnected ? Colors.green : Colors.grey,
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  _isConnected
+                      ? 'Connected to ${_connectedDevice?.platformName ?? "Printer"}'
+                      : 'Printer not connected',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: _isConnected ? Colors.green.shade700 : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              OutlinedButton(
+                onPressed: _isConnected ? _disconnectPrinter : _showPrinterDialog,
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                ),
+                child: Text(
+                  _isConnected ? 'Disconnect' : 'Connect',
+                  style: TextStyle(fontSize: 11.sp),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 16.h),
+        // Print buttons based on request type
+        _buildPrintButtons(),
+      ],
+    );
+  }
+
+  Widget _buildPrintButtons() {
+    return Column(
+      children: [
+        // Show different buttons based on request type
+        if (widget.request.requestType.toUpperCase() == 'DEPOSIT')
+          // Single button for DEPOSIT requests
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isConnected &&
+                         !_isThermalPrintingChallan &&
+                         widget.request.status.toUpperCase() == 'APPROVED'
+                  ? _handleThermalPrintChallan
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0E5CA8),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24.r),
+                ),
+              ),
+              child: _isThermalPrintingChallan
+                  ? SizedBox(
+                      height: 20.h,
+                      width: 20.w,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.w,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.print_outlined, size: 18.sp),
+                        SizedBox(width: 8.w),
+                        Text('THERMAL PRINT', style: TextStyle(fontSize: 14.sp)),
+                      ],
+                    ),
+            ),
+          )
+        else
+          // Two buttons for COLLECT requests
+          Row(
+            children: [
+              Expanded(
                 child: ElevatedButton(
                   onPressed: _isConnected &&
                              !_isThermalPrintingChallan &&
+                             !_isThermalPrintingSlip &&
                              widget.request.status.toUpperCase() == 'APPROVED'
                       ? _handleThermalPrintChallan
                       : null,
@@ -539,93 +818,51 @@ class _GatepassDialogState extends State<GatepassDialog> {
                           children: [
                             Icon(Icons.print_outlined, size: 18.sp),
                             SizedBox(width: 8.w),
-                            Text('THERMAL PRINT', style: TextStyle(fontSize: 14.sp)),
+                            Text('THERMAL CHALLAN', style: TextStyle(fontSize: 12.sp)),
                           ],
                         ),
                 ),
-              )
-            else
-              // Two buttons for COLLECT requests
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isConnected &&
-                                 !_isThermalPrintingChallan &&
-                                 !_isThermalPrintingSlip &&
-                                 widget.request.status.toUpperCase() == 'APPROVED'
-                          ? _handleThermalPrintChallan
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E5CA8),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24.r),
-                        ),
-                      ),
-                      child: _isThermalPrintingChallan
-                          ? SizedBox(
-                              height: 20.h,
-                              width: 20.w,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.w,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.print_outlined, size: 18.sp),
-                                SizedBox(width: 8.w),
-                                Text('THERMAL CHALLAN', style: TextStyle(fontSize: 12.sp)),
-                              ],
-                            ),
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isConnected &&
-                                 !_isThermalPrintingChallan &&
-                                 !_isThermalPrintingSlip &&
-                                 widget.request.status.toUpperCase() == 'APPROVED'
-                          ? _handleThermalPrintSlip
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E5CA8),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24.r),
-                        ),
-                      ),
-                      child: _isThermalPrintingSlip
-                          ? SizedBox(
-                              height: 20.h,
-                              width: 20.w,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.w,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.print_outlined, size: 18.sp),
-                                SizedBox(width: 8.w),
-                                Text('THERMAL SLIP', style: TextStyle(fontSize: 14.sp)),
-                              ],
-                            ),
-                    ),
-                  ),
-                ],
               ),
-          ],
-        ),
-      ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _isConnected &&
+                             !_isThermalPrintingChallan &&
+                             !_isThermalPrintingSlip &&
+                             widget.request.status.toUpperCase() == 'APPROVED'
+                      ? _handleThermalPrintSlip
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0E5CA8),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24.r),
+                    ),
+                  ),
+                  child: _isThermalPrintingSlip
+                      ? SizedBox(
+                          height: 20.h,
+                          width: 20.w,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.w,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.print_outlined, size: 18.sp),
+                            SizedBox(width: 8.w),
+                            Text('THERMAL SLIP', style: TextStyle(fontSize: 14.sp)),
+                          ],
+                        ),
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }

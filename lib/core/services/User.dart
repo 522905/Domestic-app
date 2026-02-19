@@ -1,7 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:shared_preferences/shared_preferences.dart';  // Unused
 
 class UserRole {
   final String role;
@@ -101,6 +101,9 @@ class User {
   static const String _novuAppIdKey = 'novu_app_id';
   static const String _novuSubscriberIdKey = 'novu_subscriber_id';
   static const String _novuSubscriberHashKey = 'novu_subscriber_hash';
+
+  // Profile photo key
+  static const String _photoUrlKey = 'photo_url';
 
   Future<void> saveTokens({
     required String token,
@@ -202,6 +205,17 @@ class User {
       await _storage.write(key: 'phone_number', value: user['phone_number'] ?? '');
       await _storage.write(key: 'email', value: user['email'] ?? '');
 
+      // Save photo URL if available
+      if (user['photo_url'] != null && user['photo_url'].toString().isNotEmpty) {
+        final photoUrlValue = user['photo_url'].toString();
+        print('DEBUG: Saving photo URL: $photoUrlValue');
+        await _storage.write(key: _photoUrlKey, value: photoUrlValue);
+      } else {
+        print('DEBUG: Photo URL not available in user data');
+        // Clear any existing photo URL if not provided
+        await _storage.delete(key: _photoUrlKey);
+      }
+
       // Handle roles properly - convert array of objects to JSON string
       if (user['roles'] != null) {
         final roles = user["roles"].values.toList();
@@ -269,6 +283,12 @@ class User {
 
   Future<String?> getUserEmail() async {
     return _storage.read(key: 'email');
+  }
+
+  Future<String?> getPhotoUrl() async {
+    final photoUrl = await _storage.read(key: _photoUrlKey);
+    print('DEBUG: Retrieved photo URL from storage: $photoUrl');
+    return photoUrl;
   }
 
   Future<List<UserRole>> getUserRoles() async {

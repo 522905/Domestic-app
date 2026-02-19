@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/orders/forms/create_sale_order_page.dart';
 import 'package:lpg_distribution_app/presentation/pages/cash/cash_page.dart';
 import '../../../core/services/User.dart';
+import '../../../core/services/api_service_interface.dart';
 import '../../../core/utils/global_drawer.dart';
 import '../../widgets/notification/inbox.dart';
 import '../../widgets/warehouse_stock_card_screen.dart';
@@ -13,6 +15,8 @@ import '../inventory/forms/collect_inventory_request_screen.dart';
 import '../inventory/forms/deposit_inventory_request_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../purchase_invoice/purchase_invoice_screen.dart';
+import '../credit_extension/gm_pending_approvals_page.dart';
+import '../orders/orders_page.dart';
 import 'package:lpg_distribution_app/l10n/app_localizations.dart';
 import 'package:lpg_distribution_app/l10n/l10n_extensions.dart';
 
@@ -31,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   UserCompany? activeCompany;
   String? novuAppId;
   String? novuSubscriberId;
+  String? _photoUrl;
 
   // Dashboard Statistics
   final Map<String, dynamic> _dashboardStats = {
@@ -42,9 +47,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Pending Approval Counts
   int _pendingInventoryApprovals = 0;
-  int _pendingCashApprovals = 3;
-  int _pendingOrderApprovals = 2;
+  int _pendingCashApprovals = 0;  // Changed from 3 to 0 (will show actual count)
+  int _pendingOrderApprovals = 0;  // Changed from 2 to 0 (will show actual count)
   int _pendingCSETickets = 15;
+  int _pendingCreditExtensions = 0;
 
   @override
   void initState() {
@@ -63,12 +69,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final userName = await User().getUserName();
       final userRole = await User().getUserRoles();
       final _activeCompany = await User().getActiveCompany();
+      final photoUrl = await User().getPhotoUrl();
 
       if (mounted) {
         setState(() {
           _userName = userName?.isNotEmpty == true ? userName : null;
           _userRoles = userRole.map((userRole) => userRole.role).toList();
           activeCompany = _activeCompany;
+          _photoUrl = photoUrl;
         });
       }
     } catch (e) {
@@ -123,6 +131,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _dashboardStats['total_cash_collected'] = 25000; // Calculate from cash list
       _dashboardStats['active_users'] = 45; // Get from user management
     });
+
+    // Fetch credit extension pending count for GM
+    if (_userRoles.contains('General Manager')) {
+      try {
+        final apiService = context.read<ApiServiceInterface>();
+        final response = await apiService.getPendingCreditExtensions();
+        final count = (response['results'] as List?)?.length ?? 0;
+        if (mounted) {
+          setState(() {
+            _pendingCreditExtensions = count;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading credit extension count: $e');
+      }
+    }
   }
 
   Future<void> _refreshDashboard() async {
@@ -285,6 +309,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 roleLine: _buildRoleLine(context),
                 pendingCount: _getTotalPendingCount(),
                 pendingLabel: _pendingApprovalLabel(context),
+                photoUrl: _photoUrl,
+                userName: _userName,
               ),
               SizedBox(height: 16.h),
               ..._buildRoleBasedContent(),
@@ -399,6 +425,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: Icons.add_circle_outline,
               color: Colors.orange,
               onTap: () => _navigateToInventoryCollect(),
+            ),
+            _buildActionCard(
+              title: 'SDMS Claims',
+              subtitle: 'Manage order claims',
+              icon: Icons.receipt_long,
+              color: const Color(0xFF6C63FF),
+              onTap: () => _navigateToSdmsClaims(),
+            ),
+            _buildActionCard(
+              title: 'My Performance',
+              subtitle: 'Track quota & bonuses',
+              icon: Icons.trending_up,
+              color: const Color(0xFF2ECC71),
+              onTap: () => _navigateToQuotaStatus(),
             ),
           ],
         ),
@@ -524,69 +564,158 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(l10n.translate('dashboardSystemOverviewTitle'), Icons.dashboard),
+        _buildSectionHeader('GM Dashboard', Icons.dashboard),
         SizedBox(height: 12.h),
 
-        // Quick Stats Row
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatsCard(
-                title: l10n.translate('dashboardTodaysOrdersLabel'),
-                value: _dashboardStats['today_orders'].toString(),
-                icon: Icons.shopping_cart,
-                color: const Color(0xFF0E5CA8),
-              ),
-            ),
-            SizedBox(width: 10.w),
-            Expanded(
-              child: _buildStatsCard(
-                title: l10n.translate('dashboardActiveUsersLabel'),
-                value: _dashboardStats['active_users'].toString(),
-                icon: Icons.people,
-                color: Colors.green,
-              ),
-            ),
-          ],
-        ),
-
-        SizedBox(height: 12.h),
-
-        // Approvals Overview
-        _buildSectionHeader(l10n.translate('dashboardAllApprovalsTitle'), Icons.approval, size: 16),
+        // Reports Section
+        _buildSectionHeader('Reports', Icons.assessment, size: 16),
         SizedBox(height: 10.h),
 
+        // Row 1: Cash Report, Inventory Report
         Row(
           children: [
             Expanded(
-              child: _buildApprovalSummaryCard(
-                title: l10n.translate('Inventory'),
-                count: _pendingInventoryApprovals,
-                color: Colors.blue,
-                onTap: () => _navigateToInventoryApprovals(),
-              ),
-            ),
-            SizedBox(width: 8.w),
-            Expanded(
-              child: _buildApprovalSummaryCard(
-                title: l10n.translate('Cash'),
-                count: _pendingCashApprovals,
+              child: _buildReportCard(
+                title: 'Cash Report',
+                icon: Icons.account_balance_wallet,
                 color: Colors.green,
-                onTap: () => _navigateToCashApprovals(),
+                isComingSoon: true,
               ),
             ),
             SizedBox(width: 8.w),
             Expanded(
-              child: _buildApprovalSummaryCard(
-                title: l10n.translate('Orders'),
-                count: _pendingOrderApprovals,
-                color: Colors.orange,
-                onTap: () => _navigateToOrderApprovals(),
+              child: _buildReportCard(
+                title: 'Inventory Report',
+                icon: Icons.inventory_2,
+                color: Colors.blue,
+                isComingSoon: true,
               ),
             ),
           ],
         ),
+
+        SizedBox(height: 8.h),
+
+        // Row 2: EOD Report, Credit Extension
+        Row(
+          children: [
+            Expanded(
+              child: _buildReportCard(
+                title: 'EOD Report',
+                icon: Icons.today,
+                color: Colors.orange,
+                isComingSoon: true,
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Expanded(
+              child: _buildReportCard(
+                title: 'Credit Extension',
+                icon: Icons.card_giftcard,
+                color: Colors.purple,
+                isComingSoon: false,
+                onTap: () => _navigateToCreditExtensions(),
+              ),
+            ),
+          ],
+        ),
+
+        SizedBox(height: 16.h),
+
+        // Management Section
+        _buildSectionHeader('Management', Icons.settings, size: 16),
+        SizedBox(height: 10.h),
+
+        // Procurement
+        _buildApprovalCard(
+          title: 'Procurement',
+          subtitle: 'Purchase Orders & Invoices',
+          count: 0,
+          icon: Icons.shopping_bag,
+          color: Colors.indigo,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PurchaseInvoiceScreen()),
+            );
+          },
+          showViewAll: true,
+        ),
+
+        SizedBox(height: 10.h),
+
+        // Warehouse Stock
+        const WarehouseStockCard(),
       ],
+    );
+  }
+
+  Widget _buildReportCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    bool isComingSoon = false,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: isComingSoon
+          ? () => _showSuccessSnackBar('$title - Coming Soon!')
+          : onTap,
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Icon(icon, color: color, size: 20.sp),
+                ),
+                Spacer(),
+                if (isComingSoon)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4.r),
+                    ),
+                    child: Text(
+                      'Soon',
+                      style: TextStyle(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1173,13 +1302,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navigateToOrderApprovals() {
-    // Navigate to order approvals screen
-    _showSuccessSnackBar(context.l10n.translate('dashboardOrderApprovalsComingSoon'));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const OrdersPage(),
+      ),
+    ).then((_) => _refreshDashboard());
   }
 
   void _navigateToCSETickets() {
     // Navigate to CSE tickets screen
     _showSuccessSnackBar(context.l10n.translate('dashboardCseTicketsComingSoon'));
+  }
+
+  void _navigateToCreditExtensions() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const GmPendingApprovalsPage(),
+      ),
+    ).then((_) => _refreshDashboard());
+  }
+
+  void _navigateToSdmsClaims() {
+    Navigator.pushNamed(context, '/sdms-claims/entry').then((_) => _refreshDashboard());
+  }
+
+  void _navigateToQuotaStatus() {
+    Navigator.pushNamed(context, '/quota').then((_) => _refreshDashboard());
   }
 
   // Helper methods
@@ -1197,6 +1347,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (_userRoles.contains('General Manager')) {
       total += _pendingOrderApprovals;
+      total += _pendingCreditExtensions;
     }
 
     if (_userRoles.contains('cse') || _userRoles.contains('General Manager')) {
@@ -1287,12 +1438,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     int? cashCount,
     int? orderCount,
     int? cseCount,
+    int? creditExtensionCount,
   }) {
     setState(() {
       if (inventoryCount != null) _pendingInventoryApprovals = inventoryCount;
       if (cashCount != null) _pendingCashApprovals = cashCount;
       if (orderCount != null) _pendingOrderApprovals = orderCount;
       if (cseCount != null) _pendingCSETickets = cseCount;
+      if (creditExtensionCount != null) _pendingCreditExtensions = creditExtensionCount;
     });
   }
 
@@ -1319,6 +1472,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             break;
           case 'cse':
             setState(() => _pendingCSETickets = count);
+            break;
+          case 'credit_extension':
+            setState(() => _pendingCreditExtensions = count);
             break;
         }
 

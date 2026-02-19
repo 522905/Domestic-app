@@ -46,6 +46,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? userVehicleNumber;
   String? userEmail;
   UserCompany? activeCompany;
+  String? photoUrl;
+  bool _imageLoadError = false;
 
   String _t(String key, {Map<String, String>? params}) =>
       context.l10n.translate(key, params: params?.values.toList());
@@ -85,6 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final _userPhoneNumber = await User().getUserPhoneNumber();
       final _userEmail = await User().getUserEmail();
       final _activeCompany = await User().getActiveCompany();
+      final _photoUrl = await User().getPhotoUrl();
 
       // Try to get additional data if available
       String? _userWarehouse;
@@ -106,8 +109,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           userEmail = _userEmail;
           userId = _userId;
           activeCompany = _activeCompany;
+          photoUrl = _photoUrl;
+          _imageLoadError = false; // Reset error flag
           _isLoading = false;
         });
+
+        // Debug logging
+        debugPrint('Profile loaded successfully');
+        debugPrint('User name: $_userName');
+        debugPrint('Photo URL: $_photoUrl');
       }
     } catch (e) {
       if (mounted) {
@@ -298,18 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            child: CircleAvatar(
-              radius: 50.r,
-              backgroundColor: const Color(0xFF0E5CA8),
-              child: Text(
-                _getInitials(userName ?? _t('profileActiveCompanyLabel')),
-                style: TextStyle(
-                  fontSize: 32.sp,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+            child: _buildProfileAvatar(),
           ),
           SizedBox(height: 16.h),
 
@@ -1073,6 +1072,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     }
+  }
+
+  Widget _buildProfileAvatar() {
+    final displayName = userName ?? _t('profileActiveCompanyLabel');
+    final hasPhotoUrl = photoUrl != null && photoUrl!.isNotEmpty && !_imageLoadError;
+
+    if (hasPhotoUrl) {
+      debugPrint('DEBUG: Building avatar with photo URL: $photoUrl');
+    } else {
+      debugPrint('DEBUG: Building avatar with initials (no photo URL or error occurred)');
+    }
+
+    return CircleAvatar(
+      radius: 50.r,
+      backgroundColor: const Color(0xFF0E5CA8),
+      backgroundImage: hasPhotoUrl ? NetworkImage(photoUrl!) : null,
+      onBackgroundImageError: hasPhotoUrl
+          ? (exception, stackTrace) {
+              debugPrint('DEBUG: Profile photo failed to load');
+              debugPrint('DEBUG: Photo URL was: $photoUrl');
+              debugPrint('DEBUG: Error: $exception');
+              debugPrint('DEBUG: StackTrace: $stackTrace');
+              // Schedule the state update for after this frame to avoid build cycle issues
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() => _imageLoadError = true);
+                }
+              });
+            }
+          : null,
+      child: !hasPhotoUrl
+          ? Text(
+              _getInitials(displayName),
+              style: TextStyle(
+                fontSize: 32.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )
+          : null,
+    );
   }
 
   String _getInitials(String name) {

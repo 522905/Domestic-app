@@ -1,13 +1,14 @@
-// Updated GlobalDrawer with proper SDMS navigation
+// GlobalDrawer
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../presentation/pages/profile/profile_screen.dart';
-import '../../presentation/pages/reports/reports_screen.dart';
-import '../../presentation/pages/sdms/sdms_transaction_list_page.dart';
-// Hidden for release build - Digital Credit not ready
-// import '../../presentation/pages/digital_credit/digital_credits_list_page.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../presentation/widgets/professional_snackbar.dart';
+import '../../presentation/routes/app_routes.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/User.dart';
+import '../../core/constants/app_colors_enhanced.dart';
+import '../../core/constants/spacing.dart';
+import '../../core/constants/text_styles.dart';
 import '../../presentation/blocs/vehicle/vehicle_bloc.dart';
 import '../../presentation/blocs/vehicle/vehicle_event.dart';
 import '../../presentation/blocs/orders/orders_bloc.dart';
@@ -40,18 +41,7 @@ class GlobalDrawer {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
-            ),
-            child: const Text(
-              'Services',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-              ),
-            ),
-          ),
+          const _UserProfileHeader(),
           ...menuItems,
         ],
       ),
@@ -76,6 +66,15 @@ class GlobalDrawer {
         title: const Text('My Bonuses'),
         onTap: () {
           Navigator.pushNamed(navigatorContext!, '/bonus-list');
+        },
+      ),
+
+      // SDMS Claims menu item
+      ListTile(
+        leading: const Icon(Icons.receipt_long),
+        title: const Text('SDMS Claims'),
+        onTap: () {
+          Navigator.pushNamed(navigatorContext!, '/sdms-claims');
         },
       ),
 
@@ -121,19 +120,19 @@ class GlobalDrawer {
         },
       ),
 
-      ListTile(
-        leading: const Icon(Icons.add_box_sharp),
-        title: const Text('SDMS Transactions'),
-
-        onTap: () {
-          Navigator.push(
-            navigatorContext!,
-            MaterialPageRoute(
-                builder: (context) => const SDMSTransactionListPage(),
-          ),
-          );
-        },
-      ),
+      // ListTile(
+      //   leading: const Icon(Icons.add_box_sharp),
+      //   title: const Text('SDMS Transactions'),
+      //
+      //   onTap: () {
+      //     Navigator.push(
+      //       navigatorContext!,
+      //       MaterialPageRoute(
+      //           builder: (context) => const SDMSTransactionListPage(),
+      //     ),
+      //     );
+      //   },
+      // ),
 
       ListTile(
         leading: const Icon(Icons.settings),
@@ -224,5 +223,235 @@ class GlobalDrawer {
     } catch (e) {
       context.showInfoSnackBar('Error logging out: $e');
     }
+  }
+}
+
+// Logout Confirmation Dialog
+class LogoutConfirmationDialog extends StatelessWidget {
+  final Future<void> Function() onLogout;
+
+  const LogoutConfirmationDialog({Key? key, required this.onLogout}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      title: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8.w),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.logout, color: Colors.red, size: 24.sp),
+          ),
+          SizedBox(width: 12.w),
+          const Text('Confirm Logout'),
+        ],
+      ),
+      content: const Text(
+        'Are you sure you want to logout?',
+        style: TextStyle(fontSize: 16),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'CANCEL',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            await onLogout();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+          ),
+          child: const Text(
+            'LOGOUT',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// User Profile Header Widget
+class _UserProfileHeader extends StatefulWidget {
+  const _UserProfileHeader({Key? key}) : super(key: key);
+
+  @override
+  State<_UserProfileHeader> createState() => _UserProfileHeaderState();
+}
+
+class _UserProfileHeaderState extends State<_UserProfileHeader> {
+  String? _userName;
+  String? _photoUrl;
+  String? _userRole;
+  bool _isLoading = true;
+  bool _imageLoadError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final userName = await User().getUserName();
+      final photoUrl = await User().getPhotoUrl();
+      final roles = await User().getUserRoles();
+
+      if (mounted) {
+        setState(() {
+          _userName = userName;
+          _photoUrl = photoUrl;
+          _userRole = roles.isNotEmpty ? roles.first.role : null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildAvatar() {
+    final displayName = _userName ?? 'User';
+    final hasPhotoUrl = _photoUrl != null &&
+        _photoUrl!.isNotEmpty &&
+        !_imageLoadError;
+
+    return CircleAvatar(
+      radius: 40.r,
+      backgroundColor: AppColorsEnhanced.brandBlue,
+      backgroundImage: hasPhotoUrl ? NetworkImage(_photoUrl!) : null,
+      onBackgroundImageError: hasPhotoUrl
+          ? (exception, stackTrace) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  setState(() => _imageLoadError = true);
+                }
+              });
+            }
+          : null,
+      child: !hasPhotoUrl
+          ? Text(
+              _getInitials(displayName),
+              style: TextStyle(
+                fontSize: 24.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )
+          : null,
+    );
+  }
+
+  String _getInitials(String name) {
+    List<String> nameParts = name.trim().split(RegExp(r'\s+'));
+    if (nameParts.length >= 2) {
+      return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return DrawerHeader(
+        decoration: BoxDecoration(
+          color: AppColorsEnhanced.brandBlue,
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
+    return DrawerHeader(
+      decoration: BoxDecoration(
+        color: AppColorsEnhanced.brandBlue,
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.pop(context); // Close drawer
+          Navigator.pushNamed(context, AppRoutes.profile);
+        },
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Avatar
+            _buildAvatar(),
+
+            SizedBox(width: AppSpacing.md),
+
+            // User Info Column
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Name
+                  Text(
+                    _userName ?? 'User',
+                    style: AppTextStyles.h4.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  SizedBox(height: AppSpacing.xs),
+
+                  // Role Badge
+                  if (_userRole != null)
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4.r),
+                      ),
+                      child: Text(
+                        _userRole!,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: Colors.white,
+                          fontSize: 10.sp,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Chevron icon to indicate it's tappable
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white.withOpacity(0.5),
+              size: 20.sp,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

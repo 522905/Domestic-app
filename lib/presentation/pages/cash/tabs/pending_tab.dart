@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../domain/entities/cash/cash_transaction.dart';
 import '../../../blocs/cash/cash_bloc.dart';
 import '../../../widgets/cash/widget_transaction_item.dart';
+import '../../../widgets/cash/grouped_transaction_card.dart';
 import '../cash_transaction_detail_screen.dart';
 
 class PendingTab extends StatelessWidget {
@@ -78,8 +79,9 @@ class PendingTab extends StatelessWidget {
               );
             }
 
-            // Group transactions by date
+            // Group transactions by date, then by user
             final groupedPending = _groupTransactionsByDate(pendingTransactions);
+            final groupedByUser = _groupTransactionsByUserWithinDate(groupedPending);
 
             return RefreshIndicator(
               onRefresh: () async {
@@ -88,12 +90,12 @@ class PendingTab extends StatelessWidget {
               },
               child: ListView.builder(
                 padding: EdgeInsets.only(top: 16.h, bottom: 80.h),
-                itemCount: groupedPending.length,
+                itemCount: groupedByUser.length,
                 itemBuilder: (context, index) {
-                  final date = groupedPending.keys.elementAt(index);
-                  final datePending = groupedPending[date]!;
+                  final date = groupedByUser.keys.elementAt(index);
+                  final userGroups = groupedByUser[date]!;
 
-                  if (datePending.isEmpty) {
+                  if (userGroups.isEmpty) {
                     return const SizedBox.shrink();
                   }
 
@@ -111,13 +113,27 @@ class PendingTab extends StatelessWidget {
                           ),
                         ),
                       ),
-                      ...datePending
-                          .map((transaction) => TransactionItem(
-                        transaction: transaction,
-                        onTap: () => _navigateToTransactionDetail(context, transaction),
-                        isFromTab: true,
-                      ))
-                          .toList(),
+                      ...userGroups.entries.map((entry) {
+                        final userName = entry.key;
+                        final transactions = entry.value;
+
+                        // If user has multiple requests, show grouped card
+                        if (transactions.length > 1) {
+                          return GroupedTransactionCard(
+                            userName: userName,
+                            transactions: transactions,
+                            onTransactionTap: (transaction) =>
+                                _navigateToTransactionDetail(context, transaction),
+                          );
+                        } else {
+                          // Single request, show normal card
+                          return TransactionItem(
+                            transaction: transactions.first,
+                            onTap: () => _navigateToTransactionDetail(context, transactions.first),
+                            isFromTab: true,
+                          );
+                        }
+                      }),
                     ],
                   );
                 },
@@ -157,6 +173,36 @@ class PendingTab extends StatelessWidget {
     };
   }
 
+  Map<DateTime, Map<String, List<CashTransaction>>> _groupTransactionsByUserWithinDate(
+      Map<DateTime, List<CashTransaction>> dateGrouped) {
+    final result = <DateTime, Map<String, List<CashTransaction>>>{};
+
+    for (final entry in dateGrouped.entries) {
+      final date = entry.key;
+      final transactions = entry.value;
+      final userGroups = <String, List<CashTransaction>>{};
+
+      for (final transaction in transactions) {
+        final userName = transaction.initiator;
+
+        if (!userGroups.containsKey(userName)) {
+          userGroups[userName] = [];
+        }
+
+        userGroups[userName]!.add(transaction);
+      }
+
+      // Sort each user's transactions by time (newest first)
+      for (final userName in userGroups.keys) {
+        userGroups[userName]!.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+
+      result[date] = userGroups;
+    }
+
+    return result;
+  }
+
   String _formatDateHeader(DateTime date) {
     final now = DateTime.now();
     final yesterday = DateTime(now.year, now.month, now.day - 1);
@@ -189,8 +235,10 @@ class PendingTab extends StatelessWidget {
     );
 
     // If any action was taken (approve/reject), refresh the data
-    if (result == true && context.mounted) {
-      context.read<CashManagementBloc>().add(RefreshCashData());
+    if (result == true) {
+      if (context.mounted) {
+        context.read<CashManagementBloc>().add(RefreshCashData());
+      }
     }
   }
 

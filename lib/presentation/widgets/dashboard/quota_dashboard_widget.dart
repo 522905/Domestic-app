@@ -12,6 +12,8 @@ class QuotaDashboardWidget extends StatefulWidget {
   final String roleLine;
   final int pendingCount;
   final String pendingLabel;
+  final String? photoUrl;
+  final String? userName;
 
   const QuotaDashboardWidget({
     Key? key,
@@ -19,6 +21,8 @@ class QuotaDashboardWidget extends StatefulWidget {
     required this.roleLine,
     required this.pendingCount,
     required this.pendingLabel,
+    this.photoUrl,
+    this.userName,
   }) : super(key: key);
 
   @override
@@ -31,6 +35,42 @@ class _QuotaDashboardWidgetState extends State<QuotaDashboardWidget> {
     super.initState();
     // Load quota on widget init
     context.read<QuotaBloc>().add(LoadQuotaSnapshot());
+  }
+
+  /// Gets user initials from full name (First Last -> FL)
+  String _getInitials(String name) {
+    List<String> nameParts = name.trim().split(RegExp(r'\s+'));
+    if (nameParts.length >= 2) {
+      return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  }
+
+  /// Builds profile avatar for greeting section
+  Widget _buildProfileAvatar() {
+    final hasPhotoUrl = widget.photoUrl != null && widget.photoUrl!.isNotEmpty;
+    final displayName = widget.userName ?? 'User';
+
+    return CircleAvatar(
+      radius: 20.r,
+      backgroundColor: AppColors.brandBlue,
+      backgroundImage: hasPhotoUrl ? NetworkImage(widget.photoUrl!) : null,
+      onBackgroundImageError: hasPhotoUrl
+          ? (exception, stackTrace) {
+              debugPrint('Error loading profile image: $exception');
+            }
+          : null,
+      child: !hasPhotoUrl
+          ? Text(
+              _getInitials(displayName),
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )
+          : null,
+    );
   }
 
   @override
@@ -588,22 +628,7 @@ class _QuotaDashboardWidgetState extends State<QuotaDashboardWidget> {
       children: [
         Row(
           children: [
-            Container(
-              padding: EdgeInsets.all(5.w),
-              decoration: BoxDecoration(
-                color: AppColors.brandBlue.withOpacity(0.1),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.brandBlue.withOpacity(0.2),
-                  width: 2,
-                ),
-              ),
-              child: Icon(
-                Icons.person,
-                color: AppColors.brandBlue,
-                size: 24.sp,
-              ),
-            ),
+            _buildProfileAvatar(),
             SizedBox(width: 16.w),
             Expanded(
               child: Column(

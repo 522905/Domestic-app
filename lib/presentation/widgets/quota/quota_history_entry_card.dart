@@ -211,23 +211,22 @@ class _QuotaHistoryEntryCardState extends State<QuotaHistoryEntryCard> {
               ],
             ),
           ),
-          // Posting ratio badge
-          if (widget.entry.postingRatio != null)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-              decoration: BoxDecoration(
-                color: _getRatioColor().withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              child: Text(
-                '${widget.entry.postingRatio!.toStringAsFixed(0)}%',
-                style: TextStyle(
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.bold,
-                  color: _getRatioColor(),
-                ),
+          // Posting ratio badge - always show
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+            decoration: BoxDecoration(
+              color: _getRatioColor().withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Text(
+              '${widget.entry.calculatedPostingRatio?.toStringAsFixed(0) ?? '0'}%',
+              style: TextStyle(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.bold,
+                color: _getRatioColor(),
               ),
             ),
+          ),
           SizedBox(width: 6.w),
           // Closing balance
           // Column(

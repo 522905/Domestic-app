@@ -10,6 +10,44 @@ enum QuotaStatus {
   blocked,     // Quota < 0 (over quota)
 }
 
+/// Class representing active extension detail
+class ActiveExtensionDetail {
+  final int id;
+  final String itemCode;
+  final String itemName;
+  final int approvedQuantity;
+  final int quantityRemaining;
+  final DateTime validUntil;
+
+  const ActiveExtensionDetail({
+    required this.id,
+    required this.itemCode,
+    required this.itemName,
+    required this.approvedQuantity,
+    required this.quantityRemaining,
+    required this.validUntil,
+  });
+
+  int get daysUntilExpiry {
+    final now = DateTime.now();
+    final difference = validUntil.difference(now);
+    return difference.inDays;
+  }
+
+  bool get isExpiringSoon => daysUntilExpiry <= 2;
+
+  factory ActiveExtensionDetail.fromJson(Map<String, dynamic> json) {
+    return ActiveExtensionDetail(
+      id: json['id'] ?? 0,
+      itemCode: json['item_code'] ?? '',
+      itemName: json['item_name'] ?? '',
+      approvedQuantity: json['approved_quantity'] ?? 0,
+      quantityRemaining: json['quantity_remaining'] ?? 0,
+      validUntil: DateTime.parse(json['valid_until']),
+    );
+  }
+}
+
 /// Class representing quota information for an item
 class QuotaInfo {
   final int available;           // Total quota available (can be negative)
@@ -18,6 +56,10 @@ class QuotaInfo {
   final bool isQuotaDisabled;    // true if quota system is globally disabled
   final bool isSdmsDown;         // true if SDMS is down (emergency bypass)
   final bool isPartnerExempt;    // true if partner is exempt from quota
+  final int extensionAvailable;  // Total remaining quantity from active extensions
+  final int effectiveLimit;      // max(0, available) + extensionAvailable
+  final bool hasActiveExtension; // Whether partner has any active extension
+  final List<ActiveExtensionDetail> extensions; // List of active extensions
 
   QuotaInfo({
     required this.available,
@@ -26,9 +68,18 @@ class QuotaInfo {
     required this.isQuotaDisabled,
     required this.isSdmsDown,
     required this.isPartnerExempt,
-  });
+    this.extensionAvailable = 0,
+    int? effectiveLimit,
+    this.hasActiveExtension = false,
+    this.extensions = const [],
+  }) : effectiveLimit = effectiveLimit ?? (available > 0 ? available : 0) + extensionAvailable;
 
   factory QuotaInfo.fromJson(Map<String, dynamic> json) {
+    final extensionsList = (json['extensions'] as List?)
+            ?.map((e) => ActiveExtensionDetail.fromJson(e))
+            .toList() ??
+        [];
+
     return QuotaInfo(
       available: _safeToInt(json['available']),
       isBlocked: json['is_blocked'] ?? false,
@@ -36,6 +87,12 @@ class QuotaInfo {
       isQuotaDisabled: json['is_quota_disabled'] ?? false,
       isSdmsDown: json['is_sdms_down'] ?? false,
       isPartnerExempt: json['is_partner_exempt'] ?? false,
+      extensionAvailable: _safeToInt(json['extension_available']),
+      effectiveLimit: json['effective_limit'] != null
+          ? _safeToInt(json['effective_limit'])
+          : null,
+      hasActiveExtension: json['has_active_extension'] ?? false,
+      extensions: extensionsList,
     );
   }
 
@@ -93,14 +150,18 @@ class SelectableOrderItem {
   /// Returns the effective maximum quantity considering both stock and quota
   int get effectiveMaxQuantity {
     if (quota == null || !quota!.hasQuotaLimit) return maxQuantity;
-    if (quota!.isBlocked) return 0;
-    return min(maxQuantity, quota!.available);
+    // Use effectiveLimit instead of available when extensions exist
+    final limit = quota!.effectiveLimit;
+    return min(maxQuantity, limit);
   }
 
   /// Returns true if this item can be selected for ordering
   bool get isSelectable {
     if (isOutOfStock) return false;
-    if (quota?.isBlocked ?? false) return false;
+    // Item is selectable if effectiveLimit > 0 (considers extensions)
+    if (quota?.hasQuotaLimit ?? false) {
+      return quota!.effectiveLimit > 0;
+    }
     return true;
   }
 

@@ -335,9 +335,12 @@ class _CashThermalPrintDialogState extends State<CashThermalPrintDialog> {
 
     try {
       // Step 1: Fetch binary ESC/POS data from API
+      // MLP 360 Bluetooth printer uses 80mm (3 inch) paper
+      const paperWidthMm = 80;
       final binaryData = await _apiService.thermalPrintPaymentRequest(
         widget.transaction.id,
         macAddress,
+        paperWidthMm,
       );
 
       debugPrint('Received ${binaryData.length} bytes from API');

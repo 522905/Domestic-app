@@ -28,12 +28,17 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
   String? _selectedAvailabilityFilter;
   String? _selectedBucketFilter;
   late List<SelectableOrderItem> _availableItems;
+  List<ActiveExtensionDetail> _activeExtensions = [];
+  bool _useCreditExtension = false;  // Toggle state (default OFF)
+  bool _isSearching = false;  // Search mode state
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _availableItems = widget.orderData.getSelectableItems();
     _selectedAvailabilityFilter = 'Available';
+    _loadActiveExtensions();
   }
 
   @override
@@ -41,7 +46,55 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.orderData != widget.orderData) {
       _availableItems = widget.orderData.getSelectableItems();
+      _loadActiveExtensions();
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _loadActiveExtensions() {
+    // Extract unique extensions from items
+    final extensionsMap = <String, ActiveExtensionDetail>{};
+    for (var item in _availableItems) {
+      if (item.quota?.hasActiveExtension ?? false) {
+        for (var ext in item.quota!.extensions) {
+          extensionsMap[ext.itemCode] = ext;
+        }
+      }
+    }
+    setState(() {
+      _activeExtensions = extensionsMap.values.toList();
+    });
+  }
+
+  SelectableOrderItem _applyExtensionToggle(SelectableOrderItem item) {
+    // If toggle is ON or item has no quota, return unchanged
+    if (_useCreditExtension || item.quota == null) {
+      return item;
+    }
+
+    // Toggle is OFF - hide extension quota
+    final originalQuota = item.quota!;
+
+    // Create modified quota without extension (only hide extension, keep base quota unchanged)
+    final modifiedQuota = QuotaInfo(
+      available: originalQuota.available,  // Keep original quota value
+      isBlocked: originalQuota.isBlocked,  // Keep original blocked state (don't recalculate)
+      isQuotaEnforced: originalQuota.isQuotaEnforced,
+      isQuotaDisabled: originalQuota.isQuotaDisabled,
+      isSdmsDown: originalQuota.isSdmsDown,
+      isPartnerExempt: originalQuota.isPartnerExempt,
+      extensionAvailable: 0,  // Hide extension
+      effectiveLimit: originalQuota.available > 0 ? originalQuota.available : 0,  // Only base quota, no extension
+      hasActiveExtension: false,  // Hide extension indicator
+      extensions: [],  // Clear extensions
+    );
+
+    return item.copyWith(quota: modifiedQuota);
   }
 
   List<SelectableOrderItem> get _filteredItems {
@@ -81,7 +134,8 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
       }).toList();
     }
 
-    return items;
+    // Apply extension toggle to all filtered items
+    return items.map((item) => _applyExtensionToggle(item)).toList();
   }
 
   bool _isItemSelected(SelectableOrderItem item) {
@@ -100,13 +154,14 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildHeader(),
-        _buildSearchBar(),
+        // _buildHeader(),  // Commented out - not required for now
+        _buildCreditExtensionToggle(),
         _buildFilterOptions(),
         Expanded(child: _buildItemsList()),
       ],
     );
   }
+
 
   Widget _buildHeader() {
     final orderType = widget.orderData.orderType;
@@ -121,85 +176,169 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20.sp),
-          SizedBox(width: 8.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$orderType Items',
+          if (!_isSearching) ...[
+            Icon(icon, color: color, size: 20.sp),
+            SizedBox(width: 8.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$orderType Items',
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Select items for your $orderType order',
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (widget.selectedItems.isNotEmpty) ...[
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Text(
+                  '${widget.selectedItems.length} selected',
                   style: TextStyle(
-                    color: color,
-                    fontSize: 16.sp,
+                    color: Colors.white,
+                    fontSize: 12.sp,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  'Select items for your $orderType order',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12.sp,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (widget.selectedItems.isNotEmpty)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(12.r),
               ),
-              child: Text(
-                '${widget.selectedItems.length} selected',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.bold,
+              SizedBox(width: 8.w),
+            ],
+            IconButton(
+              icon: Icon(Icons.search, color: color),
+              onPressed: () {
+                setState(() {
+                  _isSearching = true;
+                });
+              },
+            ),
+          ] else ...[
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search items...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.grey[600]),
                 ),
+                style: TextStyle(fontSize: 16.sp),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
               ),
             ),
+            if (_searchQuery.isNotEmpty)
+              IconButton(
+                icon: Icon(Icons.clear, color: Colors.grey[600]),
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                },
+              ),
+            IconButton(
+              icon: Icon(Icons.close, color: color),
+              onPressed: () {
+                setState(() {
+                  _isSearching = false;
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildCreditExtensionToggle() {
+    // Only show toggle if user has active extensions
+    if (_activeExtensions.isEmpty) return const SizedBox.shrink();
+
     return Container(
-      padding: EdgeInsets.all(16.w),
-      color: Colors.grey[50],
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: 'Search items by name, code, or description...',
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF0E5CA8)),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-            icon: const Icon(Icons.clear, color: Colors.grey),
-            onPressed: () {
-              setState(() {
-                _searchQuery = '';
-              });
-            },
-          )
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(25.r),
-            borderSide: BorderSide.none,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: _useCreditExtension ? Colors.purple.shade50 : Colors.grey[100],
+        border: Border(
+          bottom: BorderSide(
+            color: _useCreditExtension ? Colors.purple.shade200 : Colors.grey[300]!,
+            width: 1,
           ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(vertical: 12.h),
         ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.card_giftcard,
+            color: _useCreditExtension ? Colors.purple.shade700 : Colors.grey[600],
+            size: 22.sp,
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Use Credit Extension',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  _useCreditExtension
+                    ? 'Credit extensions are included in quota'
+                    : 'Order within base quota only',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _useCreditExtension,
+            onChanged: (value) {
+              setState(() {
+                _useCreditExtension = value;
+              });
+              // Show feedback
+              if (value) {
+                context.showSuccessSnackBar('Credit extension enabled');
+              } else {
+                context.showWarningSnackBar('Credit extension disabled - ordering within base quota');
+              }
+            },
+            activeColor: Colors.purple.shade700,
+          ),
+        ],
       ),
     );
   }
+
 
   Widget _buildFilterOptions() {
     final itemGroupFilters = widget.orderData.getItemGroupFilters();
@@ -459,7 +598,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                     ),
                     child: Icon(
                       orderType == 'Refill' ? Icons.propane_tank : Icons.propane_tank_outlined,
-                      color: color,        // <- will now be red/blue per itemCode
+                      color: color,
                       size: 24.sp,
                     ),
                   ),
@@ -555,7 +694,20 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: !isSelectable ? null : () => _showQuantityDialog(item),
+                    onPressed: !isSelectable ? () {
+                      // If blocked but extension available, suggest enabling
+                      if (item.quota?.isBlocked ?? false) {
+                        if (!_useCreditExtension && _activeExtensions.any((e) => e.itemCode == item.itemCode)) {
+                          context.showWarningSnackBar(
+                            'Enable "Use Credit Extension" toggle to order this item'
+                          );
+                          return;
+                        }
+                        context.showErrorSnackBar('${item.displayName} - Over quota limit');
+                      } else {
+                        context.showErrorSnackBar('${item.displayName} is out of stock');
+                      }
+                    } : () => _showQuantityDialog(item),
                     icon: Icon(
                       !isSelectable ? Icons.block : Icons.add_shopping_cart,
                       size: 18.sp,
@@ -643,7 +795,11 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
 
   String _getButtonText(SelectableOrderItem item) {
     if (item.quota?.isBlocked ?? false) {
-      return 'Over Quota';
+      // Check if extension would help
+      if (!_useCreditExtension && _activeExtensions.any((e) => e.itemCode == item.itemCode)) {
+        return 'Quota: ${item.quota!.available} - Enable Extension';
+      }
+      return 'Over Quota: ${item.quota!.available}';
     } else if (item.isOutOfStock) {
       return 'Out of Stock';
     } else {
@@ -679,7 +835,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
     }
   }
 
-  void _showQuantityDialog(SelectableOrderItem item) {
+  void _showQuantityDialog(SelectableOrderItem item) async {
     final selectedItem = _getSelectedItem(item);
     int selectedQty = selectedItem?.metadata['selected_qty'] ?? 1;
     final maxQty = item.effectiveMaxQuantity;
@@ -710,233 +866,329 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
           ),
           content: SizedBox(
             width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(5.w),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        item.displayName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16.sp,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 8.h),
-                      Text(
-                        'Code: ${item.itemCode}',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14.sp,
-                        ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                        decoration: BoxDecoration(
-                          color: _getAvailabilityColor(item.availabilityStatus).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4.r),
-                          border: Border.all(
-                            color: _getAvailabilityColor(item.availabilityStatus),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          item.availabilityStatus,
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: _getAvailabilityColor(item.availabilityStatus),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 16.h),
-                // Show quota info if available
-                if (item.quota != null && item.quota!.hasQuotaLimit) ...[
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Container(
-                    padding: EdgeInsets.all(12.w),
+                    padding: EdgeInsets.all(5.w),
                     decoration: BoxDecoration(
-                      color: _getQuotaWarningColor(item.quota!).withOpacity(0.1),
+                      color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(
-                        color: _getQuotaWarningColor(item.quota!),
-                        width: 1,
-                      ),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _getQuotaWarningIcon(item.quota!),
-                              color: _getQuotaWarningColor(item.quota!),
-                              size: 16.sp,
-                            ),
-                            SizedBox(width: 8.w),
-                            Text(
-                              'Quota Limited',
-                              style: TextStyle(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w600,
-                                color: _getQuotaWarningColor(item.quota!),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          item.displayName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16.sp,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: 8.h),
                         Text(
-                          'Stock: ${item.maxQuantity}  |  Quota: ${item.quota!.available}',
+                          'Code: ${item.itemCode}',
                           style: TextStyle(
-                            fontSize: 11.sp,
-                            color: Colors.grey[700],
+                            color: Colors.grey[600],
+                            fontSize: 14.sp,
                           ),
                         ),
                         SizedBox(height: 4.h),
-                        Text(
-                          'Maximum: $maxQty units',
-                          style: TextStyle(
-                            fontSize: 11.sp,
-                            color: _getQuotaWarningColor(item.quota!),
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: _getAvailabilityColor(item.availabilityStatus).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4.r),
+                            border: Border.all(
+                              color: _getAvailabilityColor(item.availabilityStatus),
+                              width: 1,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                ] else ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Maximum available:',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14.sp,
-                        ),
-                      ),
-                      Text(
-                        '$maxQty',
-                        style: TextStyle(
-                          color: Colors.green[700],
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 20.h),
-                ],
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.remove),
-                        onPressed: selectedQty > 1 ? () {
-                          setDialogState(() {
-                            selectedQty--;
-                            quantityController.text = selectedQty.toString();
-                          });
-                        } : null,
-                      ),
-                    ),
-                    SizedBox(width: 16.w),
-                    SizedBox(
-                      width: 80.w,
-                      child: TextField(
-                        controller: quantityController,
-                        textAlign: TextAlign.center,
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.r),
-                          ),
-                          contentPadding: EdgeInsets.symmetric(vertical: 12.h),
-                        ),
-                        onTap: () {
-                          quantityController.selection = TextSelection(
-                            baseOffset: 0,
-                            extentOffset: quantityController.text.length,
-                          );
-                        },
-                        onChanged: (value) {
-                          final parsedValue = int.tryParse(value);
-                          if (parsedValue != null && parsedValue >= 1 && parsedValue <= maxQty) {
-                            setDialogState(() {
-                              selectedQty = parsedValue;
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                    SizedBox(width: 16.w),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: selectedQty < maxQty ? () {
-                          setDialogState(() {
-                            selectedQty++;
-                            quantityController.text = selectedQty.toString();
-                          });
-                        } : null,
-                      ),
-                    ),
-                  ],
-                ),
-                if (maxQty == 0) ...[
-                  SizedBox(height: 16.h),
-                  Container(
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: Colors.red[50],
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: Colors.red[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.warning, color: Colors.red, size: 20.sp),
-                        SizedBox(width: 8.w),
-                        Expanded(
                           child: Text(
-                            'This item is currently out of stock',
+                            item.availabilityStatus,
                             style: TextStyle(
-                              color: Colors.red[700],
                               fontSize: 12.sp,
-                              fontStyle: FontStyle.italic,
+                              color: _getAvailabilityColor(item.availabilityStatus),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
+                  SizedBox(height: 16.h),
+                  // Show quota info if available
+                  if (item.quota != null && item.quota!.hasQuotaLimit) ...[
+                    Container(
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: _getQuotaWarningColor(item.quota!).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(
+                          color: _getQuotaWarningColor(item.quota!),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                _getQuotaWarningIcon(item.quota!),
+                                color: _getQuotaWarningColor(item.quota!),
+                                size: 16.sp,
+                              ),
+                              SizedBox(width: 8.w),
+                              Text(
+                                'Quota Limited',
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: _getQuotaWarningColor(item.quota!),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          Text(
+                            'Stock: ${item.maxQuantity}  |  Quota: ${item.quota!.available}',
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            'Maximum: $maxQty units',
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: _getQuotaWarningColor(item.quota!),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+
+                    // Extension info in quantity dialog
+                    if (item.quota!.hasActiveExtension && item.quota!.extensionAvailable > 0) ...[
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.shade50,
+                          borderRadius: BorderRadius.circular(8.r),
+                          border: Border.all(color: Colors.purple.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.card_giftcard,
+                                  color: Colors.purple.shade700,
+                                  size: 16.sp
+                                ),
+                                SizedBox(width: 6.w),
+                                Text(
+                                  'Credit Extension Active',
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.purple.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8.h),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Regular Quota:',
+                                  style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade700),
+                                ),
+                                Text(
+                                  '${item.quota!.available} units',
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: item.quota!.available < 0
+                                        ? Colors.red.shade700
+                                        : Colors.green.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Extension:',
+                                  style: TextStyle(fontSize: 11.sp, color: Colors.grey.shade700),
+                                ),
+                                Text(
+                                  '+${item.quota!.extensionAvailable} units',
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.purple.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Divider(height: 16.h),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Total Available:',
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey.shade900,
+                                  ),
+                                ),
+                                Text(
+                                  '${item.quota!.effectiveLimit} units',
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+                    ],
+                  ] else ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Maximum available:',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                        Text(
+                          '$maxQty',
+                          style: TextStyle(
+                            color: Colors.green[700],
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 20.h),
+                  ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.remove),
+                          onPressed: selectedQty > 1 ? () {
+                            setDialogState(() {
+                              selectedQty--;
+                              quantityController.text = selectedQty.toString();
+                            });
+                          } : null,
+                        ),
+                      ),
+                      SizedBox(width: 16.w),
+                      SizedBox(
+                        width: 80.w,
+                        child: TextField(
+                          controller: quantityController,
+                          textAlign: TextAlign.center,
+                          keyboardType: TextInputType.number,
+                          style: TextStyle(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(vertical: 12.h),
+                          ),
+                          onTap: () {
+                            quantityController.selection = TextSelection(
+                              baseOffset: 0,
+                              extentOffset: quantityController.text.length,
+                            );
+                          },
+                          onChanged: (value) {
+                            final parsedValue = int.tryParse(value);
+                            if (parsedValue != null && parsedValue >= 1 && parsedValue <= maxQty) {
+                              setDialogState(() {
+                                selectedQty = parsedValue;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 16.w),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: selectedQty < maxQty ? () {
+                            setDialogState(() {
+                              selectedQty++;
+                              quantityController.text = selectedQty.toString();
+                            });
+                          } : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (maxQty == 0) ...[
+                    SizedBox(height: 16.h),
+                    Container(
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(color: Colors.red[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning, color: Colors.red, size: 20.sp),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              'This item is currently out of stock',
+                              style: TextStyle(
+                                color: Colors.red[700],
+                                fontSize: 12.sp,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           actions: [
@@ -945,7 +1197,7 @@ class _OrderItemsWidgetState extends State<OrderItemsWidget> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: maxQty == 0 ? null : () {
+              onPressed: maxQty == 0 ? null : () async {
                 final finalQty = int.tryParse(quantityController.text) ?? selectedQty;
                 if (finalQty >= 1 && finalQty <= maxQty) {
                   _updateItemSelection(item, finalQty);
