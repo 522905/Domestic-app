@@ -3,8 +3,8 @@
 class ApiEndpoints {
   final String baseUrl;
 
-  // final String tempUrl = 'https://lpg.ops.arungas.com';
-  final String tempUrl = 'http://192.168.171.59:9900';
+  final String tempUrl = 'https://lpg.ops.arungas.com';
+  // final String tempUrl = 'http://192.168.171.59:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
@@ -101,7 +101,7 @@ class ApiEndpoints {
   String get validateSeedCode => '$tempUrl/purchase-invoices/validate-seed/';
   String get searchDrivers => '$tempUrl/procurement/drivers/search/';
   String get createDriver => '$tempUrl/procurement/drivers/';
-  String get uploadDriverPhoto => 'http://arungas.com:1080/files/';
+  String get uploadDriverPhoto => 'https://tus.dca.arungas.com/files/';
   String get submitReceive => '$tempUrl/procurement/purchase-invoices/receive/';
   String get submitDispatch => '$tempUrl/procurement/invoices/dispatch/';
   String vehicleHistory(String vehicleNo) => '$tempUrl/procurement/vehicles/$vehicleNo/history/';
@@ -207,4 +207,24 @@ class ApiEndpoints {
   String get defectInspectionReports => '$tempUrl/defects/api/v1/inspection-reports/';
   String get defectInspectionReportsList => '$tempUrl/defects/api/v1/inspection-reports/list/';
   String defectInspectionReportDetail(String name) => '$tempUrl/defects/api/v1/inspection-reports/$name/';
+
+  // UJJWALA INSTALLATION API'S
+  final String dcaUrl = 'https://dca.arungas.com';
+  String get ujjwalaPendingInstallations => '$dcaUrl/api/ujjwala-v3/installations/pending/';
+  String get ujjwalaSearchInstallations => '$dcaUrl/api/ujjwala-v3/installations/search/';
+  String ujjwalaInstallationSubmit(int id) => '$dcaUrl/api/ujjwala-v3/installations/$id/submit/';
+  String ujjwalaMyUploads({String? status}) {
+    final base = '$dcaUrl/api/ujjwala-v3/installations/my-uploads/';
+    return status != null ? '$base?status=$status' : base;
+  }
+
+  String ujjwalaApplicationDetail(int disbursementId) =>
+      '$dcaUrl/api/ujjwala-v3/installations/$disbursementId/application-detail/';
+
+  // LPG Ops Backend Ujjwala (new)
+  String get ujjwalaLpgInstallations => '$tempUrl/api/ujjwala/installations/';
+  String get ujjwalaBulkVerify => '$tempUrl/api/ujjwala/installations/bulk-verify/';
+  String get ujjwalaRetryFailed => '$tempUrl/api/ujjwala/installations/retry/';
+  String get ujjwalaReimbursementsPreview => '$tempUrl/api/ujjwala/reimbursements/preview/';
+  String get ujjwalaReimbursements => '$tempUrl/api/ujjwala/reimbursements/';
 }

@@ -15,6 +15,8 @@ import '../../presentation/blocs/orders/orders_bloc.dart';
 import '../../presentation/blocs/orders/orders_event.dart';
 import '../../presentation/blocs/inventory/inventory_bloc.dart';
 import '../../presentation/blocs/inventory/inventory_event.dart';
+import '../../presentation/blocs/sdms_claims/sdms_claims_bloc.dart';
+import '../../presentation/blocs/sdms_claims/sdms_claims_event.dart';
 // Hidden for release build - Digital Credit not ready
 // import '../../presentation/blocs/digital_credit/digital_credit_bloc.dart';
 // import '../../presentation/blocs/digital_credit/digital_credit_event.dart';
@@ -119,6 +121,24 @@ class GlobalDrawer {
           }
         },
       ),
+      // My Installations menu item
+      ListTile(
+        leading: const Icon(Icons.home_work_outlined),
+        title: const Text('My Installations'),
+        onTap: () {
+          Navigator.pushNamed(navigatorContext!, '/ujjwala/my-installations');
+        },
+      ),
+
+      // Ujjwala Installation menu item
+      ListTile(
+        leading: const Icon(Icons.home_work),
+        title: const Text('Ujjwala Installation'),
+        onTap: () {
+          Navigator.pushNamed(navigatorContext!, '/ujjwala-installations');
+        },
+      ),
+
 
       // ListTile(
       //   leading: const Icon(Icons.add_box_sharp),
@@ -206,6 +226,7 @@ class GlobalDrawer {
       context.read<VehicleBloc>().add(const ClearVehicleCache());
       context.read<OrdersBloc>().add(const ClearOrdersCache());
       context.read<InventoryBloc>().add(const ClearInventoryCache());
+      context.read<SdmsClaimsBloc>().add(const ClearSdmsClaimsCache());
       // Hidden for release build - Digital Credit not ready
       // context.read<DigitalCreditBloc>().add(const ClearDigitalCreditCache());
 

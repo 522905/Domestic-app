@@ -35,9 +35,26 @@ import '../blocs/bonus_detail/bonus_detail_bloc.dart';
 import '../blocs/bonus_detail/bonus_detail_event.dart';
 import '../blocs/inventory/inventory_bloc.dart';
 import '../blocs/defect_inspection/defect_inspection_bloc.dart';
+import '../blocs/ujjwala_installations/ujjwala_installations_bloc.dart';
+import '../blocs/ujjwala_installations/ujjwala_installations_event.dart';
+import '../pages/ujjwala_installations/pending_installations_page.dart';
+import '../pages/ujjwala_installations/installation_submit_page.dart';
+import '../pages/ujjwala_installations/my_uploads_page.dart';
+import '../pages/ujjwala_installations/my_installations_page.dart';
+import '../pages/ujjwala_installations/reimbursement_page.dart';
+import '../pages/ujjwala_installations/installation_detail_page.dart';
+import '../blocs/ujjwala_installations/my_installations_bloc.dart';
+import '../blocs/ujjwala_installations/my_installations_event.dart';
+import '../../domain/entities/ujjwala/ujjwala_installation.dart';
+import '../../domain/entities/ujjwala/lpg_ops_installation.dart';
+import '../../core/services/location_service.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/User.dart';
 import '../widgets/professional_snackbar.dart';
+import '../pages/credit_extension/gm_pending_approvals_page.dart';
+import '../blocs/gm_credit_approvals/gm_credit_approvals_bloc.dart';
+import '../blocs/gm_credit_approvals/gm_credit_approvals_event.dart';
+import '../pages/credit_extension/extension_detail_page.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -68,6 +85,10 @@ class AppRoutes {
   static const String bonusSchemes = 'bonus-schemes';
   static const String bonusList = 'bonus-list';
   static const String bonusDetail = 'bonus-detail';
+
+  // Ujjwala Installation routes
+  static const String ujjwalaInstallations = 'ujjwala-installations';
+  static const String ujjwalaInstallationSubmit = 'ujjwala-installation/submit';
 
   // Profile route
   static const String profile = '/profile';
@@ -473,6 +494,114 @@ class AppRoutes {
                   apiService: context.read<ApiServiceInterface>(),
                 )..add(LoadBonusDetail(bonusId)),
                 child: const BonusDetailPage(),
+              ),
+            );
+          }
+        }
+        return _errorRoute();
+
+      // UJJWALA INSTALLATION ROUTES
+      case 'ujjwala-installations':
+        // /ujjwala-installations → Pending Installations List
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => UjjwalaInstallationsBloc(
+              apiService: context.read<ApiServiceInterface>(),
+              locationService: LocationService(),
+            )..add(const LoadPendingInstallations()),
+            child: const PendingInstallationsPage(),
+          ),
+        );
+
+      case 'ujjwala-installation':
+        if (segments.length >= 2 && segments[1] == 'submit') {
+          // /ujjwala-installation/submit → Installation Submit Page
+          final installation = settings.arguments as UjjwalaInstallation;
+          return MaterialPageRoute(
+            builder: (context) {
+              final bloc = UjjwalaInstallationsBloc(
+                apiService: context.read<ApiServiceInterface>(),
+                locationService: LocationService(),
+              );
+              bloc.initializeSubmitState(installation);
+              return BlocProvider.value(
+                value: bloc,
+                child: const InstallationSubmitPage(),
+              );
+            },
+          );
+        }
+        return _errorRoute();
+
+      case 'my-uploads':
+        // /my-uploads → redirect to new My Installations Page
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (ctx) => MyInstallationsBloc(
+              apiService: ctx.read<ApiServiceInterface>(),
+            )..add(const LoadMyInstallations()),
+            child: const MyInstallationsPage(),
+          ),
+        );
+
+      case 'ujjwala':
+        if (segments.length >= 2 && segments[1] == 'my-installations') {
+          return MaterialPageRoute(
+            builder: (context) => BlocProvider(
+              create: (ctx) => MyInstallationsBloc(
+                apiService: ctx.read<ApiServiceInterface>(),
+              )..add(const LoadMyInstallations()),
+              child: const MyInstallationsPage(),
+            ),
+          );
+        } else if (segments.length >= 2 && segments[1] == 'reimbursement') {
+          return MaterialPageRoute(
+            builder: (_) => const ReimbursementPage(),
+          );
+        } else if (segments.length >= 2 && segments[1] == 'installation-detail') {
+          final installation = settings.arguments as LpgOpsInstallation;
+          return MaterialPageRoute(
+            builder: (_) => InstallationDetailPage(installation: installation),
+          );
+        }
+        return _errorRoute();
+
+      case 'gm-credit-approvals':
+        // /gm-credit-approvals → GM Pending Approvals Page
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (ctx) => GmCreditApprovalsBloc(
+              apiService: ctx.read<ApiServiceInterface>(),
+            )..add(const LoadPendingApprovals()),
+            child: const GmPendingApprovalsPage(),
+          ),
+        );
+
+      case 'credit-extension':
+        // /credit-extension/<id> → role-aware: GM sees approvals list, delivery boy sees detail
+        if (segments.length > 1) {
+          final extensionId = int.tryParse(segments[1]);
+          if (extensionId != null) {
+            return MaterialPageRoute(
+              builder: (context) => FutureBuilder<List<String>>(
+                future: User().getUserRoles().then((roles) => roles.map((r) => r.role).toList()),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final roles = snapshot.data ?? [];
+                  if (roles.contains('General Manager')) {
+                    return BlocProvider(
+                      create: (ctx) => GmCreditApprovalsBloc(
+                        apiService: ctx.read<ApiServiceInterface>(),
+                      )..add(const LoadPendingApprovals()),
+                      child: const GmPendingApprovalsPage(),
+                    );
+                  }
+                  return ExtensionDetailPage(extensionId: extensionId);
+                },
               ),
             );
           }

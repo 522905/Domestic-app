@@ -351,4 +351,37 @@ abstract class ApiServiceInterface {
     required String warehouse,
     String mode = 'equal',
   });
+
+  // Ujjwala Installation methods
+  Future<List<dynamic>> getPendingUjjwalaInstallations();
+  Future<List<dynamic>> searchUjjwalaInstallations(String query);
+  Future<Map<String, dynamic>> submitUjjwalaInstallation({
+    required int installationId,
+    required String kitchenPhotoUrl,
+    required String gatePhotoUrl,
+    required String stovePhotoUrl,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+  });
+
+  Future<List<dynamic>> getMyUjjwalaUploads({String? status});
+
+  // LPG Ops Backend Ujjwala methods
+  Future<Map<String, dynamic>> getUjjwalaApplicationDetail(int disbursementId);
+  Future<Map<String, dynamic>> submitUjjwalaInstallationV2({
+    required int disbursementId,
+    required String kitchenPhotoUrl,
+    required String gatePhotoUrl,
+    required String stovePhotoUrl,
+    required String latitude,
+    required String longitude,
+    required String accuracy,
+  });
+  Future<List<dynamic>> getLpgOpsInstallations({String scope = 'mine', String? status, bool? reimbursed});
+  Future<Map<String, dynamic>> bulkVerifyInstallations(List<int> installationIds);
+  Future<Map<String, dynamic>> retryFailedInstallations(List<int> installationIds);
+  Future<Map<String, dynamic>> getReimbursementPreview(int warehouseId);
+  Future<Map<String, dynamic>> createReimbursement({required int warehouseId, required int qty});
+  Future<List<dynamic>> getReimbursementBatches();
 }

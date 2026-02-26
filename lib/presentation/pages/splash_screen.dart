@@ -24,8 +24,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkLoginStatus() async {
     final isLoggedIn = await _secureStorage.read(key: 'isLoggedIn');
-    if (isLoggedIn == 'true') {
+    final token = await _secureStorage.read(key: 'access_token');
+    final isAuthenticated = isLoggedIn == 'true' && token != null;
+
+    if (!mounted) return;
+
+    if (isAuthenticated) {
       await sendPendingFCMToken(context);
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainContainer()),
       );

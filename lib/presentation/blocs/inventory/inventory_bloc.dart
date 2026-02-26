@@ -8,6 +8,7 @@ import 'inventory_state.dart';
 class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
   final ApiServiceInterface _apiService;
   List<InventoryRequest> _allRequests = [];
+  String _activeFilter = 'All';
 
   // Expose apiService for form screens
   ApiServiceInterface get apiService => _apiService;
@@ -30,6 +31,27 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     on<CancelInventoryRequest>(_onCancelInventoryRequest);
     on<ClearInventoryCache>(_onClearInventoryCache);
     on<LoadInventoryDetails>(_onLoadInventoryDetails);
+    on<SetInventoryFilter>(_onSetInventoryFilter);
+  }
+
+  List<InventoryRequest> _applyFilter(String filterName) {
+    switch (filterName) {
+      case 'Pending':
+        return _allRequests
+            .where((r) => r.status == 'PENDING' && r.requestType != 'TRANSFER')
+            .toList();
+      case 'Collect':
+        return _allRequests.where((r) => r.requestType == 'COLLECT').toList();
+      case 'Deposit':
+        return _allRequests.where((r) => r.requestType == 'DEPOSIT').toList();
+      default: // 'All'
+        return List.from(_allRequests);
+    }
+  }
+
+  void _onSetInventoryFilter(SetInventoryFilter event, Emitter<InventoryState> emit) {
+    _activeFilter = event.filterName;
+    emit(InventoryLoaded(requests: _applyFilter(_activeFilter)));
   }
 
   Future<void> _onLoadInventoryRequestDetail(
@@ -182,7 +204,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       });
 
       _allRequests = requests;
-      emit(InventoryLoaded(requests: _allRequests));
+      emit(InventoryLoaded(requests: _applyFilter(_activeFilter)));
     } catch (e) {
       emit(InventoryError(message: ErrorHandler.handleError(e)));
     }
@@ -204,7 +226,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
       });
 
       _allRequests = requests;
-      emit(InventoryLoaded(requests: _allRequests));
+      emit(InventoryLoaded(requests: _applyFilter(_activeFilter)));
     } catch (e) {
       print("Error refreshing inventory requests: $e");
       // If refresh fails, keep current state if available, otherwise show error

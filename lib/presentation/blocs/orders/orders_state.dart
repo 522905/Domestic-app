@@ -154,6 +154,21 @@ class OrderDetailsLoaded extends OrdersState {
   ];
 }
 
+class OrdersErrorWithRecovery extends OrdersState {
+  final String message;
+  final bool canRetry;
+  final OrdersLoaded previousState;
+
+  const OrdersErrorWithRecovery({
+    required this.message,
+    required this.canRetry,
+    required this.previousState,
+  });
+
+  @override
+  List<Object?> get props => [message, canRetry, previousState];
+}
+
 class OrderDetailsError extends OrdersState {
   final String message;
   final String orderName;

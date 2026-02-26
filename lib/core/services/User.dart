@@ -267,6 +267,7 @@ class User {
 
   Future<void> clearTokens() async {
     await _storage.deleteAll();
+    await _storage.write(key: 'isLoggedIn', value: 'false');
   }
 
   Future<String?> getUserId() async {

@@ -4498,6 +4498,46 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Driver Details'**
   String get vehicleHistoryDriverDetailsTitle;
+
+  // Ujjwala Installation Strings
+  String get ujjwalaInstallationsTitle;
+  String get ujjwalaInstallationsSubtitle;
+  String get ujjwalaPendingListTitle;
+  String get ujjwalaPendingListEmpty;
+  String get ujjwalaApplicationNumber;
+  String get ujjwalaConsumerNumber;
+  String get ujjwalaConsumerName;
+  String get ujjwalaMobileNumber;
+  String get ujjwalaAddress;
+  String get ujjwalaMaterialDelivered;
+  String get ujjwalaSubmitTitle;
+  String get ujjwalaApplicantInfo;
+  String get ujjwalaPhotosSection;
+  String get ujjwalaKitchenPhoto;
+  String get ujjwalaGatePhoto;
+  String get ujjwalaStovePhoto;
+  String get ujjwalaKitchenPhotoInfo;
+  String get ujjwalaGatePhotoInfo;
+  String get ujjwalaStovePhotoInfo;
+  String get ujjwalaTakePhoto;
+  String get ujjwalaRetakePhoto;
+  String get ujjwalaDeletePhoto;
+  String get ujjwalaRotatePhoto;
+  String get ujjwalaPhotoUploading;
+  String get ujjwalaPhotoUploaded;
+  String get ujjwalaPhotoError;
+  String get ujjwalaLocationSection;
+  String get ujjwalaLatitude;
+  String get ujjwalaLongitude;
+  String get ujjwalaAccuracy;
+  String get ujjwalaRefreshLocation;
+  String get ujjwalaFetchingLocation;
+  String get ujjwalaLocationError;
+  String get ujjwalaLocationRequired;
+  String get ujjwalaSubmitButton;
+  String get ujjwalaSubmitSuccess;
+  String get ujjwalaSubmitError;
+  String get ujjwalaAllPhotosRequired;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

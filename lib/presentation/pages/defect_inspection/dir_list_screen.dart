@@ -46,7 +46,7 @@ class _DIRListScreenState extends State<DIRListScreen> {
   Future<void> _loadWarehouses() async {
     try {
       final warehousesData = await apiService.getWarehouses();
-
+      if (!mounted) return;
       setState(() {
         _warehouses = List<Map<String, dynamic>>.from(warehousesData);
       });

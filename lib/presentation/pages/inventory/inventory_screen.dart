@@ -72,29 +72,19 @@ class _InventoryPageState extends State<InventoryPage>
       }
     });
 
-    // Load requests immediately
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    // Set active filter in BLoC first, then trigger refresh so it lands on correct tab
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        context.read<InventoryBloc>().add(SetInventoryFilter(filterName: _currentFilter));
         context.read<InventoryBloc>().add(const RefreshInventoryRequests());
-        // Wait for refresh to complete, then apply current filter
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          _filterRequests(_currentFilter);
-        }
       }
     });
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) async {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
-      // Always refresh when app comes back to foreground
       context.read<InventoryBloc>().add(const RefreshInventoryRequests());
-      // Wait for refresh to complete, then apply current filter
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        _filterRequests(_currentFilter);
-      }
     }
   }
 
@@ -124,34 +114,7 @@ class _InventoryPageState extends State<InventoryPage>
   }
 
   void _filterRequests(String tabName) {
-    if (tabName == 'All') {
-      // Show all requests
-      context
-          .read<InventoryBloc>()
-          .add(const FilterInventoryRequests(status: null));
-    } else if (tabName == 'Pending') {
-      // Show only pending requests (excluding TRANSFER)
-      context
-          .read<InventoryBloc>()
-          .add(const FilterInventoryRequestsByStatusAndType(
-            status: 'PENDING',
-            excludeTransfer: true,
-          ));
-    } else if (tabName == 'Collect') {
-      // Show all COLLECT requests
-      context
-          .read<InventoryBloc>()
-          .add(const FilterInventoryRequestsByType(
-            requestType: 'COLLECT',
-          ));
-    } else if (tabName == 'Deposit') {
-      // Show all DEPOSIT requests
-      context
-          .read<InventoryBloc>()
-          .add(const FilterInventoryRequestsByType(
-            requestType: 'DEPOSIT',
-          ));
-    }
+    context.read<InventoryBloc>().add(SetInventoryFilter(filterName: tabName));
   }
 
   Future<void> _navigateToActionScreen(Widget screen) async {
@@ -163,14 +126,9 @@ class _InventoryPageState extends State<InventoryPage>
   }
 
   void _refreshOnFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<InventoryBloc>().add(const RefreshInventoryRequests());
-        // Wait for refresh to complete, then apply current filter
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          _filterRequests(_currentFilter);
-        }
       }
     });
   }
@@ -240,16 +198,6 @@ class _InventoryPageState extends State<InventoryPage>
 
                 if (mounted) {
                   context.read<InventoryBloc>().add(const RefreshInventoryRequests());
-                }
-
-                await Future.delayed(const Duration(milliseconds: 600));
-
-                if (mounted) {
-                  _filterRequests(_currentFilter);
-                }
-
-                await Future.delayed(const Duration(milliseconds: 100));
-                if (mounted) {
                   Navigator.of(context).pop();
                 }
               } catch (e) {
@@ -356,13 +304,6 @@ class _InventoryPageState extends State<InventoryPage>
                           context
                               .read<InventoryBloc>()
                               .add(const RefreshInventoryRequests());
-                          // Wait longer for data to load before re-applying filter
-                          await Future.delayed(const Duration(milliseconds: 500));
-
-                          // Re-apply current tab filter after refresh
-                          if (mounted) {
-                            _filterRequests(_currentFilter);
-                          }
                         },
                         child: ListView.builder(
                           padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -666,13 +607,9 @@ class _InventoryPageState extends State<InventoryPage>
               ),
             );
           }
-          // Refresh and re-apply filter after returning from detail screen
+          // Refresh after returning from detail screen
           if (mounted) {
             context.read<InventoryBloc>().add(const RefreshInventoryRequests());
-            await Future.delayed(const Duration(milliseconds: 300));
-            if (mounted) {
-              _filterRequests(_currentFilter);
-            }
           }
         },
         borderRadius: BorderRadius.circular(8.r),
@@ -755,12 +692,15 @@ class _InventoryPageState extends State<InventoryPage>
                     color: Colors.grey[600],
                   ),
                   SizedBox(width: 4.w),
-                  Text(
-                    '${AppLocalizations.of(context)!.inventoryRequestedBy}: ${request.requestedBy}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16.sp,
-                      color: Colors.deepOrange[300],
+                  Expanded(
+                    child: Text(
+                      '${AppLocalizations.of(context)!.inventoryRequestedBy}: ${request.requestedBy}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16.sp,
+                        color: Colors.deepOrange[300],
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -774,11 +714,14 @@ class _InventoryPageState extends State<InventoryPage>
                     color: Colors.grey[600],
                   ),
                   SizedBox(width: 4.w),
-                  Text(
-                    '${AppLocalizations.of(context)!.profileWarehouseLabel}: ${request.warehouse}',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      color: Colors.grey[600],
+                  Expanded(
+                    child: Text(
+                      '${AppLocalizations.of(context)!.profileWarehouseLabel}: ${request.warehouse}',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -792,11 +735,14 @@ class _InventoryPageState extends State<InventoryPage>
                     color: Colors.grey[600],
                   ),
                   SizedBox(width: 4.w),
-                  Text(
-                    '${AppLocalizations.of(context)!.inventoryVehicleNumber}: ${request.vehicle ?? 'N/A'}',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      color: Colors.grey[600],
+                  Expanded(
+                    child: Text(
+                      '${AppLocalizations.of(context)!.inventoryVehicleNumber}: ${request.vehicle ?? 'N/A'}',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

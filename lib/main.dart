@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
+import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -82,6 +84,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Force GoogleMap platform views to use a real Android SurfaceView.
+  // This bypasses Flutter's ImageReaderSurfaceProducer path, which does not
+  // support fence-waiting on Android < API 33 and produces a blank map.
+  // Must be set before any GoogleMap widget is created.
+  final mapsImpl = GoogleMapsFlutterPlatform.instance;
+  if (mapsImpl is GoogleMapsFlutterAndroid) {
+    mapsImpl.useAndroidViewSurface = true;  // synchronous, no await
+  }
 
   // Lock app to portrait mode only
   await SystemChrome.setPreferredOrientations([
@@ -277,7 +288,7 @@ Future<void> initializeNotifications() async {
 
   // Handle notification tap when app is in background
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    _handleNotificationTap(message.data.toString());
+    _handleNotificationTap(jsonEncode(message.data));
   });
 
 }
@@ -316,21 +327,19 @@ void _handleNotificationTap(String payload) {
     final route = data['route'] as String?;
     final type = data['type'] as String?;
 
-    // Digital Credit specific notifications
+    // Type-specific navigation
     if (type != null) {
       switch (type) {
         case 'credit_ready':
         case 'credit_auto_claimed':
           final creditId = data['credit_id'] as String?;
           if (creditId != null) {
-            // Navigate to credit detail
             Navigator.pushNamed(context, '/digital-credit/$creditId');
           }
           break;
 
         case 'claim_transfer_request':
         case 'transfer_reminder':
-          // Navigate to Pending Approvals tab
           Navigator.pushNamed(context, '/digital-credits?tab=3');
           break;
 
@@ -342,11 +351,34 @@ void _handleNotificationTap(String payload) {
             Navigator.pushNamed(context, '/digital-credit/$creditId');
           }
           break;
+
+        case 'extension_request':
+        case 'credit_extension_request':
+        case 'new_extension_request':
+        case 'extension_pending':
+          // GM notification: someone submitted a credit extension request
+          Navigator.pushNamed(context, '/gm-credit-approvals');
+          break;
+
+        case 'extension_approved':
+        case 'extension_rejected':
+          // Notification to the requester: their extension was decided
+          final extensionId = data['extension_id'] as String? ??
+              data['credit_extension_id'] as String?;
+          if (extensionId != null) {
+            Navigator.pushNamed(context, '/credit-extension/$extensionId');
+          } else {
+            Navigator.pushNamed(context, '/gm-credit-approvals');
+          }
+          break;
+
+        default:
+          // Unknown type — fall through to route-based navigation below
+          break;
       }
-      return; // Exit after handling digital credit notification
     }
 
-    // Default route-based navigation (existing functionality)
+    // Route-based navigation fallback (also handles unknown types)
     if (route != null) {
       AppRoutes.navigateWithCompanyCheck(context, route);
     }

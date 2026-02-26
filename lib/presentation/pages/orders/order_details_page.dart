@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
+import 'package:lpg_distribution_app/core/models/api_validation_exception.dart';
+import 'package:lpg_distribution_app/core/services/validation_error_dialog.dart';
 import 'package:lpg_distribution_app/utils/currency_utils.dart';
 import '../../../core/services/User.dart';
 import '../../../domain/entities/order.dart';
@@ -71,8 +73,20 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
       );
 
       if (responseState is OrdersLoadedWithResponse) {
+        final response = responseState.response;
+
+        // Check for blocked status and show popup
+        final erp = (response['erp_response'] as Map?)?.cast<String, dynamic>();
+        final msg = erp != null ? (erp['message'] as Map?)?.cast<String, dynamic>() : null;
+        if (msg != null && msg['status'] == 'blocked') {
+          final blockers = (msg['blockers'] as List?) ?? [];
+          if (context.mounted) _showBlockersDialog(blockers);
+          // Don't set _approvalResponse for blocked — popup is sufficient
+          return;
+        }
+
         setState(() {
-          _approvalResponse = responseState.response;
+          _approvalResponse = response;
         });
       } else if (responseState is OrdersError) {
         setState(() {
@@ -88,6 +102,24 @@ class _OrderDetailsPageState extends State<OrderDetailsPage> {
         _isRequestingApproval = false;
       });
     }
+  }
+
+  void _showBlockersDialog(List<dynamic> blockers) {
+    final errors = blockers
+        .whereType<Map>()
+        .map((b) => ValidationError(
+              message: b['message']?.toString() ?? 'Unknown error',
+              code: b['code']?.toString() ?? 'UNKNOWN',
+            ))
+        .toList();
+
+    ValidationErrorDialog.show(
+      context,
+      ApiValidationException(
+        title: 'Order Blocked',
+        errors: errors,
+      ),
+    );
   }
 
   Widget _buildResponseWidget() {

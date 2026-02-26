@@ -124,6 +124,14 @@ class FilterInventoryRequestsByStatusAndType extends InventoryEvent {
   List<Object?> get props => [status, excludeTransfer];
 }
 
+/// Sets the active tab filter in the BLoC so refreshes preserve the correct tab view.
+class SetInventoryFilter extends InventoryEvent {
+  final String filterName; // 'All' | 'Pending' | 'Collect' | 'Deposit'
+  const SetInventoryFilter({required this.filterName});
+  @override
+  List<Object> get props => [filterName];
+}
+
 class ClearInventoryCache extends InventoryEvent {
   const ClearInventoryCache();
 }

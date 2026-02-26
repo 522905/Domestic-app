@@ -2283,4 +2283,122 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vehicleHistoryDriverDetailsTitle => 'Driver Details';
+
+  // Ujjwala Installation Strings
+  @override
+  String get ujjwalaInstallationsTitle => 'Ujjwala Installation';
+
+  @override
+  String get ujjwalaInstallationsSubtitle => 'Complete installation submissions';
+
+  @override
+  String get ujjwalaPendingListTitle => 'Pending Installations';
+
+  @override
+  String get ujjwalaPendingListEmpty => 'No pending installations found';
+
+  @override
+  String get ujjwalaApplicationNumber => 'Application Number';
+
+  @override
+  String get ujjwalaConsumerNumber => 'Consumer Number';
+
+  @override
+  String get ujjwalaConsumerName => 'Consumer Name';
+
+  @override
+  String get ujjwalaMobileNumber => 'Mobile Number';
+
+  @override
+  String get ujjwalaAddress => 'Address';
+
+  @override
+  String get ujjwalaMaterialDelivered => 'Material Delivered';
+
+  @override
+  String get ujjwalaSubmitTitle => 'Submit Installation';
+
+  @override
+  String get ujjwalaApplicantInfo => 'Applicant Information';
+
+  @override
+  String get ujjwalaPhotosSection => 'Installation Photos';
+
+  @override
+  String get ujjwalaKitchenPhoto => 'Kitchen Installation Context Photo';
+
+  @override
+  String get ujjwalaGatePhoto => 'Road-Facing House Identification Photo';
+
+  @override
+  String get ujjwalaStovePhoto => 'Installation Completion & Accountability Photo';
+
+  @override
+  String get ujjwalaKitchenPhotoInfo =>
+      'Capture the full kitchen area where LPG is installed, including platform, ventilation, and surrounding space.';
+
+  @override
+  String get ujjwalaGatePhotoInfo =>
+      'Stand on the road and capture the house exactly as it appears when approaching from the street. Gate, boundary, nearby landmarks, nameplate (if any), and visible damage must be clearly shown.';
+
+  @override
+  String get ujjwalaStovePhotoInfo =>
+      'One clear photo showing all of the following together:\n• Authorized Mechanic\n• Installed LPG Cylinder\n• Installed Equipment (Regulator/Hose/Stove)\n• Beneficiary (BB) linked to the connection\n\nAll faces, equipment, and surroundings must be clean and clearly visible.';
+
+  @override
+  String get ujjwalaTakePhoto => 'Take Photo';
+
+  @override
+  String get ujjwalaRetakePhoto => 'Retake';
+
+  @override
+  String get ujjwalaDeletePhoto => 'Delete';
+
+  @override
+  String get ujjwalaRotatePhoto => 'Rotate';
+
+  @override
+  String get ujjwalaPhotoUploading => 'Uploading';
+
+  @override
+  String get ujjwalaPhotoUploaded => 'Photo uploaded successfully';
+
+  @override
+  String get ujjwalaPhotoError => 'Upload failed';
+
+  @override
+  String get ujjwalaLocationSection => 'GPS Location';
+
+  @override
+  String get ujjwalaLatitude => 'Latitude';
+
+  @override
+  String get ujjwalaLongitude => 'Longitude';
+
+  @override
+  String get ujjwalaAccuracy => 'Accuracy';
+
+  @override
+  String get ujjwalaRefreshLocation => 'Refresh Location';
+
+  @override
+  String get ujjwalaFetchingLocation => 'Fetching location...';
+
+  @override
+  String get ujjwalaLocationError => 'Failed to get location';
+
+  @override
+  String get ujjwalaLocationRequired => 'Location is required';
+
+  @override
+  String get ujjwalaSubmitButton => 'Submit Installation';
+
+  @override
+  String get ujjwalaSubmitSuccess => 'Installation submitted successfully';
+
+  @override
+  String get ujjwalaSubmitError => 'Failed to submit installation';
+
+  @override
+  String get ujjwalaAllPhotosRequired => 'Please upload all photos';
 }

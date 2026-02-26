@@ -321,6 +321,12 @@ class _OrderDetailPageState extends State<OrderDetailPage>
           _buildHeroStatusCard(order),
           SizedBox(height: AppSpacing.md),
 
+          // 1b. QUEUED BANNER (prominent explanation when data not yet fetched)
+          if (order.isRpaInProgress) ...[
+            _buildQueuedBanner(order),
+            SizedBox(height: AppSpacing.md),
+          ],
+
           // 2. APPROVAL SECTION (if pending) - PROMINENT!
           if (order.pendingTransfer != null && order.pendingTransfer!.canApprove) ...[
             _ApprovalWidget(
@@ -791,7 +797,93 @@ class _OrderDetailPageState extends State<OrderDetailPage>
     );
   }
 
+  Widget _buildQueuedBanner(SdmsOrder order) {
+    final isQueued = order.dataStatus == 'QUEUED';
+    final label = isQueued ? 'Queued for SDMS Processing' : 'Processing in SDMS...';
+    final description = isQueued
+        ? 'Your order has been submitted and is waiting in the SDMS queue. Consumer details and amount will appear once processing begins.'
+        : 'SDMS is currently processing this order. Consumer details and amount will appear shortly.';
+
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColorsEnhanced.infoBlue.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColorsEnhanced.infoBlue.withOpacity(0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 20.w,
+            height: 20.h,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation(AppColorsEnhanced.infoBlue),
+            ),
+          ),
+          SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColorsEnhanced.infoBlue,
+                  ),
+                ),
+                SizedBox(height: AppSpacing.xs),
+                Text(
+                  description,
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColorsEnhanced.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionButtons(SdmsOrder order) {
+    // QUEUED / PROCESSING: show disabled waiting indicator instead of blank
+    if (order.isRpaInProgress) {
+      return Container(
+        padding: EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColorsEnhanced.infoBlue.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColorsEnhanced.infoBlue.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 14.w,
+              height: 14.h,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(AppColorsEnhanced.infoBlue),
+              ),
+            ),
+            SizedBox(width: AppSpacing.sm),
+            Text(
+              'Waiting for SDMS data — actions available after processing',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColorsEnhanced.infoBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+
     if (order.canClaim) {
       return ProfessionalButton(
         text: context.l10n.translate('sdmsClaimsClaimOrderButtonText'),

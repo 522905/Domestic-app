@@ -34,5 +34,8 @@ class SDMSCreateError extends SDMSCreateState {
 
 class SDMSCreateDetailedError extends SDMSCreateState {
   final SDMSErrorResponse errorResponse;
-  SDMSCreateDetailedError({required this.errorResponse});
+  const SDMSCreateDetailedError({required this.errorResponse});
+
+  @override
+  List<Object> get props => [errorResponse];
 }

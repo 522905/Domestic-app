@@ -161,6 +161,7 @@ class _ReceiveVehicleScreenState extends State<ReceiveVehicleScreen> {
 
     try {
       final results = await _apiService.searchDrivers(phone);
+      if (!mounted) return;
       final drivers = List<Map<String, dynamic>>.from(results);
 
       setState(() {
@@ -175,6 +176,7 @@ class _ReceiveVehicleScreenState extends State<ReceiveVehicleScreen> {
       }
 
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _driverState = DriverSelectionState.creatingNew;
         _searchedDrivers.clear();
@@ -237,8 +239,9 @@ class _ReceiveVehicleScreenState extends State<ReceiveVehicleScreen> {
 
         _tusClient = TusClient(photo);
 
+        print('🔵 TUS: Uploading driver photo to https://tus.dca.arungas.com/files/');
         await _tusClient!.upload(
-          uri: Uri.parse('http://arungas.com:1080/files/'),
+          uri: Uri.parse('https://tus.dca.arungas.com/files/'),
           onComplete: () {
             print('TUS Upload complete! URL: ${_tusClient!.uploadUrl}');
             if (mounted) {

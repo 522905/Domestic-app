@@ -2283,4 +2283,122 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get vehicleHistoryDriverDetailsTitle => 'Driver Details';
+
+  // Ujjwala Installation Strings (Hindi)
+  @override
+  String get ujjwalaInstallationsTitle => 'उज्ज्वला स्थापना';
+
+  @override
+  String get ujjwalaInstallationsSubtitle => 'स्थापना सबमिशन पूर्ण करें';
+
+  @override
+  String get ujjwalaPendingListTitle => 'लंबित स्थापनाएं';
+
+  @override
+  String get ujjwalaPendingListEmpty => 'कोई लंबित स्थापना नहीं मिली';
+
+  @override
+  String get ujjwalaApplicationNumber => 'आवेदन संख्या';
+
+  @override
+  String get ujjwalaConsumerNumber => 'उपभोक्ता संख्या';
+
+  @override
+  String get ujjwalaConsumerName => 'उपभोक्ता का नाम';
+
+  @override
+  String get ujjwalaMobileNumber => 'मोबाइल नंबर';
+
+  @override
+  String get ujjwalaAddress => 'पता';
+
+  @override
+  String get ujjwalaMaterialDelivered => 'सामग्री वितरित';
+
+  @override
+  String get ujjwalaSubmitTitle => 'स्थापना सबमिट करें';
+
+  @override
+  String get ujjwalaApplicantInfo => 'आवेदक की जानकारी';
+
+  @override
+  String get ujjwalaPhotosSection => 'स्थापना फोटो';
+
+  @override
+  String get ujjwalaKitchenPhoto => 'रसोई स्थापना संदर्भ फोटो';
+
+  @override
+  String get ujjwalaGatePhoto => 'सड़क की ओर घर की पहचान फोटो';
+
+  @override
+  String get ujjwalaStovePhoto => 'स्थापना पूर्णता एवं जवाबदेही फोटो';
+
+  @override
+  String get ujjwalaKitchenPhotoInfo =>
+      'LPG स्थापित किए गए पूरे रसोई क्षेत्र की फोटो लें, जिसमें प्लेटफ़ॉर्म, वेंटिलेशन और आसपास की जगह शामिल हो।';
+
+  @override
+  String get ujjwalaGatePhotoInfo =>
+      'सड़क पर खड़े होकर घर की फोटो लें जैसा वह सड़क से दिखता है। गेट, सीमा, आसपास के स्थल, नामपट्टिका (यदि हो) और दिखाई देने वाली क्षति स्पष्ट रूप से दिखनी चाहिए।';
+
+  @override
+  String get ujjwalaStovePhotoInfo =>
+      'एक स्पष्ट फोटो में निम्नलिखित सभी दिखाएं:\n• अधिकृत मैकेनिक\n• स्थापित LPG सिलेंडर\n• स्थापित उपकरण (रेगुलेटर/होज़/स्टोव)\n• कनेक्शन से जुड़े लाभार्थी (BB)\n\nसभी चेहरे, उपकरण और परिवेश साफ और स्पष्ट दिखने चाहिए।';
+
+  @override
+  String get ujjwalaTakePhoto => 'फोटो लें';
+
+  @override
+  String get ujjwalaRetakePhoto => 'पुनः लें';
+
+  @override
+  String get ujjwalaDeletePhoto => 'हटाएं';
+
+  @override
+  String get ujjwalaRotatePhoto => 'घुमाएं';
+
+  @override
+  String get ujjwalaPhotoUploading => 'अपलोड हो रहा है';
+
+  @override
+  String get ujjwalaPhotoUploaded => 'फोटो सफलतापूर्वक अपलोड हुआ';
+
+  @override
+  String get ujjwalaPhotoError => 'अपलोड विफल';
+
+  @override
+  String get ujjwalaLocationSection => 'GPS स्थान';
+
+  @override
+  String get ujjwalaLatitude => 'अक्षांश';
+
+  @override
+  String get ujjwalaLongitude => 'देशांतर';
+
+  @override
+  String get ujjwalaAccuracy => 'सटीकता';
+
+  @override
+  String get ujjwalaRefreshLocation => 'स्थान रीफ्रेश करें';
+
+  @override
+  String get ujjwalaFetchingLocation => 'स्थान प्राप्त कर रहे हैं...';
+
+  @override
+  String get ujjwalaLocationError => 'स्थान प्राप्त करने में विफल';
+
+  @override
+  String get ujjwalaLocationRequired => 'स्थान आवश्यक है';
+
+  @override
+  String get ujjwalaSubmitButton => 'स्थापना सबमिट करें';
+
+  @override
+  String get ujjwalaSubmitSuccess => 'स्थापना सफलतापूर्वक सबमिट हुई';
+
+  @override
+  String get ujjwalaSubmitError => 'स्थापना सबमिट करने में विफल';
+
+  @override
+  String get ujjwalaAllPhotosRequired => 'कृपया सभी फोटो अपलोड करें';
 }

@@ -376,18 +376,3 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
   }
 }
 
-// Optional: Add this state class to orders_state.dart for better error recovery
-class OrdersErrorWithRecovery extends OrdersState {
-  final String message;
-  final bool canRetry;
-  final OrdersLoaded previousState;
-
-  const OrdersErrorWithRecovery({
-    required this.message,
-    required this.canRetry,
-    required this.previousState,
-  });
-
-  @override
-  List<Object?> get props => [message, canRetry, previousState];
-}

@@ -8,6 +8,7 @@ import 'package:lpg_distribution_app/presentation/blocs/quota/quota_event.dart';
 import 'package:lpg_distribution_app/presentation/blocs/quota/quota_state.dart';
 import 'package:lpg_distribution_app/presentation/blocs/quota_history/quota_history_bloc.dart';
 import 'package:lpg_distribution_app/presentation/pages/quota/quota_history_page.dart';
+import 'package:lpg_distribution_app/core/services/User.dart';
 import 'package:lpg_distribution_app/presentation/pages/credit_extension/extension_list_page.dart';
 import 'package:lpg_distribution_app/presentation/widgets/dashboard/bonus_summary_card.dart';
 import 'package:lpg_distribution_app/domain/entities/quota/quota_snapshot.dart';
@@ -253,13 +254,20 @@ class QuotaSnapshotPage extends StatelessWidget {
                 Container(
                   margin: EdgeInsets.only(bottom: 12.h),
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ExtensionListPage(),
-                        ),
-                      );
+                    onPressed: () async {
+                      final roles = await User().getUserRoles();
+                      final isGM = roles.any((r) => r.role == 'General Manager');
+                      if (!context.mounted) return;
+                      if (isGM) {
+                        Navigator.pushNamed(context, '/gm-credit-approvals');
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ExtensionListPage(),
+                          ),
+                        );
+                      }
                     },
                     icon: Icon(Icons.request_quote, size: 18.sp),
                     label: Text(

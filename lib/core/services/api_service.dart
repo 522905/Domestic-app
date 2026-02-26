@@ -2691,4 +2691,246 @@ class ApiService implements ApiServiceInterface {
     }
   }
 
+  // Ujjwala Installation methods
+  @override
+  Future<List<dynamic>> getPendingUjjwalaInstallations() async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaPendingInstallations,
+      );
+      // API returns paginated response: {"count": 17, "results": [...]}
+      if (response.data is Map<String, dynamic> && response.data.containsKey('results')) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+      return response.data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> searchUjjwalaInstallations(String query) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaSearchInstallations,
+        queryParameters: {
+          'q': query,
+        },
+      );
+
+      // Handle paginated response format: {"count": 17, "results": [...]}
+      if (response.data is Map<String, dynamic> && response.data.containsKey('results')) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+
+      // Handle direct list response
+      if (response.data is List) {
+        return response.data as List<dynamic>;
+      }
+
+      return [];
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> submitUjjwalaInstallation({
+    required int installationId,
+    required String kitchenPhotoUrl,
+    required String gatePhotoUrl,
+    required String stovePhotoUrl,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+  }) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.ujjwalaLpgInstallations,
+        data: {
+          'disbursement_id': installationId,
+          'kitchen_photo_url': kitchenPhotoUrl,
+          'gate_photo_url': gatePhotoUrl,
+          'stove_photo_url': stovePhotoUrl,
+          'latitude': latitude.toString(),
+          'longitude': longitude.toString(),
+          'accuracy': accuracy.toString(),
+        },
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data['data'] ?? response.data as Map<String, dynamic>;
+      }
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getMyUjjwalaUploads({String? status}) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaMyUploads(status: status),
+      );
+      // API returns paginated response: {"count": 17, "results": [...]}
+      if (response.data is Map<String, dynamic> && response.data.containsKey('results')) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+      return response.data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getUjjwalaApplicationDetail(int disbursementId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaApplicationDetail(disbursementId),
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> submitUjjwalaInstallationV2({
+    required int disbursementId,
+    required String kitchenPhotoUrl,
+    required String gatePhotoUrl,
+    required String stovePhotoUrl,
+    required String latitude,
+    required String longitude,
+    required String accuracy,
+  }) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.ujjwalaLpgInstallations,
+        data: {
+          'disbursement_id': disbursementId,
+          'kitchen_photo_url': kitchenPhotoUrl,
+          'gate_photo_url': gatePhotoUrl,
+          'stove_photo_url': stovePhotoUrl,
+          'latitude': latitude,
+          'longitude': longitude,
+          'accuracy': accuracy,
+        },
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data['data'] ?? response.data as Map<String, dynamic>;
+      }
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getLpgOpsInstallations({
+    String scope = 'mine',
+    String? status,
+    bool? reimbursed,
+  }) async {
+    try {
+      final queryParameters = <String, dynamic>{'scope': scope};
+      if (status != null) queryParameters['status'] = status;
+      if (reimbursed != null) queryParameters['reimbursed'] = reimbursed.toString();
+
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaLpgInstallations,
+        queryParameters: queryParameters,
+      );
+
+      if (response.data is Map<String, dynamic>) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+      return response.data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> bulkVerifyInstallations(List<int> installationIds) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.ujjwalaBulkVerify,
+        data: {'installation_ids': installationIds},
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> retryFailedInstallations(List<int> installationIds) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.ujjwalaRetryFailed,
+        data: {'installation_ids': installationIds},
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getReimbursementPreview(int warehouseId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaReimbursementsPreview,
+        queryParameters: {'warehouse_id': warehouseId},
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> createReimbursement({
+    required int warehouseId,
+    required int qty,
+  }) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.ujjwalaReimbursements,
+        data: {'warehouse_id': warehouseId, 'qty': qty},
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getReimbursementBatches() async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaReimbursements,
+      );
+      if (response.data is Map<String, dynamic>) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+      return response.data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
 }

@@ -139,8 +139,9 @@ class _BankDepositScreenState extends State<BankDepositScreen> {
 
       _tusClient = TusClient(_receiptImage!);
 
+      print('🔵 TUS: Uploading bank receipt to https://tus.dca.arungas.com/files/');
       await _tusClient!.upload(
-        uri: Uri.parse('http://arungas.com:1080/files/'),
+        uri: Uri.parse('https://tus.dca.arungas.com/files/'),
         onComplete: () {
           if (mounted) {
             setState(() {
