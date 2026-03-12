@@ -18,6 +18,7 @@ class UjjwalaInstallation extends Equatable {
   final double? longitude;
   final double? accuracy;
   final String? googleMapsUrl;
+  final String? orderId;
 
   const UjjwalaInstallation({
     required this.id,
@@ -37,6 +38,7 @@ class UjjwalaInstallation extends Equatable {
     this.longitude,
     this.accuracy,
     this.googleMapsUrl,
+    this.orderId,
   });
 
   @override
@@ -58,6 +60,7 @@ class UjjwalaInstallation extends Equatable {
         longitude,
         accuracy,
         googleMapsUrl,
+        orderId,
       ];
 
   factory UjjwalaInstallation.fromJson(Map<String, dynamic> json) {
@@ -92,6 +95,7 @@ class UjjwalaInstallation extends Equatable {
           ? _parseDouble(json['accuracy'])
           : null,
       googleMapsUrl: json['google_maps_url'] as String?,
+      orderId: json['order_id'] as String?,
     );
   }
 
@@ -113,6 +117,7 @@ class UjjwalaInstallation extends Equatable {
         'longitude': longitude,
         'accuracy': accuracy,
         'google_maps_url': googleMapsUrl,
+        'order_id': orderId,
       };
 
   UjjwalaInstallation copyWith({
@@ -133,6 +138,7 @@ class UjjwalaInstallation extends Equatable {
     double? longitude,
     double? accuracy,
     String? googleMapsUrl,
+    String? orderId,
   }) {
     return UjjwalaInstallation(
       id: id ?? this.id,
@@ -152,6 +158,7 @@ class UjjwalaInstallation extends Equatable {
       longitude: longitude ?? this.longitude,
       accuracy: accuracy ?? this.accuracy,
       googleMapsUrl: googleMapsUrl ?? this.googleMapsUrl,
+      orderId: orderId ?? this.orderId,
     );
   }
 

@@ -65,6 +65,9 @@ class InstallationSubmitState extends UjjwalaInstallationsState {
   final bool isSubmitting;
   final bool submitSuccess;
   final String? submitError;
+  final List<Map<String, dynamic>> installationHistory;
+  final bool isHistoryLoading;
+  final String? historyError;
 
   const InstallationSubmitState({
     required this.installation,
@@ -75,6 +78,9 @@ class InstallationSubmitState extends UjjwalaInstallationsState {
     this.isSubmitting = false,
     this.submitSuccess = false,
     this.submitError,
+    this.installationHistory = const [],
+    this.isHistoryLoading = false,
+    this.historyError,
   });
 
   @override
@@ -87,6 +93,9 @@ class InstallationSubmitState extends UjjwalaInstallationsState {
         isSubmitting,
         submitSuccess,
         submitError,
+        installationHistory,
+        isHistoryLoading,
+        historyError,
       ];
 
   InstallationSubmitState copyWith({
@@ -98,6 +107,9 @@ class InstallationSubmitState extends UjjwalaInstallationsState {
     bool? isSubmitting,
     bool? submitSuccess,
     String? submitError,
+    List<Map<String, dynamic>>? installationHistory,
+    bool? isHistoryLoading,
+    String? historyError,
   }) {
     return InstallationSubmitState(
       installation: installation ?? this.installation,
@@ -108,6 +120,9 @@ class InstallationSubmitState extends UjjwalaInstallationsState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       submitSuccess: submitSuccess ?? this.submitSuccess,
       submitError: submitError,
+      installationHistory: installationHistory ?? this.installationHistory,
+      isHistoryLoading: isHistoryLoading ?? this.isHistoryLoading,
+      historyError: historyError,
     );
   }
 

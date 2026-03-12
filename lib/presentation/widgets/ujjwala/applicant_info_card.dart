@@ -61,6 +61,10 @@ class ApplicantInfoCard extends StatelessWidget {
             context.l10n.ujjwalaConsumerName,
             installation.consumerName,
           ),
+          if (installation.orderId != null) ...[
+            SizedBox(height: AppSpacing.sm),
+            _buildInfoRow(context, 'Order ID', installation.orderId!),
+          ],
           SizedBox(height: AppSpacing.sm),
           _buildInfoRow(
             context,

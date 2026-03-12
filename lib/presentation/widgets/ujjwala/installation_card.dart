@@ -82,6 +82,30 @@ class InstallationCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (installation.orderId != null) ...[
+                          SizedBox(width: AppSpacing.xs),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColorsEnhanced.successGreen.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6.r),
+                              border: Border.all(
+                                color: AppColorsEnhanced.successGreen,
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              'Order: ${installation.orderId}',
+                              style: AppTextStyles.labelSmall.copyWith(
+                                color: AppColorsEnhanced.successGreen,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                         const Spacer(),
                         if (_hasValidLocation)
                           InkWell(

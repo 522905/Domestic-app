@@ -37,6 +37,8 @@ import '../blocs/inventory/inventory_bloc.dart';
 import '../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../blocs/ujjwala_installations/ujjwala_installations_bloc.dart';
 import '../blocs/ujjwala_installations/ujjwala_installations_event.dart';
+import '../pages/dac_orders/dac_orders_list_page.dart';
+import '../pages/dac_orders/dac_orders_add_page.dart';
 import '../pages/ujjwala_installations/pending_installations_page.dart';
 import '../pages/ujjwala_installations/installation_submit_page.dart';
 import '../pages/ujjwala_installations/my_uploads_page.dart';
@@ -89,6 +91,9 @@ class AppRoutes {
   // Ujjwala Installation routes
   static const String ujjwalaInstallations = 'ujjwala-installations';
   static const String ujjwalaInstallationSubmit = 'ujjwala-installation/submit';
+
+  // DAC Orders routes
+  static const String dacOrders = 'dac-orders';
 
   // Profile route
   static const String profile = '/profile';
@@ -562,6 +567,19 @@ class AppRoutes {
           final installation = settings.arguments as LpgOpsInstallation;
           return MaterialPageRoute(
             builder: (_) => InstallationDetailPage(installation: installation),
+          );
+        }
+        return _errorRoute();
+
+      // DAC ORDERS
+      case 'dac-orders':
+        if (segments.length == 1) {
+          return MaterialPageRoute(
+            builder: (_) => const DacOrdersListPage(),
+          );
+        } else if (segments[1] == 'add') {
+          return MaterialPageRoute(
+            builder: (_) => const DacOrdersAddPage(),
           );
         }
         return _errorRoute();

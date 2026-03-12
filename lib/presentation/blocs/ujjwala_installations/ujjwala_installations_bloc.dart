@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:tus_client_dart/tus_client_dart.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/services/ujjwala_photo_cache_service.dart';
 import '../../../domain/entities/ujjwala/ujjwala_installation.dart';
 import '../../../domain/entities/ujjwala/ujjwala_photo_upload.dart';
 import 'ujjwala_installations_event.dart';
@@ -17,6 +19,7 @@ class UjjwalaInstallationsBloc
 
   List<UjjwalaInstallation> _cachedInstallations = [];
   final Map<PhotoType, TusClient?> _tusClients = {};
+  final UjjwalaPhotoCacheService _photoCache = UjjwalaPhotoCacheService();
 
   UjjwalaInstallationsBloc({
     required this.apiService,
@@ -33,12 +36,14 @@ class UjjwalaInstallationsBloc
     on<DeletePhoto>(_onDeletePhoto);
     on<FetchLocation>(_onFetchLocation);
     on<SubmitInstallation>(_onSubmitInstallation);
+    on<LoadInstallationHistory>(_onLoadInstallationHistory);
   }
 
-  void initializeSubmitState(UjjwalaInstallation installation) {
+  Future<void> initializeSubmitState(UjjwalaInstallation installation) async {
     print('🏗️ Initializing submit state');
     print('📍 Installation coordinates: ${installation.latitude}, ${installation.longitude}');
 
+    // Emit empty state immediately (fast)
     emit(InstallationSubmitState(
       installation: installation,
       photos: {
@@ -48,8 +53,31 @@ class UjjwalaInstallationsBloc
       },
     ));
 
-    // Auto-fetch location on initialization
+    // Restore cached photos — with local file preview if still on disk
+    final restored = <PhotoType, UjjwalaPhotoUpload>{};
+    for (final type in PhotoType.values) {
+      final entry = await _photoCache.getPhoto(installation.id, type);
+      if (entry != null) {
+        final fileExists = File(entry.localFilePath).existsSync();
+        restored[type] = UjjwalaPhotoUpload(
+          file: fileExists ? XFile(entry.localFilePath) : null,
+          uploadedUrl: entry.tusUrl,
+          status: PhotoUploadStatus.success,
+          uploadProgress: 100.0,
+        );
+        print('📦 Restored cached photo for $type (file on disk: $fileExists)');
+      } else {
+        restored[type] = UjjwalaPhotoUpload.empty();
+      }
+    }
+
+    if (state is InstallationSubmitState) {
+      emit((state as InstallationSubmitState).copyWith(photos: restored));
+    }
+
+    // Auto-fetch location and history on initialization
     add(const FetchLocation());
+    add(const LoadInstallationHistory());
   }
 
   Future<void> _onLoadPendingInstallations(
@@ -221,7 +249,7 @@ class UjjwalaInstallationsBloc
       print('🔵 TUS: Upload URL: https://tus.dca.arungas.com/files/');
       print('🔵 TUS: File path: ${photoUpload.file!.path}');
 
-      // Upload using TUS
+      // Upload using TUS with a 90-second timeout
       await tusClient.upload(
         uri: Uri.parse('https://tus.dca.arungas.com/files/'),
         onProgress: (double progress, Duration total) {
@@ -239,6 +267,10 @@ class UjjwalaInstallationsBloc
             uploadedUrl: tusClient.uploadUrl.toString(),
           ));
         },
+      ).timeout(
+        const Duration(seconds: 90),
+        onTimeout: () =>
+            throw TimeoutException('Upload timed out after 90 seconds'),
       );
     } catch (e) {
       print('❌ TUS: Upload failed!');
@@ -291,6 +323,16 @@ class UjjwalaInstallationsBloc
 
       // Clean up TUS client
       _tusClients[event.photoType] = null;
+
+      // Fire-and-forget: persist TUS URL + local file path for cache restore on re-entry
+      if (photoUpload.file != null) {
+        _photoCache.savePhoto(
+          currentState.installation.id,
+          event.photoType,
+          event.uploadedUrl,
+          photoUpload.file!.path,
+        );
+      }
     }
   }
 
@@ -338,6 +380,9 @@ class UjjwalaInstallationsBloc
       photos: updatedPhotos,
       submitError: null,
     ));
+
+    // Fire-and-forget: remove cache entry so re-entry shows capture button
+    _photoCache.clearPhoto(currentState.installation.id, event.photoType);
   }
 
   Future<void> _onFetchLocation(
@@ -345,10 +390,7 @@ class UjjwalaInstallationsBloc
     Emitter<UjjwalaInstallationsState> emit,
   ) async {
     if (state is! InstallationSubmitState) return;
-
-    final currentState = state as InstallationSubmitState;
-
-    emit(currentState.copyWith(
+    emit((state as InstallationSubmitState).copyWith(
       isLocationLoading: true,
       locationError: null,
     ));
@@ -357,15 +399,16 @@ class UjjwalaInstallationsBloc
       print('📍 Fetching current GPS location...');
       final location = await locationService.getCurrentLocation();
       print('✅ Current GPS location: ${location.latitude}, ${location.longitude} (accuracy: ${location.accuracy}m)');
-
-      emit(currentState.copyWith(
+      if (state is! InstallationSubmitState) return;
+      emit((state as InstallationSubmitState).copyWith(
         location: location,
         isLocationLoading: false,
         locationError: null,
       ));
     } catch (e) {
       print('❌ Failed to get location: $e');
-      emit(currentState.copyWith(
+      if (state is! InstallationSubmitState) return;
+      emit((state as InstallationSubmitState).copyWith(
         isLocationLoading: false,
         locationError: e.toString(),
       ));
@@ -377,30 +420,31 @@ class UjjwalaInstallationsBloc
     Emitter<UjjwalaInstallationsState> emit,
   ) async {
     if (state is! InstallationSubmitState) return;
+    final snap = state as InstallationSubmitState;
 
-    final currentState = state as InstallationSubmitState;
-
-    if (!currentState.canSubmit) {
-      emit(currentState.copyWith(
+    if (!snap.canSubmit) {
+      emit(snap.copyWith(
         submitError: 'Please complete all photos and location before submitting',
       ));
       return;
     }
 
-    emit(currentState.copyWith(
+    // Capture the fields we need for the API call before any await.
+    final installationId = snap.installation.id;
+    final kitchenUrl = snap.photos[PhotoType.kitchen]!.uploadedUrl!;
+    final gateUrl = snap.photos[PhotoType.gate]!.uploadedUrl!;
+    final stoveUrl = snap.photos[PhotoType.stove]!.uploadedUrl!;
+    final location = snap.location!;
+
+    emit(snap.copyWith(
       isSubmitting: true,
       submitError: null,
       submitSuccess: false,
     ));
 
     try {
-      final kitchenUrl = currentState.photos[PhotoType.kitchen]!.uploadedUrl!;
-      final gateUrl = currentState.photos[PhotoType.gate]!.uploadedUrl!;
-      final stoveUrl = currentState.photos[PhotoType.stove]!.uploadedUrl!;
-      final location = currentState.location!;
-
-      await apiService.submitUjjwalaInstallation(
-        installationId: currentState.installation.id,
+      final response = await apiService.submitUjjwalaInstallation(
+        installationId: installationId,
         kitchenPhotoUrl: kitchenUrl,
         gatePhotoUrl: gateUrl,
         stovePhotoUrl: stoveUrl,
@@ -409,22 +453,70 @@ class UjjwalaInstallationsBloc
         accuracy: location.accuracy,
       );
 
+      // API must return success: true — otherwise treat as a business error.
+      if (response['success'] != true) {
+        if (state is! InstallationSubmitState) return;
+        emit((state as InstallationSubmitState).copyWith(
+          isSubmitting: false,
+          submitError: response['message']?.toString() ??
+              'Submission failed. Please try again.',
+        ));
+        return;
+      }
+
       // Clear cache to refresh list on return
       _cachedInstallations = [];
 
-      emit(currentState.copyWith(
+      // Clear photo cache so re-entry shows fresh state
+      await _photoCache.clearAllPhotos(installationId);
+
+      if (state is! InstallationSubmitState) return;
+      emit((state as InstallationSubmitState).copyWith(
         isSubmitting: false,
         submitSuccess: true,
       ));
     } catch (e) {
-      emit(currentState.copyWith(
+      if (state is! InstallationSubmitState) return;
+      emit((state as InstallationSubmitState).copyWith(
         isSubmitting: false,
         submitError: 'Failed to submit installation: ${e.toString()}',
       ));
     }
   }
 
+  Future<void> _onLoadInstallationHistory(
+    LoadInstallationHistory event,
+    Emitter<UjjwalaInstallationsState> emit,
+  ) async {
+    if (state is! InstallationSubmitState) return;
+    // Save only the installation ID before any await — do NOT snapshot the
+    // whole state here, as concurrent handlers will have already mutated it.
+    final installationId = (state as InstallationSubmitState).installation.id;
+    emit((state as InstallationSubmitState)
+        .copyWith(isHistoryLoading: true, historyError: null));
+    try {
+      final raw =
+          await apiService.getUjjwalaInstallationHistory(installationId);
+      final history =
+          raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      if (state is! InstallationSubmitState) return;
+      emit((state as InstallationSubmitState).copyWith(
+        installationHistory: history,
+        isHistoryLoading: false,
+      ));
+    } catch (_) {
+      if (state is! InstallationSubmitState) return;
+      emit((state as InstallationSubmitState).copyWith(
+        isHistoryLoading: false,
+        historyError: 'Could not load history.',
+      ));
+    }
+  }
+
   String _parseUploadError(dynamic error) {
+    if (error is TimeoutException) {
+      return 'Upload timed out. Please check your network and retry.';
+    }
     final errorString = error.toString();
     if (errorString.contains('412')) {
       return 'Upload precondition failed. Please try again.';

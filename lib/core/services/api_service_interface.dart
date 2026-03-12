@@ -365,6 +365,10 @@ abstract class ApiServiceInterface {
     required double accuracy,
   });
 
+  Future<List<dynamic>> getUjjwalaServiceAreas();
+
+  Future<List<dynamic>> getUjjwalaInstallationHistory(int installationId);
+
   Future<List<dynamic>> getMyUjjwalaUploads({String? status});
 
   // LPG Ops Backend Ujjwala methods

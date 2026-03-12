@@ -89,13 +89,10 @@ class InstallationSubmitPage extends StatelessWidget {
                     ),
 
                   // Photos Section Header
-                  _buildSectionHeader(
-                    context,
-                    icon: Icons.photo_camera,
-                    title: context.l10n.ujjwalaPhotosSection,
-                    subtitle: 'Capture all required installation photos',
-                  ),
-                  SizedBox(height: AppSpacing.md),
+                  _buildSectionLabel(context,
+                      icon: Icons.photo_camera,
+                      title: context.l10n.ujjwalaPhotosSection),
+                  SizedBox(height: AppSpacing.sm),
 
                   // Kitchen Photo
                   PhotoUploadWidget(
@@ -104,7 +101,7 @@ class InstallationSubmitPage extends StatelessWidget {
                     label: context.l10n.ujjwalaKitchenPhoto,
                     infoText: context.l10n.ujjwalaKitchenPhotoInfo,
                   ),
-                  SizedBox(height: AppSpacing.md),
+                  SizedBox(height: AppSpacing.sm),
 
                   // Gate Photo
                   PhotoUploadWidget(
@@ -113,7 +110,7 @@ class InstallationSubmitPage extends StatelessWidget {
                     label: context.l10n.ujjwalaGatePhoto,
                     infoText: context.l10n.ujjwalaGatePhotoInfo,
                   ),
-                  SizedBox(height: AppSpacing.md),
+                  SizedBox(height: AppSpacing.sm),
 
                   // Stove Photo
                   PhotoUploadWidget(
@@ -125,13 +122,10 @@ class InstallationSubmitPage extends StatelessWidget {
                   SizedBox(height: AppSpacing.lg),
 
                   // Location Section Header
-                  _buildSectionHeader(
-                    context,
-                    icon: Icons.location_on,
-                    title: context.l10n.ujjwalaLocationSection,
-                    subtitle: 'Verify current GPS location',
-                  ),
-                  SizedBox(height: AppSpacing.md),
+                  _buildSectionLabel(context,
+                      icon: Icons.location_on,
+                      title: context.l10n.ujjwalaLocationSection),
+                  SizedBox(height: AppSpacing.sm),
 
                   // Location Widget
                   LocationWidget(
@@ -139,7 +133,22 @@ class InstallationSubmitPage extends StatelessWidget {
                     isLoading: state.isLocationLoading,
                     errorMessage: state.locationError,
                   ),
-                  SizedBox(height: AppSpacing.xl),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Previous Attempts section
+                  if (state.isHistoryLoading || state.installationHistory.isNotEmpty)
+                    Column(children: [
+                      _buildSectionLabel(
+                        context,
+                        icon: Icons.history,
+                        title: state.installationHistory.isEmpty
+                            ? 'Previous Attempts'
+                            : 'Previous Attempts (${state.installationHistory.length})',
+                      ),
+                      SizedBox(height: AppSpacing.sm),
+                      _buildHistorySection(context, state),
+                      SizedBox(height: AppSpacing.lg),
+                    ]),
 
                   // Submit Button
                   SizedBox(
@@ -229,69 +238,135 @@ class InstallationSubmitPage extends StatelessWidget {
     return '';
   }
 
-  Widget _buildSectionHeader(
+  Widget _buildHistorySection(
+      BuildContext context, InstallationSubmitState state) {
+    if (state.isHistoryLoading) {
+      return Container(
+        padding: EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: AppColorsEnhanced.border),
+        ),
+        child: Row(children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: AppColorsEnhanced.brandBlue),
+          ),
+          SizedBox(width: AppSpacing.sm),
+          Text('Loading history...', style: AppTextStyles.bodySmall),
+        ]),
+      );
+    }
+
+    return Column(
+      children: state.installationHistory.map((attempt) {
+        final status = attempt['status']?.toString() ?? '';
+        final statusDisplay =
+            attempt['status_display']?.toString() ?? status;
+        final submittedAt = attempt['submitted_at']?.toString() ?? '';
+        final rejectionReason =
+            attempt['rejection_reason']?.toString();
+
+        final statusColor = switch (status) {
+          'ACCEPTED' => AppColorsEnhanced.successGreen,
+          'REJECTED' => AppColorsEnhanced.errorRed,
+          _ => AppColorsEnhanced.warningYellow,
+        };
+
+        return Container(
+          margin: EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: AppColorsEnhanced.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6.r),
+                  ),
+                  child: Text(statusDisplay,
+                      style: AppTextStyles.labelSmall.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold)),
+                ),
+                const Spacer(),
+                Text(
+                  submittedAt.isNotEmpty
+                      ? _formatHistoryDate(submittedAt)
+                      : '',
+                  style: AppTextStyles.labelSmall
+                      .copyWith(color: AppColorsEnhanced.secondaryText),
+                ),
+              ]),
+              if (rejectionReason != null &&
+                  rejectionReason.isNotEmpty) ...[
+                SizedBox(height: AppSpacing.sm),
+                Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline,
+                          size: 16.r, color: AppColorsEnhanced.errorRed),
+                      SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                          child: Text(rejectionReason,
+                              style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColorsEnhanced.errorRed))),
+                    ]),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _formatHistoryDate(String isoDate) {
+    try {
+      final dt = DateTime.parse(isoDate).toLocal();
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return isoDate;
+    }
+  }
+
+  Widget _buildSectionLabel(
     BuildContext context, {
     required IconData icon,
     required String title,
-    required String subtitle,
   }) {
-    return Container(
-      padding: EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColorsEnhanced.brandBlue.withOpacity(0.1),
-            AppColorsEnhanced.brandBlue.withOpacity(0.05),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border(
-          left: BorderSide(
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 16.r,
+          decoration: BoxDecoration(
             color: AppColorsEnhanced.brandBlue,
-            width: 3,
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: AppColorsEnhanced.brandBlue,
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 24.r,
-            ),
+        SizedBox(width: AppSpacing.sm),
+        Icon(icon, size: 15.r, color: AppColorsEnhanced.brandBlue),
+        SizedBox(width: AppSpacing.xs),
+        Text(
+          title,
+          style: AppTextStyles.bodyMedium.copyWith(
+            fontWeight: FontWeight.w700,
+            color: AppColorsEnhanced.brandBlue,
           ),
-          SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: AppTextStyles.h4.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColorsEnhanced.brandBlue,
-                  ),
-                ),
-                SizedBox(height: AppSpacing.xs),
-                Text(
-                  subtitle,
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColorsEnhanced.secondaryText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

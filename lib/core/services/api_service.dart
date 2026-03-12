@@ -2759,10 +2759,43 @@ class ApiService implements ApiServiceInterface {
           'accuracy': accuracy.toString(),
         },
       );
+      // Return the full response map so callers can inspect `success` and `message`.
       if (response.data is Map<String, dynamic>) {
-        return response.data['data'] ?? response.data as Map<String, dynamic>;
+        return response.data as Map<String, dynamic>;
       }
       return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getUjjwalaServiceAreas() async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.ujjwalaServiceAreas);
+      if (response.data is Map<String, dynamic> &&
+          response.data.containsKey('results')) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+      return response.data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getUjjwalaInstallationHistory(int installationId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.ujjwalaInstallationHistory(installationId),
+      );
+      if (response.data is Map<String, dynamic> &&
+          response.data.containsKey('results')) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+      return response.data as List<dynamic>;
     } catch (e) {
       _handleError(e);
       rethrow;

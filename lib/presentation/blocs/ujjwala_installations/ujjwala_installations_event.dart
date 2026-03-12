@@ -103,3 +103,7 @@ class SearchInstallations extends UjjwalaInstallationsEvent {
   @override
   List<Object?> get props => [query];
 }
+
+class LoadInstallationHistory extends UjjwalaInstallationsEvent {
+  const LoadInstallationHistory();
+}

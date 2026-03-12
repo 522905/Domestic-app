@@ -47,8 +47,8 @@ class PhotoUploadWidget extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: AppTextStyles.h4.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -57,7 +57,7 @@ class PhotoUploadWidget extends StatelessWidget {
                   icon: Icon(
                     Icons.info_outline,
                     color: AppColorsEnhanced.brandBlue,
-                    size: 20.r,
+                    size: 18.r,
                   ),
                   tooltip: 'Photo instructions',
                   padding: EdgeInsets.zero,
@@ -66,10 +66,12 @@ class PhotoUploadWidget extends StatelessWidget {
                 ),
             ],
           ),
-          SizedBox(height: AppSpacing.md),
+          SizedBox(height: AppSpacing.sm),
 
-          // Photo preview or capture button
-          if (photoUpload.hasFile)
+          // Photo preview, cached placeholder, or capture button
+          if (photoUpload.isUploaded && !photoUpload.hasFile)
+            _buildCachedPhotoPlaceholder(context)
+          else if (photoUpload.hasFile)
             _buildPhotoPreview(context)
           else
             _buildCaptureButton(context),
@@ -92,12 +94,46 @@ class PhotoUploadWidget extends StatelessWidget {
             _buildSuccessIndicator(context),
           ],
 
-          // Action buttons
-          if (photoUpload.hasFile && !photoUpload.isUploading) ...[
+          // Action buttons — also shown for cache-restored uploads (no local file)
+          if ((photoUpload.hasFile || (photoUpload.isUploaded && !photoUpload.hasFile)) && !photoUpload.isUploading) ...[
             SizedBox(height: AppSpacing.md),
             _buildActionButtons(context),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildCachedPhotoPlaceholder(BuildContext context) {
+    return Container(
+      height: 80.h,
+      decoration: BoxDecoration(
+        color: AppColorsEnhanced.successGreen.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(
+          color: AppColorsEnhanced.successGreen,
+          width: 1.5,
+        ),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.cloud_done,
+              size: 22.r,
+              color: AppColorsEnhanced.successGreen,
+            ),
+            SizedBox(width: AppSpacing.sm),
+            Text(
+              'Uploaded — tap Retake to replace',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColorsEnhanced.successGreen,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -113,7 +149,7 @@ class PhotoUploadWidget extends StatelessWidget {
             );
       },
       child: Container(
-        height: 200.h,
+        height: 120.h,
         decoration: BoxDecoration(
           color: AppColorsEnhanced.brandBlue.withOpacity(0.05),
           borderRadius: BorderRadius.circular(8.r),
@@ -124,15 +160,15 @@ class PhotoUploadWidget extends StatelessWidget {
           ),
         ),
         child: Center(
-          child: Column(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.camera_alt,
-                size: 48.r,
+                size: 28.r,
                 color: AppColorsEnhanced.brandBlue,
               ),
-              SizedBox(height: AppSpacing.sm),
+              SizedBox(width: AppSpacing.sm),
               Text(
                 context.l10n.ujjwalaTakePhoto,
                 style: AppTextStyles.bodyMedium.copyWith(
@@ -152,7 +188,7 @@ class PhotoUploadWidget extends StatelessWidget {
       borderRadius: BorderRadius.circular(8.r),
       child: Image.file(
         File(photoUpload.file!.path),
-        height: 200.h,
+        height: 150.h,
         width: double.infinity,
         fit: BoxFit.cover,
       ),

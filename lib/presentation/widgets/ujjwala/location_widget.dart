@@ -27,12 +27,7 @@ class LocationWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.r),
-        border: Border(
-          left: BorderSide(
-            color: _getBorderColor(),
-            width: 4,
-          ),
-        ),
+        border: Border.all(color: _getBorderColor(), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -41,171 +36,159 @@ class LocationWidget extends StatelessWidget {
           ),
         ],
       ),
-      padding: EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    // Loading state — inline spinner
+    if (isLoading) {
+      return Row(children: [
+        SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColorsEnhanced.brandBlue,
+          ),
+        ),
+        SizedBox(width: AppSpacing.sm),
+        Text(
+          context.l10n.ujjwalaFetchingLocation,
+          style: AppTextStyles.bodySmall
+              .copyWith(color: AppColorsEnhanced.secondaryText),
+        ),
+      ]);
+    }
+
+    // Error state — inline error + retry
+    if (errorMessage != null) {
+      return Row(children: [
+        Icon(Icons.location_off,
+            color: AppColorsEnhanced.errorRed, size: 18.r),
+        SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            errorMessage!,
+            style: AppTextStyles.bodySmall
+                .copyWith(color: AppColorsEnhanced.errorRed),
+          ),
+        ),
+        TextButton(
+          onPressed: () => context
+              .read<UjjwalaInstallationsBloc>()
+              .add(const FetchLocation()),
+          style: TextButton.styleFrom(
+            padding:
+                EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(
+            'Retry',
+            style: AppTextStyles.labelSmall
+                .copyWith(color: AppColorsEnhanced.brandBlue),
+          ),
+        ),
+      ]);
+    }
+
+    // Location captured — coords + accuracy + refresh button
+    if (location != null) {
+      return Row(children: [
+        Icon(Icons.gps_fixed,
+            color: AppColorsEnhanced.successGreen, size: 20.r),
+        SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                context.l10n.ujjwalaLocationSection,
-                style: AppTextStyles.h4.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                '${location!.latitude.toStringAsFixed(5)}, '
+                '${location!.longitude.toStringAsFixed(5)}',
+                style: AppTextStyles.bodyMedium
+                    .copyWith(fontWeight: FontWeight.w600),
               ),
-              if (!isLoading)
-                IconButton(
-                  onPressed: () {
-                    context.read<UjjwalaInstallationsBloc>().add(
-                          const FetchLocation(),
-                        );
-                  },
-                  icon: Icon(
-                    Icons.refresh,
-                    color: AppColorsEnhanced.brandBlue,
-                  ),
-                  tooltip: context.l10n.ujjwalaRefreshLocation,
+              SizedBox(height: 2.h),
+              Row(children: [
+                Text(
+                  '${context.l10n.ujjwalaAccuracy}: '
+                  '${location!.accuracy.toStringAsFixed(1)} m',
+                  style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColorsEnhanced.secondaryText),
                 ),
-            ],
-          ),
-          SizedBox(height: AppSpacing.md),
-          if (isLoading)
-            Center(
-              child: Column(
-                children: [
-                  CircularProgressIndicator(
-                    color: AppColorsEnhanced.brandBlue,
-                  ),
-                  SizedBox(height: AppSpacing.sm),
-                  Text(
-                    context.l10n.ujjwalaFetchingLocation,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColorsEnhanced.secondaryText,
+                if (location!.accuracy < 50) ...[
+                  SizedBox(width: AppSpacing.xs),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColorsEnhanced.successGreen
+                          .withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Good',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColorsEnhanced.successGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
-              ),
-            )
-          else if (errorMessage != null)
-            Column(
-              children: [
-                Icon(
-                  Icons.location_off,
-                  size: 48.r,
-                  color: AppColorsEnhanced.errorRed,
-                ),
-                SizedBox(height: AppSpacing.sm),
-                Text(
-                  errorMessage!,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColorsEnhanced.errorRed,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            )
-          else if (location != null)
-            Column(
-              children: [
-                _buildLocationRow(
-                  context,
-                  Icons.location_on,
-                  context.l10n.ujjwalaLatitude,
-                  location!.latitude.toStringAsFixed(6),
-                ),
-                SizedBox(height: AppSpacing.sm),
-                _buildLocationRow(
-                  context,
-                  Icons.location_on,
-                  context.l10n.ujjwalaLongitude,
-                  location!.longitude.toStringAsFixed(6),
-                ),
-                SizedBox(height: AppSpacing.sm),
-                _buildLocationRow(
-                  context,
-                  Icons.gps_fixed,
-                  context.l10n.ujjwalaAccuracy,
-                  '${location!.accuracy.toStringAsFixed(1)} m',
-                ),
-                if (location!.accuracy < 50)
-                  Padding(
-                    padding: EdgeInsets.only(top: AppSpacing.sm),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.check_circle,
-                          size: 16.r,
-                          color: AppColorsEnhanced.successGreen,
-                        ),
-                        SizedBox(width: AppSpacing.xs),
-                        Text(
-                          'Good accuracy',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: AppColorsEnhanced.successGreen,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            )
-          else
-            Center(
-              child: Text(
-                context.l10n.ujjwalaLocationRequired,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColorsEnhanced.secondaryText,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+              ]),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: () => context
+              .read<UjjwalaInstallationsBloc>()
+              .add(const FetchLocation()),
+          icon: Icon(Icons.refresh,
+              color: AppColorsEnhanced.brandBlue, size: 20.r),
+          tooltip: context.l10n.ujjwalaRefreshLocation,
+          padding: EdgeInsets.zero,
+          constraints: BoxConstraints(minWidth: 32.r, minHeight: 32.r),
+        ),
+      ]);
+    }
 
-  Widget _buildLocationRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-  ) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 20.r,
-          color: AppColorsEnhanced.brandBlue,
+    // No location yet — prompt with Get button
+    return Row(children: [
+      Icon(Icons.location_searching,
+          color: AppColorsEnhanced.secondaryText, size: 20.r),
+      SizedBox(width: AppSpacing.sm),
+      Expanded(
+        child: Text(
+          context.l10n.ujjwalaLocationRequired,
+          style: AppTextStyles.bodySmall
+              .copyWith(color: AppColorsEnhanced.secondaryText),
         ),
-        SizedBox(width: AppSpacing.sm),
-        SizedBox(
-          width: 100.w,
-          child: Text(
-            label,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColorsEnhanced.secondaryText,
-            ),
-          ),
+      ),
+      SizedBox(width: AppSpacing.sm),
+      ElevatedButton.icon(
+        onPressed: () => context
+            .read<UjjwalaInstallationsBloc>()
+            .add(const FetchLocation()),
+        icon: Icon(Icons.my_location, size: 14.r),
+        label: Text('Get', style: AppTextStyles.labelSmall),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColorsEnhanced.brandBlue,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTextStyles.bodyMedium.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
+      ),
+    ]);
   }
 
   Color _getBorderColor() {
-    if (errorMessage != null) {
-      return AppColorsEnhanced.errorRed;
-    } else if (location != null) {
-      return AppColorsEnhanced.successGreen;
-    } else {
-      return AppColorsEnhanced.warningYellow;
-    }
+    if (errorMessage != null) return AppColorsEnhanced.errorRed;
+    if (location != null) return AppColorsEnhanced.successGreen;
+    return AppColorsEnhanced.warningYellow;
   }
 }

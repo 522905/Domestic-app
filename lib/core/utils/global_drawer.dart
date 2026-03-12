@@ -139,6 +139,15 @@ class GlobalDrawer {
         },
       ),
 
+      // DAC Orders menu item
+      ListTile(
+        leading: const Icon(Icons.assignment),
+        title: const Text('DAC Orders'),
+        onTap: () {
+          Navigator.pushNamed(navigatorContext!, '/dac-orders');
+        },
+      ),
+
 
       // ListTile(
       //   leading: const Icon(Icons.add_box_sharp),

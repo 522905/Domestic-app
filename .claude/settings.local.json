@@ -4,7 +4,22 @@
       "Bash(git log:*)",
       "Bash(flutter analyze:*)",
       "Bash(gradlew.bat --stop:*)",
-      "Bash(flutter gen-l10n:*)"
+      "Bash(flutter gen-l10n:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter build:*)",
+      "Bash(java -version:*)",
+      "Bash(gradlew:*)",
+      "Bash(dir:*)",
+      "Bash(taskkill:*)",
+      "Bash(flutter clean:*)",
+      "Bash(findstr:*)",
+      "Bash(flutter run:*)",
+      "Bash(adb logcat:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb:*)",
+      "Bash(echo:*)",
+      "Bash(read:*)",
+      "Bash(grep -r \"thermal.*print\\\\|PrintButton\\\\|print.*dialog\" /c/Users/om/Documents/AndroidStudioProjects/domestic_app/lib --include=\"*.dart\" -i 2>/dev/null | head -20)"
     ],
     "deny": [],
     "ask": []
