@@ -40,6 +40,9 @@ import 'package:flutter_novu/generated/app_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
 import 'utils/localization/locale_notifier.dart';
+import 'dart:async';
+import 'presentation/blocs/offline_delivery/offline_delivery_bloc.dart';
+import 'presentation/blocs/offline_delivery/offline_delivery_event.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -58,6 +61,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   print("Background message: ${message.messageId}");
   print("Message data: ${message.data}"); // Debug log
+
+  // Suppress notification display for offline delivery silent pushes
+  final data = message.data;
+  if (data['silent'] == 'true' && data['scope'] == 'offline_delivery') {
+    return;
+  }
 
   // Encode data as JSON string
   final payloadJson = message.data.isNotEmpty
@@ -281,6 +290,11 @@ Future<void> initializeNotifications() async {
 
   // Handle foreground messages
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    final data = message.data;
+    if (data['silent'] == 'true' && data['scope'] == 'offline_delivery') {
+      _handleOfflineDeliverySilentPush(data);
+      return;
+    }
     _showNotification(message);
   });
 
@@ -291,6 +305,22 @@ Future<void> initializeNotifications() async {
     _handleNotificationTap(jsonEncode(message.data));
   });
 
+}
+
+Timer? _offlineDeliverySilentPushDebounce;
+void _handleOfflineDeliverySilentPush(Map<String, dynamic> data) {
+  _offlineDeliverySilentPushDebounce?.cancel();
+  _offlineDeliverySilentPushDebounce = Timer(const Duration(seconds: 2), () {
+    final context = NavKey.currentContext;
+    if (context == null) return;
+    try {
+      context.read<OfflineDeliveryBloc>().add(HandleSilentPush(
+        action: data['action'] ?? '',
+        resource: data['resource'] ?? '',
+        resourceId: data['resource_id'],
+      ));
+    } catch (_) {} // BLoC not in scope — page not open
+  });
 }
 
 void _showNotification(RemoteMessage message) {

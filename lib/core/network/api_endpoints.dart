@@ -4,7 +4,7 @@ class ApiEndpoints {
   final String baseUrl;
 
   final String tempUrl = 'https://lpg.ops.arungas.com';
-  // final String tempUrl = 'http://192.168.171.59:9900';
+  // final String tempUrl = 'http://192.168.171.131:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
@@ -230,4 +230,18 @@ class ApiEndpoints {
   String get ujjwalaRetryFailed => '$tempUrl/api/ujjwala/installations/retry/';
   String get ujjwalaReimbursementsPreview => '$tempUrl/api/ujjwala/reimbursements/preview/';
   String get ujjwalaReimbursements => '$tempUrl/api/ujjwala/reimbursements/';
+
+  // Offline Delivery
+  String get offlineDeliveryStatus => '$tempUrl/api/offline-delivery/status/';
+  String get offlineDeliveryDistributionPoints => '$tempUrl/api/offline-delivery/distribution-points/';
+  String get offlineDeliveryBookingVerifications => '$tempUrl/api/offline-delivery/booking-verifications/';
+  String offlineDeliveryBookingVerificationDetail(String id) => '$tempUrl/api/offline-delivery/booking-verifications/$id/';
+  String offlineDeliveryBookingVerificationRetry(String id) => '$tempUrl/api/offline-delivery/booking-verifications/$id/retry/';
+  String get offlineDeliveryTokens => '$tempUrl/api/offline-delivery/tokens/';
+  String offlineDeliveryTokenDetail(String id) => '$tempUrl/api/offline-delivery/tokens/$id/';
+  String offlineDeliveryTokenDeliver(String id) => '$tempUrl/api/offline-delivery/tokens/$id/deliver/';
+  String offlineDeliveryTokenCorrect(String id) => '$tempUrl/api/offline-delivery/tokens/$id/correct/';
+  String offlineDeliveryTokenAttachImages(String id) => '$tempUrl/api/offline-delivery/tokens/$id/attach-images/';
+  String get offlineDeliveryQuickDeliver => '$tempUrl/api/offline-delivery/tokens/quick-deliver/';
+  String get offlineDeliveryCompanies => '$tempUrl/api/offline-delivery/companies/';
 }

@@ -388,4 +388,19 @@ abstract class ApiServiceInterface {
   Future<Map<String, dynamic>> getReimbursementPreview(int warehouseId);
   Future<Map<String, dynamic>> createReimbursement({required int warehouseId, required int qty});
   Future<List<dynamic>> getReimbursementBatches();
+
+  // Offline Delivery methods
+  Future<Map<String, dynamic>> getOfflineDeliveryStatus();
+  Future<List<dynamic>> getOfflineDeliveryDistributionPoints();
+  Future<Map<String, dynamic>> getOfflineDeliveryTokensPaginated({String? distributionPointId, String? date, String? status, String? search});
+  Future<Map<String, dynamic>> getOfflineDeliveryVerificationsPaginated({String? distributionPointId, String? date, String? status, String? search});
+  Future<Map<String, dynamic>> getOfflineDeliveryNextPage(String nextUrl);
+  Future<Map<String, dynamic>> createOfflineDeliveryToken(Map<String, dynamic> data);
+  Future<Map<String, dynamic>> deliverOfflineDeliveryToken(String tokenId, Map<String, dynamic> data);
+  Future<Map<String, dynamic>> correctOfflineDeliveryToken(String tokenId, Map<String, dynamic> data);
+  Future<Map<String, dynamic>> attachOfflineDeliveryTokenImages(String tokenId, Map<String, dynamic> data);
+  Future<Map<String, dynamic>> quickDeliverOfflineDelivery(Map<String, dynamic> data);
+  Future<Map<String, dynamic>> createBookingVerification(Map<String, dynamic> data);
+  Future<Map<String, dynamic>> retryBookingVerification(String verificationId);
+  Future<List<dynamic>> getOfflineDeliveryCompanies();
 }

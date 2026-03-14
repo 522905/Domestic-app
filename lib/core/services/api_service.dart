@@ -2966,4 +2966,212 @@ class ApiService implements ApiServiceInterface {
     }
   }
 
+  // Offline Delivery methods
+
+  @override
+  Future<Map<String, dynamic>> getOfflineDeliveryStatus() async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.offlineDeliveryStatus);
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getOfflineDeliveryDistributionPoints() async {
+    try {
+      final response = await apiClient.get(apiClient.endpoints.offlineDeliveryDistributionPoints);
+      if (response.data is Map<String, dynamic>) {
+        return (response.data['results'] ?? []) as List<dynamic>;
+      }
+      return response.data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOfflineDeliveryTokensPaginated({
+    String? distributionPointId,
+    String? date,
+    String? status,
+    String? search,
+  }) async {
+    try {
+      final queryParameters = <String, dynamic>{};
+      if (distributionPointId != null) queryParameters['distribution_point'] = distributionPointId;
+      if (date != null) queryParameters['date'] = date;
+      if (status != null) queryParameters['status'] = status;
+      if (search != null && search.isNotEmpty) queryParameters['search'] = search;
+
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryTokens,
+        queryParameters: queryParameters,
+      );
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'results': response.data as List<dynamic>, 'next': null, 'count': (response.data as List).length};
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOfflineDeliveryVerificationsPaginated({
+    String? distributionPointId,
+    String? date,
+    String? status,
+    String? search,
+  }) async {
+    try {
+      final queryParameters = <String, dynamic>{};
+      if (distributionPointId != null) queryParameters['distribution_point'] = distributionPointId;
+      if (date != null) queryParameters['date'] = date;
+      if (status != null) queryParameters['status'] = status;
+      if (search != null && search.isNotEmpty) queryParameters['search'] = search;
+
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryBookingVerifications,
+        queryParameters: queryParameters,
+      );
+
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'results': response.data as List<dynamic>, 'next': null, 'count': (response.data as List).length};
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOfflineDeliveryNextPage(String nextUrl) async {
+    try {
+      final response = await apiClient.get(nextUrl);
+      if (response.data is Map<String, dynamic>) {
+        return response.data as Map<String, dynamic>;
+      }
+      return {'results': response.data as List<dynamic>, 'next': null, 'count': (response.data as List).length};
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> createOfflineDeliveryToken(Map<String, dynamic> data) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryTokens,
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> deliverOfflineDeliveryToken(String tokenId, Map<String, dynamic> data) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryTokenDeliver(tokenId),
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> correctOfflineDeliveryToken(String tokenId, Map<String, dynamic> data) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryTokenCorrect(tokenId),
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> attachOfflineDeliveryTokenImages(String tokenId, Map<String, dynamic> data) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryTokenAttachImages(tokenId),
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> quickDeliverOfflineDelivery(Map<String, dynamic> data) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryQuickDeliver,
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> createBookingVerification(Map<String, dynamic> data) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryBookingVerifications,
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> retryBookingVerification(String verificationId) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryBookingVerificationRetry(verificationId),
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getOfflineDeliveryCompanies() async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryCompanies,
+      );
+      return response.data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
 }

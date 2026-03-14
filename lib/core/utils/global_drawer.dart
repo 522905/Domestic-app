@@ -139,14 +139,15 @@ class GlobalDrawer {
         },
       ),
 
-      // DAC Orders menu item
+      // Offline Delivery menu item
       ListTile(
-        leading: const Icon(Icons.assignment),
-        title: const Text('DAC Orders'),
+        leading: const Icon(Icons.local_shipping),
+        title: const Text('Offline Delivery'),
         onTap: () {
-          Navigator.pushNamed(navigatorContext!, '/dac-orders');
+          Navigator.pushNamed(navigatorContext!, '/offline-delivery');
         },
       ),
+
 
 
       // ListTile(

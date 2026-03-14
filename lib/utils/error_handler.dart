@@ -28,6 +28,9 @@ class ErrorHandler {
         return errorString.substring(11);
       }
       return errorString;
+    } else if (error is Error) {
+      debugPrint('[ErrorHandler] Error type: ${error.runtimeType}, message: $error');
+      return error.toString();
     } else {
       return "An unknown error occurred.";
     }

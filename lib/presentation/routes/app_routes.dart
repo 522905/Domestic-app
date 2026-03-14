@@ -37,8 +37,9 @@ import '../blocs/inventory/inventory_bloc.dart';
 import '../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../blocs/ujjwala_installations/ujjwala_installations_bloc.dart';
 import '../blocs/ujjwala_installations/ujjwala_installations_event.dart';
-import '../pages/dac_orders/dac_orders_list_page.dart';
-import '../pages/dac_orders/dac_orders_add_page.dart';
+import '../pages/offline_delivery/offline_delivery_page.dart';
+import '../blocs/offline_delivery/offline_delivery_bloc.dart';
+import '../blocs/offline_delivery/offline_delivery_event.dart';
 import '../pages/ujjwala_installations/pending_installations_page.dart';
 import '../pages/ujjwala_installations/installation_submit_page.dart';
 import '../pages/ujjwala_installations/my_uploads_page.dart';
@@ -92,8 +93,8 @@ class AppRoutes {
   static const String ujjwalaInstallations = 'ujjwala-installations';
   static const String ujjwalaInstallationSubmit = 'ujjwala-installation/submit';
 
-  // DAC Orders routes
-  static const String dacOrders = 'dac-orders';
+  // Offline Delivery route
+  static const String offlineDelivery = 'offline-delivery';
 
   // Profile route
   static const String profile = '/profile';
@@ -571,18 +572,16 @@ class AppRoutes {
         }
         return _errorRoute();
 
-      // DAC ORDERS
-      case 'dac-orders':
-        if (segments.length == 1) {
-          return MaterialPageRoute(
-            builder: (_) => const DacOrdersListPage(),
-          );
-        } else if (segments[1] == 'add') {
-          return MaterialPageRoute(
-            builder: (_) => const DacOrdersAddPage(),
-          );
-        }
-        return _errorRoute();
+      // OFFLINE DELIVERY
+      case 'offline-delivery':
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => OfflineDeliveryBloc(
+              apiService: context.read<ApiServiceInterface>(),
+            )..add(const LoadInitialData()),
+            child: const OfflineDeliveryPage(),
+          ),
+        );
 
       case 'gm-credit-approvals':
         // /gm-credit-approvals → GM Pending Approvals Page
