@@ -139,7 +139,7 @@ class _VerificationFormState extends State<VerificationForm> {
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(9),
+                          LengthLimitingTextInputFormatter(10),
                         ],
                         decoration: InputDecoration(
                           labelText: 'Consumer Number',
@@ -156,8 +156,8 @@ class _VerificationFormState extends State<VerificationForm> {
                         textInputAction: TextInputAction.next,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) return null;
-                          if (value.trim().length != 9) {
-                            return 'Enter 9 digits (total 10 with prefix 7)';
+                          if (value.trim().length != 10) {
+                            return 'Enter 10 digits after 7';
                           }
                           return null;
                         },
