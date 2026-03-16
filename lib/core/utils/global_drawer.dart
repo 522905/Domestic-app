@@ -27,6 +27,7 @@ import '../services/service_provider.dart';
 class GlobalDrawer {
   static ApiService? _apiService;
   static BuildContext? navigatorContext;
+  static Set<String>? _cachedUserRoles;
 
   static void initialize(ApiService apiService) {
     _apiService = apiService;
@@ -35,9 +36,12 @@ class GlobalDrawer {
   // Remove the static ValueNotifier - this was the core problem
   static Drawer getDrawer(BuildContext context, {Set<String>? userRoles}) {
     navigatorContext = context;
+    if (userRoles != null) {
+      _cachedUserRoles = userRoles;
+    }
 
     // Build menu items dynamically based on userRoles
-    List<Widget> menuItems = _buildMenuItems(userRoles);
+    List<Widget> menuItems = _buildMenuItems(_cachedUserRoles);
 
     return Drawer(
       child: ListView(
@@ -139,12 +143,22 @@ class GlobalDrawer {
         },
       ),
 
-      // Offline Delivery menu item
+      // Offline Delivery - only for users with 'Offline Delivery' role
+      if (userRoles?.contains('Offline Delivery') == true)
+        ListTile(
+          leading: const Icon(Icons.local_shipping),
+          title: const Text('Offline Delivery'),
+          onTap: () {
+            Navigator.pushNamed(navigatorContext!, '/offline-delivery');
+          },
+        ),
+
+      // Booking menu item
       ListTile(
-        leading: const Icon(Icons.local_shipping),
-        title: const Text('Offline Delivery'),
+        leading: const Icon(Icons.book_outlined),
+        title: const Text('Booking'),
         onTap: () {
-          Navigator.pushNamed(navigatorContext!, '/offline-delivery');
+          Navigator.pushNamed(navigatorContext!, '/offline-booking');
         },
       ),
 
