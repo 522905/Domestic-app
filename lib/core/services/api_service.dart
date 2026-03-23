@@ -2691,6 +2691,118 @@ class ApiService implements ApiServiceInterface {
     }
   }
 
+  @override
+  Future<List<int>> thermalPrintOfflineDeliveryToken(
+    String tokenId,
+    String deviceIdentifier,
+    int paperWidthMm,
+  ) async {
+    try {
+      final printerProfile = deviceIdentifier.toUpperCase().contains('SUNMI')
+          ? 'sunmi_v2s'
+          : 'tvs_mlp360';
+
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryTokenPrint(tokenId),
+        data: {
+          'device_mac_address': deviceIdentifier.toUpperCase().contains('SUNMI') ? '' : deviceIdentifier,
+          'printer_profile': printerProfile,
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) {
+            return status != null && status < 500;
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is List<int>) {
+          return response.data as List<int>;
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        String errorMessage = 'Failed to get thermal print data: ${response.statusCode}';
+        try {
+          if (response.data is List<int>) {
+            final jsonString = String.fromCharCodes(response.data as List<int>);
+            final errorData = json.decode(jsonString);
+            if (errorData is Map && errorData.containsKey('error')) {
+              errorMessage = errorData['error'].toString();
+            } else if (errorData is Map && errorData.containsKey('message')) {
+              errorMessage = errorData['message'].toString();
+            } else if (errorData is Map && errorData.containsKey('detail')) {
+              errorMessage = errorData['detail'].toString();
+            }
+          }
+        } catch (parseError) {
+          debugPrint('Error parsing error response: $parseError');
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<int>> thermalPrintBookingVerification(
+    String verificationId,
+    String deviceIdentifier,
+    int paperWidthMm,
+  ) async {
+    try {
+      final printerProfile = deviceIdentifier.toUpperCase().contains('SUNMI')
+          ? 'sunmi_v2s'
+          : 'tvs_mlp360';
+
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryBookingVerificationPrint(verificationId),
+        data: {
+          'device_mac_address': deviceIdentifier.toUpperCase().contains('SUNMI') ? '' : deviceIdentifier,
+          'printer_profile': printerProfile,
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (status) {
+            return status != null && status < 500;
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is List<int>) {
+          return response.data as List<int>;
+        } else {
+          throw Exception('Invalid response format');
+        }
+      } else {
+        String errorMessage = 'Failed to get thermal print data: ${response.statusCode}';
+        try {
+          if (response.data is List<int>) {
+            final jsonString = String.fromCharCodes(response.data as List<int>);
+            final errorData = json.decode(jsonString);
+            if (errorData is Map && errorData.containsKey('error')) {
+              errorMessage = errorData['error'].toString();
+            } else if (errorData is Map && errorData.containsKey('message')) {
+              errorMessage = errorData['message'].toString();
+            } else if (errorData is Map && errorData.containsKey('detail')) {
+              errorMessage = errorData['detail'].toString();
+            }
+          }
+        } catch (parseError) {
+          debugPrint('Error parsing error response: $parseError');
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
   // Ujjwala Installation methods
   @override
   Future<List<dynamic>> getPendingUjjwalaInstallations() async {
@@ -3005,7 +3117,16 @@ class ApiService implements ApiServiceInterface {
       if (distributionPointId != null) queryParameters['distribution_point'] = distributionPointId;
       if (date != null) queryParameters['date'] = date;
       if (status != null) queryParameters['status'] = status;
-      if (search != null && search.isNotEmpty) queryParameters['search'] = search;
+      if (search != null && search.isNotEmpty) {
+        final digits = search.replaceAll(RegExp(r'\D'), '');
+        if (digits.length == 16) {
+          queryParameters['consumer_id'] = search;
+        } else if (digits.length == 10) {
+          queryParameters['consumer_number'] = search;
+        } else {
+          queryParameters['search'] = search;
+        }
+      }
 
       final response = await apiClient.get(
         apiClient.endpoints.offlineDeliveryTokens,
@@ -3027,13 +3148,24 @@ class ApiService implements ApiServiceInterface {
     String? date,
     String? status,
     String? search,
+    bool? showAll,
   }) async {
     try {
       final queryParameters = <String, dynamic>{};
       if (distributionPointId != null) queryParameters['distribution_point'] = distributionPointId;
       if (date != null) queryParameters['date'] = date;
       if (status != null) queryParameters['status'] = status;
-      if (search != null && search.isNotEmpty) queryParameters['search'] = search;
+      if (showAll == true) queryParameters['show_all'] = 'true';
+      if (search != null && search.isNotEmpty) {
+        final digits = search.replaceAll(RegExp(r'\D'), '');
+        if (digits.length == 16) {
+          queryParameters['consumer_id'] = search;
+        } else if (digits.length == 10) {
+          queryParameters['consumer_number'] = search;
+        } else {
+          queryParameters['search'] = search;
+        }
+      }
 
       final response = await apiClient.get(
         apiClient.endpoints.offlineDeliveryBookingVerifications,
@@ -3053,11 +3185,31 @@ class ApiService implements ApiServiceInterface {
   @override
   Future<Map<String, dynamic>> getOfflineDeliveryNextPage(String nextUrl) async {
     try {
-      final response = await apiClient.get(nextUrl);
+      // The API returns full absolute URLs for pagination (e.g. https://host/api/...?page=2).
+      // Dio prepends its baseUrl to whatever path is passed, so we must strip the scheme+host
+      // to avoid a malformed double-prefixed URL that returns 401.
+      final uri = Uri.parse(nextUrl);
+      final response = await apiClient.get(
+        uri.path,
+        queryParameters: uri.queryParameters.isNotEmpty ? uri.queryParameters : null,
+      );
       if (response.data is Map<String, dynamic>) {
         return response.data as Map<String, dynamic>;
       }
       return {'results': response.data as List<dynamic>, 'next': null, 'count': (response.data as List).length};
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getOfflineDeliveryTokenDetail(String tokenId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryTokenDetail(tokenId),
+      );
+      return response.data as Map<String, dynamic>;
     } catch (e) {
       _handleError(e);
       rethrow;

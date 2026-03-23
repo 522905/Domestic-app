@@ -1,33 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_colors_enhanced.dart';
 import '../../../../core/constants/spacing.dart';
 import '../../../../core/constants/text_styles.dart';
+import '../../../../core/services/service_provider.dart';
 import '../../../../domain/entities/offline_delivery/booking_verification.dart';
+import '../../../../domain/entities/offline_delivery/offline_delivery_token.dart';
 import '../../../blocs/offline_delivery/offline_delivery_bloc.dart';
 import '../../../blocs/offline_delivery/offline_delivery_event.dart';
 import '../../../blocs/offline_delivery/offline_delivery_state.dart';
+import 'booking_receipt_sheet.dart';
 import 'supervisor_override_dialog.dart';
+import 'token_detail_sheet.dart';
 
 
 class VerificationListWidget extends StatelessWidget {
   final List<BookingVerification> verifications;
-  final String distributionPointId;
+  final String? distributionPointId;
   final bool isSupervisor;
+  final bool isBookingMode;
   final bool hasMore;
   final bool isLoadingMore;
   final VoidCallback? onLoadMore;
+  final bool showAllActive;
 
   const VerificationListWidget({
     Key? key,
     required this.verifications,
-    required this.distributionPointId,
+    this.distributionPointId,
     this.isSupervisor = false,
+    this.isBookingMode = false,
     this.hasMore = false,
     this.isLoadingMore = false,
     this.onLoadMore,
+    this.showAllActive = false,
   }) : super(key: key);
 
   @override
@@ -85,6 +94,8 @@ class VerificationListWidget extends StatelessWidget {
               verification: v,
               distributionPointId: distributionPointId,
               isSupervisor: isSupervisor,
+              isBookingMode: isBookingMode,
+              showAllActive: showAllActive,
             )),
 
         // Load more button
@@ -131,13 +142,17 @@ class VerificationListWidget extends StatelessWidget {
 
 class _VerificationCard extends StatelessWidget {
   final BookingVerification verification;
-  final String distributionPointId;
+  final String? distributionPointId;
   final bool isSupervisor;
+  final bool isBookingMode;
+  final bool showAllActive;
 
   const _VerificationCard({
     required this.verification,
-    required this.distributionPointId,
+    this.distributionPointId,
     this.isSupervisor = false,
+    this.isBookingMode = false,
+    this.showAllActive = false,
   });
 
   @override
@@ -172,18 +187,33 @@ class _VerificationCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    if (verification.consumerNumber != null) ...[
+                    if (verification.consumerNumber != null && verification.consumerNumber!.isNotEmpty) ...[
                       SizedBox(height: 2),
-                      _infoRow('Consumer No.', verification.consumerNumber!.substring(1), prefix: '7'),
+                      _infoRow('Consumer No.', verification.consumerNumber!.length > 1 ? verification.consumerNumber!.substring(1) : verification.consumerNumber!, prefix: '7'),
                     ],
-                    if (verification.consumerId != null) ...[
+                    if (verification.consumerId != null && verification.consumerId!.isNotEmpty) ...[
                       SizedBox(height: 2),
-                      _infoRow('Consumer ID', verification.consumerId!.substring(1), prefix: '7'),
+                      _infoRow('Consumer ID', verification.consumerId!.length > 1 ? verification.consumerId!.substring(1) : verification.consumerId!, prefix: '7'),
                     ],
                     if (verification.orderNumber != null ||
                         verification.orderNumberFromRpa != null) ...[
                       SizedBox(height: 2),
-                      _infoRow('Order', (verification.orderNumberFromRpa ?? verification.orderNumber ?? '').substring(2), prefix: '2-'),
+                      Builder(builder: (_) {
+                        final order = verification.orderNumberFromRpa ?? verification.orderNumber ?? '';
+                        return _infoRow('Order', order.length > 2 ? order.substring(2) : order, prefix: '2-');
+                      }),
+                    ],
+                    if (verification.dacCode != null && verification.dacCode!.isNotEmpty) ...[
+                      SizedBox(height: 2),
+                      _infoRow('DAC', verification.dacCode!),
+                    ],
+                    if (verification.deliveryConfirmationType != null) ...[
+                      SizedBox(height: 2),
+                      _infoRow('Confirmation', verification.deliveryConfirmationType!.isEmpty ? 'Blank' : verification.deliveryConfirmationType!),
+                    ],
+                    if (showAllActive && verification.createdByName != null) ...[
+                      SizedBox(height: 2),
+                      _infoRow('Created by', verification.createdByName!),
                     ],
                   ],
                 ),
@@ -250,7 +280,7 @@ class _VerificationCard extends StatelessWidget {
 
           // Action buttons
           SizedBox(height: AppSpacing.sm),
-          _buildActions(context),
+          isBookingMode ? _buildBookingActions(context) : _buildActions(context),
         ],
       ),
     );
@@ -363,31 +393,58 @@ class _VerificationCard extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context) {
-    // Already has a token — show indicator
+    // Already has a token — show tappable indicator to open token detail
     if (verification.hasToken) {
-      return Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: Colors.grey, size: 16.sp),
-            SizedBox(width: AppSpacing.xs),
-            Text(
-              'Token Created',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: Colors.grey,
-                fontWeight: FontWeight.w600,
+      return GestureDetector(
+        onTap: () {
+          if (verification.tokenId != null) {
+            _openTokenDetail(context, verification.tokenId!);
+          } else {
+            // tokenId null but hasToken true — find by consumer number
+            final bloc = context.read<OfflineDeliveryBloc>();
+            final state = bloc.state;
+            if (state is OfflineDeliveryLoaded) {
+              final match = state.tokens.where((t) =>
+                t.consumerNumber == verification.consumerNumber ||
+                t.consumerId == verification.consumerId);
+              if (match.isNotEmpty) {
+                _showTokenSheet(context, bloc, match.first);
+              }
+            }
+          }
+        },
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: AppColorsEnhanced.brandBlue.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColorsEnhanced.brandBlue.withOpacity(0.2)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle,
+                  color: AppColorsEnhanced.brandBlue,
+                  size: 16.sp),
+              SizedBox(width: AppSpacing.xs),
+              Text(
+                'View Token',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColorsEnhanced.brandBlue,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+              if (verification.tokenId != null) ...[
+                SizedBox(width: AppSpacing.xs),
+                Icon(Icons.chevron_right,
+                    color: AppColorsEnhanced.brandBlue, size: 16.sp),
+              ],
+            ],
+          ),
         ),
       );
     }
@@ -397,24 +454,7 @@ class _VerificationCard extends StatelessWidget {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: () {
-            final idempotencyKey = const Uuid().v4();
-            final bloc = context.read<OfflineDeliveryBloc>();
-            final companyId = verification.company?.id ??
-                (bloc.state is OfflineDeliveryLoaded
-                    ? (bloc.state as OfflineDeliveryLoaded).lastSelectedCompanyId
-                    : null);
-            if (companyId == null) return;
-            bloc.add(CreateToken(
-              distributionPointId: distributionPointId,
-              consumerId: verification.consumerId,
-              consumerNumber: verification.consumerNumber,
-              orderNumber: verification.orderNumberFromRpa ?? verification.orderNumber,
-              idempotencyKey: idempotencyKey,
-              bookingVerificationId: verification.id,
-              companyId: companyId,
-            ));
-          },
+          onPressed: () => _showDacCodeDialog(context, verification),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColorsEnhanced.brandBlue,
             foregroundColor: Colors.white,
@@ -460,7 +500,7 @@ class _VerificationCard extends StatelessWidget {
             ),
           ),
           // Supervisor override button
-          if (isSupervisor) ...[
+          if (isSupervisor && distributionPointId != null && distributionPointId!.isNotEmpty) ...[
             SizedBox(height: AppSpacing.xs),
             SizedBox(
               width: double.infinity,
@@ -473,7 +513,7 @@ class _VerificationCard extends StatelessWidget {
                       value: bloc,
                       child: SupervisorOverrideDialog(
                         verification: verification,
-                        distributionPointId: distributionPointId,
+                        distributionPointId: distributionPointId!,
                       ),
                     ),
                   );
@@ -500,5 +540,256 @@ class _VerificationCard extends StatelessWidget {
 
     // QUEUED or PROCESSING — no action available
     return const SizedBox.shrink();
+  }
+
+  Widget _buildBookingActions(BuildContext context) {
+    // Failed — show retry + optional supervisor override
+    if (verification.isFailed) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                context.read<OfflineDeliveryBloc>().add(
+                  RetryVerification(verificationId: verification.id),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColorsEnhanced.warningYellow,
+                side: BorderSide(color: AppColorsEnhanced.warningYellow),
+                padding: EdgeInsets.symmetric(vertical: 10.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+              icon: Icon(Icons.refresh, size: 18.sp),
+              label: Text(
+                'Retry',
+                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+          if (isSupervisor && distributionPointId != null && distributionPointId!.isNotEmpty) ...[
+            SizedBox(height: AppSpacing.xs),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  final bloc = context.read<OfflineDeliveryBloc>();
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => BlocProvider.value(
+                      value: bloc,
+                      child: SupervisorOverrideDialog(
+                        verification: verification,
+                        distributionPointId: distributionPointId!,
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColorsEnhanced.warningYellow,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 10.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                ),
+                icon: Icon(Icons.admin_panel_settings, size: 18.sp),
+                label: Text(
+                  'Issue Anyway',
+                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // Not failed — show Print Receipt button
+    if (verification.isVerified || verification.isBookingCreated || verification.hasToken) {
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () => _openBookingReceipt(context),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColorsEnhanced.brandBlue,
+            side: BorderSide(color: AppColorsEnhanced.brandBlue.withOpacity(0.3)),
+            padding: EdgeInsets.symmetric(vertical: 10.h),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+          ),
+          icon: Icon(Icons.receipt_long, size: 18.sp),
+          label: Text(
+            'Print Receipt',
+            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
+    // QUEUED or PROCESSING — no action
+    return const SizedBox.shrink();
+  }
+
+  void _showDacCodeDialog(BuildContext context, BookingVerification verification) {
+    if (distributionPointId == null || distributionPointId!.isEmpty) return;
+
+    final dacController = TextEditingController(
+      text: verification.dacCode ?? '',
+    );
+    final bloc = context.read<OfflineDeliveryBloc>();
+    final companyId = verification.company?.id ??
+        (bloc.state is OfflineDeliveryLoaded
+            ? (bloc.state as OfflineDeliveryLoaded).lastSelectedCompanyId
+            : null);
+    if (companyId == null) return;
+
+    void createToken({String? dacCode}) {
+      final idempotencyKey = const Uuid().v4();
+      bloc.add(CreateToken(
+        distributionPointId: distributionPointId!,
+        consumerId: verification.consumerId,
+        consumerNumber: verification.consumerNumber,
+        orderNumber: verification.orderNumberFromRpa ?? verification.orderNumber,
+        dacCode: dacCode,
+        idempotencyKey: idempotencyKey,
+        bookingVerificationId: verification.id,
+        companyId: companyId,
+      ));
+    }
+
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('DAC Code'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: dacController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
+            decoration: InputDecoration(
+              labelText: 'DAC Code',
+              hintText: 'Enter 6-digit DAC Code',
+              prefixIcon: const Icon(Icons.qr_code),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'DAC Code is required';
+              }
+              if (value.trim().length != 6) {
+                return 'Enter 6-digit DAC Code';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              createToken();
+            },
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColorsEnhanced.brandBlue),
+              foregroundColor: AppColorsEnhanced.brandBlue,
+            ),
+            child: const Text('Skip'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              Navigator.pop(ctx);
+              createToken(dacCode: dacController.text.trim());
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColorsEnhanced.brandBlue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openBookingReceipt(BuildContext context) {
+    final bloc = context.read<OfflineDeliveryBloc>();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BlocProvider.value(
+        value: bloc,
+        child: BookingReceiptSheet(verification: verification),
+      ),
+    );
+  }
+
+  void _openTokenDetail(BuildContext context, String tokenId) async {
+    final bloc = context.read<OfflineDeliveryBloc>();
+    final state = bloc.state;
+    if (state is! OfflineDeliveryLoaded) return;
+
+    // Try cache first (sync — no context lifecycle issue)
+    final match = state.tokens.where((t) => t.id == tokenId);
+    if (match.isNotEmpty) {
+      _showTokenSheet(context, bloc, match.first);
+      return;
+    }
+
+    // Capture stable NavigatorState BEFORE async gap.
+    // _VerificationCard is a StatelessWidget in a BLoC-rebuilt list —
+    // the card's context can become unmounted during await (polling rebuilds).
+    // Navigator.of(context) gives us the NavigatorState whose context is stable.
+    final navigator = Navigator.of(context);
+
+    // Token not in cache — fetch directly from API by ID
+    try {
+      final apiService = await ServiceProvider.getApiService();
+      final data = await apiService.getOfflineDeliveryTokenDetail(tokenId);
+      final token = OfflineDeliveryToken.fromJson(data);
+      if (navigator.mounted) {
+        showModalBottomSheet(
+          context: navigator.context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (ctx) => BlocProvider.value(
+            value: bloc,
+            child: TokenDetailSheet(token: token, printOnly: true),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch token detail: $e');
+    }
+  }
+
+  void _showTokenSheet(BuildContext context, OfflineDeliveryBloc bloc, OfflineDeliveryToken token) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BlocProvider.value(
+        value: bloc,
+        child: TokenDetailSheet(token: token, printOnly: true),
+      ),
+    );
   }
 }

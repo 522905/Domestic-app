@@ -12,14 +12,14 @@ import '../../../../core/services/printer/printer_manager.dart';
 import '../../../../core/services/printer/printer_interface.dart';
 import '../../../../core/services/printer/printer_type.dart';
 import '../../../../core/services/printer/bluetooth_printer_service.dart';
-import '../../../../core/services/User.dart';
+import '../../../../core/services/api_service_interface.dart';
+import '../../../../core/services/service_provider.dart';
 import '../../../../domain/entities/offline_delivery/offline_system_status.dart';
 import '../../../../domain/entities/offline_delivery/offline_delivery_token.dart';
 import '../../../blocs/offline_delivery/offline_delivery_bloc.dart';
 import '../../../blocs/offline_delivery/offline_delivery_event.dart';
 import '../../../blocs/offline_delivery/offline_delivery_state.dart';
 import '../../../widgets/professional_snackbar.dart';
-import '../offline_delivery_print_helper.dart';
 
 class TokenCreationForm extends StatefulWidget {
   final String distributionPointId;
@@ -42,6 +42,7 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
   final _consumerIdController = TextEditingController();
   final _consumerNumberController = TextEditingController();
   final _orderNumberController = TextEditingController();
+  final _dacCodeController = TextEditingController();
   final _remarkController = TextEditingController();
 
   final PrinterManager _printerManager = PrinterManager();
@@ -59,11 +60,17 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
   bool _isScanning = false;
   List<BluetoothDevice> _printers = [];
   StreamSubscription<List<ScanResult>>? _scanSubscription;
+  late ApiServiceInterface _apiService;
 
   @override
   void initState() {
     super.initState();
     _initPrinter();
+    _initApiService();
+  }
+
+  Future<void> _initApiService() async {
+    _apiService = await ServiceProvider.getApiService();
   }
 
   @override
@@ -71,6 +78,7 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
     _consumerIdController.dispose();
     _consumerNumberController.dispose();
     _orderNumberController.dispose();
+    _dacCodeController.dispose();
     _remarkController.dispose();
     _scanSubscription?.cancel();
     if (_printerType != PrinterType.sunmi) {
@@ -200,10 +208,13 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
 
     context.read<OfflineDeliveryBloc>().add(CreateToken(
       distributionPointId: widget.distributionPointId,
-      consumerId: consumerId.isNotEmpty ? '7$consumerId' : null,
-      consumerNumber: consumerNumber.isNotEmpty ? '7$consumerNumber' : null,
+      consumerId: consumerId.isNotEmpty ? consumerId : null,
+      consumerNumber: consumerNumber.isNotEmpty ? consumerNumber : null,
       orderNumber: _orderNumberController.text.trim().isNotEmpty
           ? '2-${_orderNumberController.text.trim()}'
+          : null,
+      dacCode: _dacCodeController.text.trim().isNotEmpty
+          ? _dacCodeController.text.trim()
           : null,
       remark: _remarkController.text.trim().isNotEmpty
           ? _remarkController.text.trim()
@@ -219,19 +230,26 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
     if (_lastCreatedToken == null || _printer == null || !_isConnected) return;
     setState(() => _isPrinting = true);
     try {
-      final userName = await User().getUserName() ?? 'Unknown';
-      final bytes = OfflineDeliveryPrintHelper.buildTokenReceiptBytes(
-          _lastCreatedToken!, userName);
-      final success = await _printer!.printBinaryData(bytes);
+      final binaryData = await _apiService.thermalPrintOfflineDeliveryToken(
+        _lastCreatedToken!.id,
+        _printer!.deviceIdentifier,
+        _printer!.paperWidthMm,
+      );
+      final success = await _printer!.printBinaryData(binaryData);
       if (mounted) {
         if (success) {
           context.showSuccessSnackBar('Receipt printed successfully');
+          context.read<OfflineDeliveryBloc>().add(const RefreshTokens());
         } else {
           context.showErrorSnackBar('Failed to print');
         }
       }
     } catch (e) {
-      if (mounted) context.showErrorSnackBar('Print error: $e');
+      if (mounted) {
+        context.showErrorSnackBar(
+          'Print error: ${e.toString().replaceAll('Exception: ', '')}',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isPrinting = false);
     }
@@ -241,6 +259,7 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
     _consumerIdController.clear();
     _consumerNumberController.clear();
     _orderNumberController.clear();
+    _dacCodeController.clear();
     _remarkController.clear();
     setState(() {
       _submitSuccess = false;
@@ -283,16 +302,12 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(15),
+                        LengthLimitingTextInputFormatter(16),
                       ],
                       decoration: InputDecoration(
                         labelText: 'Consumer ID',
-                        hintText: '500000047614745',
+                        hintText: '7500000047614745',
                         prefixIcon: const Icon(Icons.tag),
-                        prefixText: '7',
-                        prefixStyle: AppTextStyles.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.r),
                         ),
@@ -300,8 +315,8 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) return null;
-                        if (value.trim().length != 15) {
-                          return 'Enter 15 digits (total 16 with prefix 7)';
+                        if (value.trim().length != 16) {
+                          return 'Enter 16-digit Consumer ID';
                         }
                         return null;
                       },
@@ -315,16 +330,12 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(9),
+                        LengthLimitingTextInputFormatter(10),
                       ],
                       decoration: InputDecoration(
                         labelText: 'Consumer Number',
-                        hintText: '547614745',
+                        hintText: '7547614745',
                         prefixIcon: const Icon(Icons.numbers),
-                        prefixText: '7',
-                        prefixStyle: AppTextStyles.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.r),
                         ),
@@ -332,8 +343,8 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) return null;
-                        if (value.trim().length != 9) {
-                          return 'Enter 9 digits (total 10 with prefix 7)';
+                        if (value.trim().length != 10) {
+                          return 'Enter 10-digit Consumer Number';
                         }
                         return null;
                       },
@@ -381,7 +392,31 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
                         return null;
                       },
                     ),
-                    SizedBox(height: AppSpacing.md),
+                    // DAC Code (always visible)
+                      TextFormField(
+                        controller: _dacCodeController,
+                        enabled: !_submitSuccess,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
+                        decoration: InputDecoration(
+                          labelText: 'DAC Code',
+                          hintText: 'Enter 6-digit DAC Code',
+                          prefixIcon: const Icon(Icons.qr_code),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                        ),
+                        textInputAction: TextInputAction.next,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return null;
+                          if (value.trim().length != 6) {
+                            return 'Enter 6-digit DAC Code';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: AppSpacing.md),
 
                     // Remark
                     TextFormField(
@@ -534,7 +569,7 @@ class _TokenCreationFormState extends State<TokenCreationForm> {
                                   )
                                 : Icon(Icons.print, size: 20.sp),
                             label: Text(
-                              _isPrinting ? 'Printing...' : 'Print Receipt',
+                              _isPrinting ? 'Printing...' : 'Print Token',
                               style: TextStyle(
                                   fontSize: 16.sp, fontWeight: FontWeight.w600),
                             ),

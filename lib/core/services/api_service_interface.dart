@@ -113,6 +113,16 @@ abstract class ApiServiceInterface {
     String deviceIdentifier,
     int paperWidthMm,
   );
+  Future<List<int>> thermalPrintOfflineDeliveryToken(
+    String tokenId,
+    String deviceIdentifier,
+    int paperWidthMm,
+  );
+  Future<List<int>> thermalPrintBookingVerification(
+    String verificationId,
+    String deviceIdentifier,
+    int paperWidthMm,
+  );
 
   // Document methods
   Future<String> uploadDocument(
@@ -393,8 +403,9 @@ abstract class ApiServiceInterface {
   Future<Map<String, dynamic>> getOfflineDeliveryStatus();
   Future<List<dynamic>> getOfflineDeliveryDistributionPoints();
   Future<Map<String, dynamic>> getOfflineDeliveryTokensPaginated({String? distributionPointId, String? date, String? status, String? search});
-  Future<Map<String, dynamic>> getOfflineDeliveryVerificationsPaginated({String? distributionPointId, String? date, String? status, String? search});
+  Future<Map<String, dynamic>> getOfflineDeliveryVerificationsPaginated({String? distributionPointId, String? date, String? status, String? search, bool? showAll});
   Future<Map<String, dynamic>> getOfflineDeliveryNextPage(String nextUrl);
+  Future<Map<String, dynamic>> getOfflineDeliveryTokenDetail(String tokenId);
   Future<Map<String, dynamic>> createOfflineDeliveryToken(Map<String, dynamic> data);
   Future<Map<String, dynamic>> deliverOfflineDeliveryToken(String tokenId, Map<String, dynamic> data);
   Future<Map<String, dynamic>> correctOfflineDeliveryToken(String tokenId, Map<String, dynamic> data);

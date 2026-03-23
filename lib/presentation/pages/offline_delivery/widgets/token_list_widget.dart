@@ -18,6 +18,7 @@ class TokenListWidget extends StatefulWidget {
   final bool hasMore;
   final bool isLoadingMore;
   final VoidCallback? onLoadMore;
+  final bool isSearchActive;
 
   const TokenListWidget({
     Key? key,
@@ -27,6 +28,7 @@ class TokenListWidget extends StatefulWidget {
     this.hasMore = false,
     this.isLoadingMore = false,
     this.onLoadMore,
+    this.isSearchActive = false,
   }) : super(key: key);
 
   @override
@@ -347,6 +349,7 @@ class _TokenListWidgetState extends State<TokenListWidget> {
         ...tokens.map((token) => _TokenCard(
               token: token,
               onTap: () => _showTokenDetail(context, token),
+              isSearchActive: widget.isSearchActive,
             )),
       ],
     );
@@ -369,10 +372,12 @@ class _TokenListWidgetState extends State<TokenListWidget> {
 class _TokenCard extends StatelessWidget {
   final OfflineDeliveryToken token;
   final VoidCallback onTap;
+  final bool isSearchActive;
 
   const _TokenCard({
     required this.token,
     required this.onTap,
+    this.isSearchActive = false,
   });
 
   @override
@@ -426,13 +431,17 @@ class _TokenCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  if (token.consumerNumber != null) ...[
+                  if (token.consumerNumber != null && token.consumerNumber!.isNotEmpty) ...[
                     SizedBox(height: 2),
-                    _infoRow('Consumer No.', token.consumerNumber!.substring(1), prefix: '7'),
+                    _infoRow('Consumer No.', token.consumerNumber!.length > 1 ? token.consumerNumber!.substring(1) : token.consumerNumber!, prefix: '7'),
                   ],
-                  if (token.consumerId != null) ...[
+                  if (token.consumerId != null && token.consumerId!.isNotEmpty) ...[
                     SizedBox(height: 2),
-                    _infoRow('Consumer ID', token.consumerId!.substring(1), prefix: '7'),
+                    _infoRow('Consumer ID', token.consumerId!.length > 1 ? token.consumerId!.substring(1) : token.consumerId!, prefix: '7'),
+                  ],
+                  if (token.dacCode != null && token.dacCode!.isNotEmpty) ...[
+                    SizedBox(height: 2),
+                    _infoRow('DAC', token.dacCode!),
                   ],
                   if (token.cashToCollect != null) ...[
                     SizedBox(height: 2),
@@ -453,6 +462,18 @@ class _TokenCard extends StatelessWidget {
                             ),
                           ),
                       ],
+                    ),
+                  ],
+                  if (isSearchActive && token.createdByName != null && token.createdByName!.isNotEmpty) ...[
+                    SizedBox(height: 2),
+                    Text(
+                      'By: ${token.createdByName}',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColorsEnhanced.secondaryText,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
@@ -531,7 +552,7 @@ class _TokenCard extends StatelessWidget {
     } else {
       bgColor = Colors.grey.withOpacity(0.1);
       textColor = Colors.grey.shade700;
-      label = 'PENDING';
+      label = 'ISSUED';
     }
 
     return Container(

@@ -11,20 +11,22 @@ import '../../../../core/services/printer/printer_manager.dart';
 import '../../../../core/services/printer/printer_interface.dart';
 import '../../../../core/services/printer/printer_type.dart';
 import '../../../../core/services/printer/bluetooth_printer_service.dart';
-import '../../../../core/services/User.dart';
+import '../../../../core/services/api_service_interface.dart';
+import '../../../../core/services/service_provider.dart';
 import '../../../../domain/entities/offline_delivery/offline_delivery_token.dart';
 import '../../../blocs/offline_delivery/offline_delivery_bloc.dart';
+import '../../../blocs/offline_delivery/offline_delivery_event.dart';
 import '../../../blocs/offline_delivery/offline_delivery_state.dart';
 import '../../../widgets/professional_snackbar.dart';
-import '../offline_delivery_print_helper.dart';
 import 'delivery_dialog.dart';
 import 'token_correction_dialog.dart';
 import 'token_image_upload_widget.dart';
 
 class TokenDetailSheet extends StatefulWidget {
   final OfflineDeliveryToken token;
+  final bool printOnly;
 
-  const TokenDetailSheet({Key? key, required this.token}) : super(key: key);
+  const TokenDetailSheet({Key? key, required this.token, this.printOnly = false}) : super(key: key);
 
   @override
   State<TokenDetailSheet> createState() => _TokenDetailSheetState();
@@ -40,11 +42,17 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
   bool _isScanning = false;
   List<BluetoothDevice> _printers = [];
   StreamSubscription<List<ScanResult>>? _scanSubscription;
+  late ApiServiceInterface _apiService;
 
   @override
   void initState() {
     super.initState();
     _initPrinter();
+    _initApiService();
+  }
+
+  Future<void> _initApiService() async {
+    _apiService = await ServiceProvider.getApiService();
   }
 
   @override
@@ -161,19 +169,26 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
     if (_printer == null || !_isConnected) return;
     setState(() => _isPrinting = true);
     try {
-      final userName = await User().getUserName() ?? 'Unknown';
-      final bytes = OfflineDeliveryPrintHelper.buildTokenReceiptBytes(
-          currentToken, userName);
-      final success = await _printer!.printBinaryData(bytes);
+      final binaryData = await _apiService.thermalPrintOfflineDeliveryToken(
+        currentToken.id,
+        _printer!.deviceIdentifier,
+        _printer!.paperWidthMm,
+      );
+      final success = await _printer!.printBinaryData(binaryData);
       if (mounted) {
         if (success) {
           context.showSuccessSnackBar('Receipt printed successfully');
+          context.read<OfflineDeliveryBloc>().add(const RefreshTokens());
         } else {
           context.showErrorSnackBar('Failed to print');
         }
       }
     } catch (e) {
-      if (mounted) context.showErrorSnackBar('Print error: $e');
+      if (mounted) {
+        context.showErrorSnackBar(
+          'Print error: ${e.toString().replaceAll('Exception: ', '')}',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isPrinting = false);
     }
@@ -204,7 +219,9 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
               builder: (context, state) {
                 // Get the latest token data from the bloc cache
                 OfflineDeliveryToken currentToken = widget.token;
+                bool isSupervisor = false;
                 if (state is OfflineDeliveryLoaded) {
+                  isSupervisor = state.isSupervisor;
                   final updated = state.tokens.where((t) => t.id == widget.token.id);
                   if (updated.isNotEmpty) {
                     currentToken = updated.first;
@@ -319,96 +336,98 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
                         ),
                       SizedBox(height: AppSpacing.xl),
 
-                      // Image upload section — show for PENDING tokens
-                      if (currentToken.isPending && !currentToken.imagesUploaded) ...[
-                        TokenImageUploadWidget(tokenId: currentToken.id),
-                        SizedBox(height: AppSpacing.md),
-                      ],
+                      if (!widget.printOnly) ...[
+                        // Image upload section — show for PENDING tokens
+                        if (currentToken.isPending && !currentToken.imagesUploaded) ...[
+                          TokenImageUploadWidget(tokenId: currentToken.id),
+                          SizedBox(height: AppSpacing.md),
+                        ],
 
-                      // Uploaded indicator
-                      if (currentToken.imagesUploaded) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(AppSpacing.sm),
-                          decoration: BoxDecoration(
-                            color: AppColorsEnhanced.successGreen.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: AppColorsEnhanced.successGreen.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check_circle,
-                                  color: AppColorsEnhanced.successGreen, size: 18.sp),
-                              SizedBox(width: AppSpacing.sm),
-                              Text(
-                                'Photos uploaded',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                  color: AppColorsEnhanced.successGreen,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: AppSpacing.md),
-                      ],
-
-                      // Actions
-                      if (currentToken.isPending) ...[
-                        // Evidence gate: if evidence required but images not uploaded, block delivery
-                        if (currentToken.evidenceRequired && !currentToken.imagesUploaded) ...[
+                        // Uploaded indicator
+                        if (currentToken.imagesUploaded) ...[
                           Container(
                             width: double.infinity,
-                            padding: EdgeInsets.symmetric(vertical: 14.h),
+                            padding: EdgeInsets.all(AppSpacing.sm),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(24.r),
+                              color: AppColorsEnhanced.successGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColorsEnhanced.successGreen.withOpacity(0.3),
+                              ),
                             ),
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.camera_alt, color: Colors.grey, size: 20.sp),
+                                Icon(Icons.check_circle,
+                                    color: AppColorsEnhanced.successGreen, size: 18.sp),
                                 SizedBox(width: AppSpacing.sm),
                                 Text(
-                                  'Upload photo first',
-                                  style: TextStyle(
-                                    fontSize: 16.sp,
+                                  'Photos uploaded',
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColorsEnhanced.successGreen,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.grey,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ] else ...[
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () => _showDeliveryDialog(context, currentToken),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColorsEnhanced.successGreen,
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(vertical: 14.h),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24.r),
-                                ),
+                          SizedBox(height: AppSpacing.md),
+                        ],
+
+                        // Actions
+                        if (currentToken.isPending) ...[
+                          // Evidence gate: if evidence required but images not uploaded, block delivery
+                          if (currentToken.evidenceRequired && !currentToken.imagesUploaded) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.symmetric(vertical: 14.h),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(24.r),
                               ),
-                              icon: Icon(Icons.check_circle_outline, size: 20.sp),
-                              label: Text(
-                                'Mark Delivered',
-                                style: TextStyle(
-                                    fontSize: 16.sp, fontWeight: FontWeight.w600),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.camera_alt, color: Colors.grey, size: 20.sp),
+                                  SizedBox(width: AppSpacing.sm),
+                                  Text(
+                                    'Upload photo first',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
+                          ] else ...[
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _showDeliveryDialog(context, currentToken),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColorsEnhanced.successGreen,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: 14.h),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24.r),
+                                  ),
+                                ),
+                                icon: Icon(Icons.check_circle_outline, size: 20.sp),
+                                label: Text(
+                                  'Mark Delivered',
+                                  style: TextStyle(
+                                      fontSize: 16.sp, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ),
+                          ],
+                          SizedBox(height: AppSpacing.md),
                         ],
-                        SizedBox(height: AppSpacing.md),
                       ],
 
                       // Inline printer section
-                      _buildPrinterSection(currentToken),
+                      _buildPrinterSection(currentToken, isSupervisor),
 
                       SizedBox(height: AppSpacing.lg),
                     ],
@@ -422,7 +441,7 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
     );
   }
 
-  Widget _buildPrinterSection(OfflineDeliveryToken currentToken) {
+  Widget _buildPrinterSection(OfflineDeliveryToken currentToken, bool isSupervisor) {
     if (_isPrinterInitializing) {
       return Container(
         width: double.infinity,
@@ -564,35 +583,56 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
             Divider(height: 1, color: AppColorsEnhanced.border),
             Padding(
               padding: EdgeInsets.all(AppSpacing.sm),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: !_isPrinting ? () => _printReceipt(currentToken) : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColorsEnhanced.brandBlue,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24.r),
-                    ),
-                  ),
-                  icon: _isPrinting
-                      ? SizedBox(
-                          height: 20.h,
-                          width: 20.w,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.w,
+              child: Builder(builder: (_) {
+                // Supervisors can always print; non-supervisors rely on API's canPrint
+                final canPrintNow = currentToken.canPrint || isSupervisor;
+                return Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: (!_isPrinting && canPrintNow)
+                            ? () => _printReceipt(currentToken)
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColorsEnhanced.brandBlue,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          padding: EdgeInsets.symmetric(vertical: 12.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24.r),
                           ),
-                        )
-                      : Icon(Icons.print, size: 20.sp),
-                  label: Text(
-                    _isPrinting ? 'Printing...' : 'Print Receipt',
-                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
+                        ),
+                        icon: _isPrinting
+                            ? SizedBox(
+                                height: 20.h,
+                                width: 20.w,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.w,
+                                ),
+                              )
+                            : Icon(Icons.print, size: 20.sp),
+                        label: Text(
+                          _isPrinting
+                              ? 'Printing...'
+                              : currentToken.printCount == 0
+                                  ? 'Print Token'
+                                  : 'Reprint Token',
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    if (!canPrintNow) ...[
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Already printed. Ask supervisor to reprint.',
+                        style: TextStyle(color: Colors.orange, fontSize: 12.sp),
+                      ),
+                    ],
+                  ],
+                );
+              }),
             ),
           ],
         ],
@@ -746,7 +786,7 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
     } else {
       bgColor = Colors.grey.withOpacity(0.1);
       textColor = Colors.grey.shade700;
-      label = 'PENDING';
+      label = 'ISSUED';
     }
 
     return Container(
@@ -771,11 +811,6 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
 
   void _showDeliveryDialog(BuildContext context, OfflineDeliveryToken currentToken) {
     final bloc = context.read<OfflineDeliveryBloc>();
-    final blocState = bloc.state;
-    final requireDacCode = blocState is OfflineDeliveryLoaded
-        ? blocState.systemStatus.requireDacCode
-        : false;
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -783,7 +818,6 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
         value: bloc,
         child: DeliveryDialog(
           token: currentToken,
-          requireDacCode: requireDacCode && currentToken.dacCode == null,
         ),
       ),
     );

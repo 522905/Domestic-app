@@ -34,6 +34,8 @@ class OfflineDeliveryToken extends Equatable {
   final OfflineDeliveryCompany? company;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final int printCount;
+  final bool canPrint;
 
   const OfflineDeliveryToken({
     required this.id,
@@ -68,9 +70,11 @@ class OfflineDeliveryToken extends Equatable {
     this.createdByName,
     this.createdAt,
     this.updatedAt,
+    this.printCount = 0,
+    this.canPrint = true,
   });
 
-  bool get isPending => status == 'PENDING';
+  bool get isPending => status == 'TOKEN_ISSUED';
   bool get isDelivered => status == 'DELIVERED';
   bool get isVoided => status == 'VOIDED';
   bool get needsCorrection => reconciliationStatus == 'NEEDS_CORRECTION';
@@ -100,7 +104,7 @@ class OfflineDeliveryToken extends Equatable {
       imagesUploaded: json['images_uploaded'] ?? false,
       evidenceRequired: json['evidence_required'] ?? false,
       remark: json['remark'],
-      status: json['status'] ?? 'PENDING',
+      status: json['status'] ?? 'TOKEN_ISSUED',
       modeSnapshot: json['mode_snapshot'],
       creationType: json['creation_type'],
       isQuickDelivery: json['is_quick_delivery'] ?? false,
@@ -118,6 +122,53 @@ class OfflineDeliveryToken extends Equatable {
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'])
           : null,
+      printCount: json['print_count'] ?? 0,
+      canPrint: json['can_print'] ?? true,
+    );
+  }
+
+  OfflineDeliveryToken copyWith({
+    int? printCount,
+    bool? canPrint,
+    String? status,
+    String? reconciliationStatus,
+    String? reconciliationError,
+  }) {
+    return OfflineDeliveryToken(
+      id: id,
+      tokenNumber: tokenNumber,
+      tokenDate: tokenDate,
+      consumerId: consumerId,
+      consumerNumber: consumerNumber,
+      consumerName: consumerName,
+      consumerNameManual: consumerNameManual,
+      orderNumber: orderNumber,
+      bookingOrigin: bookingOrigin,
+      dacCode: dacCode,
+      deliveredAt: deliveredAt,
+      cashToCollect: cashToCollect,
+      cashToCollectIsEstimated: cashToCollectIsEstimated,
+      digitalAmount: digitalAmount,
+      cashCollected: cashCollected,
+      referenceImage1: referenceImage1,
+      referenceImage2: referenceImage2,
+      imagesUploaded: imagesUploaded,
+      evidenceRequired: evidenceRequired,
+      remark: remark,
+      status: status ?? this.status,
+      modeSnapshot: modeSnapshot,
+      creationType: creationType,
+      isQuickDelivery: isQuickDelivery,
+      overrideReason: overrideReason,
+      reconciliationStatus: reconciliationStatus ?? this.reconciliationStatus,
+      reconciliationError: reconciliationError ?? this.reconciliationError,
+      distributionPointName: distributionPointName,
+      company: company,
+      createdByName: createdByName,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      printCount: printCount ?? this.printCount,
+      canPrint: canPrint ?? this.canPrint,
     );
   }
 
@@ -131,5 +182,6 @@ class OfflineDeliveryToken extends Equatable {
     creationType, isQuickDelivery, overrideReason,
     reconciliationStatus, reconciliationError, company,
     distributionPointName, createdByName, createdAt, updatedAt,
+    printCount, canPrint,
   ];
 }

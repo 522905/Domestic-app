@@ -12,13 +12,13 @@ import '../../../../core/services/printer/printer_manager.dart';
 import '../../../../core/services/printer/printer_interface.dart';
 import '../../../../core/services/printer/printer_type.dart';
 import '../../../../core/services/printer/bluetooth_printer_service.dart';
-import '../../../../core/services/User.dart';
+import '../../../../core/services/api_service_interface.dart';
+import '../../../../core/services/service_provider.dart';
 import '../../../../domain/entities/offline_delivery/offline_delivery_token.dart';
 import '../../../blocs/offline_delivery/offline_delivery_bloc.dart';
 import '../../../blocs/offline_delivery/offline_delivery_event.dart';
 import '../../../blocs/offline_delivery/offline_delivery_state.dart';
 import '../../../widgets/professional_snackbar.dart';
-import '../offline_delivery_print_helper.dart';
 
 class OwnersReferenceForm extends StatefulWidget {
   final String distributionPointId;
@@ -58,11 +58,17 @@ class _OwnersReferenceFormState extends State<OwnersReferenceForm> {
   bool _isScanning = false;
   List<BluetoothDevice> _printers = [];
   StreamSubscription<List<ScanResult>>? _scanSubscription;
+  late ApiServiceInterface _apiService;
 
   @override
   void initState() {
     super.initState();
     _initPrinter();
+    _initApiService();
+  }
+
+  Future<void> _initApiService() async {
+    _apiService = await ServiceProvider.getApiService();
   }
 
   @override
@@ -207,19 +213,26 @@ class _OwnersReferenceFormState extends State<OwnersReferenceForm> {
     if (_lastCreatedToken == null || _printer == null || !_isConnected) return;
     setState(() => _isPrinting = true);
     try {
-      final userName = await User().getUserName() ?? 'Unknown';
-      final bytes = OfflineDeliveryPrintHelper.buildTokenReceiptBytes(
-          _lastCreatedToken!, userName);
-      final success = await _printer!.printBinaryData(bytes);
+      final binaryData = await _apiService.thermalPrintOfflineDeliveryToken(
+        _lastCreatedToken!.id,
+        _printer!.deviceIdentifier,
+        _printer!.paperWidthMm,
+      );
+      final success = await _printer!.printBinaryData(binaryData);
       if (mounted) {
         if (success) {
           context.showSuccessSnackBar('Receipt printed successfully');
+          context.read<OfflineDeliveryBloc>().add(const RefreshTokens());
         } else {
           context.showErrorSnackBar('Failed to print');
         }
       }
     } catch (e) {
-      if (mounted) context.showErrorSnackBar('Print error: $e');
+      if (mounted) {
+        context.showErrorSnackBar(
+          'Print error: ${e.toString().replaceAll('Exception: ', '')}',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isPrinting = false);
     }
@@ -491,7 +504,7 @@ class _OwnersReferenceFormState extends State<OwnersReferenceForm> {
                                     )
                                   : Icon(Icons.print, size: 20.sp),
                               label: Text(
-                                _isPrinting ? 'Printing...' : 'Print Receipt',
+                                _isPrinting ? 'Printing...' : 'Print Token',
                                 style: TextStyle(
                                     fontSize: 16.sp,
                                     fontWeight: FontWeight.w600),
