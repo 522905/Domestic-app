@@ -29,13 +29,55 @@ class _DeliveryDialogState extends State<DeliveryDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _cashController;
   final _dacCodeController = TextEditingController();
+  late final TextEditingController _emptiesController;
   bool _isDelivering = false;
+
+  // Derive hints from available_actions
+  Map<String, dynamic>? get _deliverAction => widget.token.getAction('deliver');
+
+  bool get _showCashField {
+    final action = _deliverAction;
+    if (action != null) {
+      // API tells us whether to collect cash at delivery
+      return action['collect_cash_at_delivery'] == true;
+    }
+    // Fallback: show cash for non-obligation tokens, or if cash_arrangement is COLLECT_AT_DELIVERY
+    if (!widget.token.isObligation) return true;
+    return widget.token.obligationDetail?.cashArrangement == 'COLLECT_AT_DELIVERY';
+  }
+
+  bool get _showEmptiesField {
+    final action = _deliverAction;
+    if (action != null) {
+      // record_empties = DEFERRED (user picks count), collect_empties = SAME_DAY (auto)
+      return action['record_empties_at_delivery'] == true;
+    }
+    // Fallback
+    final detail = widget.token.obligationDetail;
+    return widget.token.isObligation &&
+        detail != null &&
+        detail.emptyArrangement == 'DEFERRED' &&
+        detail.emptiesExpected > 0;
+  }
+
+  bool get _showEmptiesAutoNote {
+    final action = _deliverAction;
+    return action != null && action['collect_empties_at_delivery'] == true;
+  }
 
   @override
   void initState() {
     super.initState();
     _cashController = TextEditingController(
-      text: widget.token.cashToCollect?.toStringAsFixed(2) ?? '',
+      text: _showCashField
+          ? (widget.token.cashToCollect?.toStringAsFixed(2) ?? '')
+          : '',
+    );
+    _dacCodeController.text = widget.token.dacCode ?? '';
+    final expected = _deliverAction?['empties_expected'] ??
+        widget.token.obligationDetail?.emptiesExpected ?? 0;
+    _emptiesController = TextEditingController(
+      text: _showEmptiesField ? expected.toString() : '',
     );
   }
 
@@ -43,23 +85,33 @@ class _DeliveryDialogState extends State<DeliveryDialog> {
   void dispose() {
     _cashController.dispose();
     _dacCodeController.dispose();
+    _emptiesController.dispose();
     super.dispose();
   }
 
   void _handleConfirm() {
     if (!_formKey.currentState!.validate()) return;
 
-    final cashCollected = double.tryParse(_cashController.text.trim());
-    if (cashCollected == null) return;
+    final cashCollected = _showCashField
+        ? (_cashController.text.trim().isNotEmpty
+            ? double.tryParse(_cashController.text.trim())
+            : null)
+        : null;
+    final emptiesCollected = _showEmptiesField
+        ? (_emptiesController.text.trim().isNotEmpty
+            ? int.tryParse(_emptiesController.text.trim())
+            : null)
+        : null;
 
     setState(() => _isDelivering = true);
 
     context.read<OfflineDeliveryBloc>().add(DeliverToken(
       tokenId: widget.token.id,
       cashCollected: cashCollected,
-      dacCode: widget.requireDacCode && _dacCodeController.text.trim().isNotEmpty
+      dacCode: _dacCodeController.text.trim().isNotEmpty
           ? _dacCodeController.text.trim()
           : null,
+      emptiesCollected: emptiesCollected,
     ));
   }
 
@@ -134,7 +186,129 @@ class _DeliveryDialogState extends State<DeliveryDialog> {
                 ),
                 SizedBox(height: AppSpacing.lg),
 
-                // Cash Collected
+                // SAME_DAY empties auto-complete note
+                if (_showEmptiesAutoNote) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(AppSpacing.sm),
+                    margin: EdgeInsets.only(bottom: AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColorsEnhanced.successGreen.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(
+                        color: AppColorsEnhanced.successGreen.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, size: 16, color: AppColorsEnhanced.successGreen),
+                        SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            'All empties will be marked as collected automatically',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColorsEnhanced.successGreen,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // DEFERRED empties — user enters count collected now
+                if (_showEmptiesField) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(AppSpacing.sm),
+                    margin: EdgeInsets.only(bottom: AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColorsEnhanced.infoBlue.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(
+                        color: AppColorsEnhanced.infoBlue.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.swap_vert, size: 16, color: AppColorsEnhanced.infoBlue),
+                        SizedBox(width: AppSpacing.xs),
+                        Text(
+                          '${_deliverAction?['empties_expected'] ?? widget.token.obligationDetail?.emptiesExpected ?? 0} empties expected (deferred)',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColorsEnhanced.infoBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextFormField(
+                    controller: _emptiesController,
+                    enabled: !_isDelivering,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    decoration: InputDecoration(
+                      labelText: 'Empties Collected Now',
+                      hintText: 'Enter 0 if none collected now',
+                      prefixIcon: const Icon(Icons.swap_vert),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value != null && value.trim().isNotEmpty) {
+                        final count = int.tryParse(value.trim());
+                        if (count == null || count < 0) {
+                          return 'Enter a valid count';
+                        }
+                        final max = _deliverAction?['empties_expected'] ?? widget.token.obligationDetail?.emptiesExpected ?? 0;
+                        if (count > max) {
+                          return 'Cannot exceed $max';
+                        }
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: AppSpacing.md),
+                ],
+
+                // Deferred cash info note
+                if (widget.token.isObligation && !_showCashField &&
+                    widget.token.obligationDetail?.cashArrangement == 'DEFERRED') ...[
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(AppSpacing.sm),
+                    margin: EdgeInsets.only(bottom: AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColorsEnhanced.warningYellow.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(
+                        color: AppColorsEnhanced.warningYellow.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.schedule, size: 16, color: AppColorsEnhanced.warningYellow),
+                        SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            'Cash deferred — due ${widget.token.obligationDetail?.cashDueDate != null ? '${widget.token.obligationDetail!.cashDueDate!.day}/${widget.token.obligationDetail!.cashDueDate!.month}/${widget.token.obligationDetail!.cashDueDate!.year}' : 'later'}',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColorsEnhanced.warningYellow,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Cash Collected (only when collect_cash_at_delivery)
+                if (_showCashField)
                 TextFormField(
                   controller: _cashController,
                   enabled: !_isDelivering,
@@ -143,7 +317,7 @@ class _DeliveryDialogState extends State<DeliveryDialog> {
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                   ],
                   decoration: InputDecoration(
-                    labelText: 'Cash Collected *',
+                    labelText: 'Cash Collected',
                     hintText: 'Enter amount collected',
                     prefixIcon: const Icon(Icons.currency_rupee),
                     border: OutlineInputBorder(
@@ -151,38 +325,43 @@ class _DeliveryDialogState extends State<DeliveryDialog> {
                     ),
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Cash collected is required';
-                    }
-                    final amount = double.tryParse(value.trim());
-                    if (amount == null || amount < 0) {
-                      return 'Enter a valid amount';
+                    if (value != null && value.trim().isNotEmpty) {
+                      final amount = double.tryParse(value.trim());
+                      if (amount == null || amount < 0) {
+                        return 'Enter a valid amount';
+                      }
                     }
                     return null;
                   },
                 ),
                 SizedBox(height: AppSpacing.md),
 
-                // DAC Code (if required and not already set)
-                if (widget.requireDacCode) ...[
-                  TextFormField(
-                    controller: _dacCodeController,
-                    enabled: !_isDelivering,
-                    decoration: InputDecoration(
-                      labelText: 'DAC Code',
-                      hintText: 'Enter DAC Code (digits only)',
-                      prefixIcon: const Icon(Icons.qr_code),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
+                // DAC Code
+                TextFormField(
+                  controller: _dacCodeController,
+                  enabled: !_isDelivering,
+                  decoration: InputDecoration(
+                    labelText: 'DAC Code',
+                    hintText: 'Enter 6-digit DAC Code',
+                    prefixIcon: const Icon(Icons.qr_code),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
                     ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
                   ),
-                  SizedBox(height: AppSpacing.md),
-                ],
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    if (value.trim().length != 6) {
+                      return 'Enter 6-digit DAC Code';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: AppSpacing.md),
               ],
             ),
           ),

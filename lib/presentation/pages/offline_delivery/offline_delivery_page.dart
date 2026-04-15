@@ -13,6 +13,7 @@ import 'widgets/verification_list_widget.dart';
 import 'verify_booking_create_page.dart';
 import 'normal_token_create_page.dart';
 import 'quick_token_create_page.dart';
+import 'obligation_token_create_page.dart';
 
 class OfflineDeliveryPage extends StatefulWidget {
   const OfflineDeliveryPage({Key? key}) : super(key: key);
@@ -201,13 +202,20 @@ class _OfflineDeliveryPageState extends State<OfflineDeliveryPage>
 
     _ensureTabController(needsTabs);
 
-    // Auto-show warehouse picker on first load when no point selected
+    // Auto-select if single warehouse, otherwise show picker
     if (!hasPoint &&
         !_hasAutoShownPicker &&
         state.distributionPoints.isNotEmpty) {
       _hasAutoShownPicker = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showWarehousePickerSheet(state);
+        if (!mounted) return;
+        if (state.distributionPoints.length == 1) {
+          context
+              .read<OfflineDeliveryBloc>()
+              .add(SelectDistributionPoint(state.distributionPoints.first.id));
+        } else {
+          _showWarehousePickerSheet(state);
+        }
       });
     }
 
@@ -249,6 +257,21 @@ class _OfflineDeliveryPageState extends State<OfflineDeliveryPage>
         backgroundColor: AppColorsEnhanced.brandBlue,
         foregroundColor: Colors.white,
         actions: [
+          if (state.isSupervisor)
+            IconButton(
+              icon: const Icon(Icons.checklist),
+              tooltip: 'Due Collections',
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  'offline-delivery-collections',
+                  arguments: {
+                    'companies': state.companies,
+                    'initialCompanyId': state.lastSelectedCompanyId,
+                  },
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -527,6 +550,7 @@ class _OfflineDeliveryPageState extends State<OfflineDeliveryPage>
           selectedDate: state.selectedDate,
           hasMore: state.hasMoreTokens,
           isLoadingMore: state.isLoadingMoreTokens,
+          isSearchActive: state.searchQuery.isNotEmpty,
           onLoadMore: () {
             context.read<OfflineDeliveryBloc>().add(const LoadMoreTokens());
           },
@@ -547,18 +571,69 @@ class _OfflineDeliveryPageState extends State<OfflineDeliveryPage>
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-        child: VerificationListWidget(
-          verifications: state.verifications,
-          distributionPointId: state.selectedPoint!.id,
-          isSupervisor: state.isSupervisor,
-          hasMore: state.hasMoreVerifications,
-          isLoadingMore: state.isLoadingMoreVerifications,
-          onLoadMore: () {
-            context
-                .read<OfflineDeliveryBloc>()
-                .add(const LoadMoreVerifications());
-          },
+        child: Column(
+          children: [
+            _buildShowAllChip(state),
+            VerificationListWidget(
+              verifications: state.verifications,
+              distributionPointId: state.selectedPoint?.id,
+              isSupervisor: state.isSupervisor,
+              showAllActive: state.showAllVerifications,
+              hasMore: state.hasMoreVerifications,
+              isLoadingMore: state.isLoadingMoreVerifications,
+              onLoadMore: () {
+                context
+                    .read<OfflineDeliveryBloc>()
+                    .add(const LoadMoreVerifications());
+              },
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildShowAllChip(OfflineDeliveryLoaded state) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: Row(
+        children: [
+          FilterChip(
+            label: Text(
+              'Show All',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: state.showAllVerifications
+                    ? Colors.white
+                    : AppColorsEnhanced.secondaryText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            selected: state.showAllVerifications,
+            onSelected: (value) {
+              context
+                  .read<OfflineDeliveryBloc>()
+                  .add(ToggleShowAllVerifications(value));
+            },
+            selectedColor: AppColorsEnhanced.brandBlue,
+            checkmarkColor: Colors.white,
+            backgroundColor: Colors.white,
+            side: BorderSide(
+              color: state.showAllVerifications
+                  ? AppColorsEnhanced.brandBlue
+                  : AppColorsEnhanced.border,
+            ),
+            visualDensity: VisualDensity.compact,
+          ),
+          SizedBox(width: AppSpacing.sm),
+          if (state.showAllVerifications)
+            Text(
+              'Showing all users\' verifications',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColorsEnhanced.secondaryText,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -677,6 +752,35 @@ class _OfflineDeliveryPageState extends State<OfflineDeliveryPage>
                       _pushQuickTokenPage(state);
                     },
                   ),
+                if (state.isSupervisor)
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          AppColorsEnhanced.warningYellow.withOpacity(0.1),
+                      child: Icon(
+                        Icons.assignment,
+                        color: AppColorsEnhanced.warningYellow,
+                      ),
+                    ),
+                    title: Text(
+                      'Obligation Token',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Director-authorized delivery',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColorsEnhanced.secondaryText,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _pushObligationTokenPage(state);
+                    },
+                  ),
+
+
               ],
             ),
           ),
@@ -709,6 +813,23 @@ class _OfflineDeliveryPageState extends State<OfflineDeliveryPage>
         builder: (_) => BlocProvider.value(
           value: context.read<OfflineDeliveryBloc>(),
           child: QuickTokenCreatePage(
+            distributionPointId: state.selectedPoint!.id,
+            systemStatus: state.systemStatus,
+            companies: state.companies,
+            initialCompanyId: state.lastSelectedCompanyId,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _pushObligationTokenPage(OfflineDeliveryLoaded state) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<OfflineDeliveryBloc>(),
+          child: ObligationTokenCreatePage(
             distributionPointId: state.selectedPoint!.id,
             systemStatus: state.systemStatus,
             companies: state.companies,

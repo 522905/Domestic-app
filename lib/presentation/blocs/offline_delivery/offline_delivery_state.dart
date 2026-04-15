@@ -4,6 +4,7 @@ import '../../../domain/entities/offline_delivery/distribution_point.dart';
 import '../../../domain/entities/offline_delivery/booking_verification.dart';
 import '../../../domain/entities/offline_delivery/offline_delivery_token.dart';
 import '../../../domain/entities/offline_delivery/offline_delivery_company.dart';
+import '../../../domain/entities/offline_delivery/obligation_director.dart';
 
 abstract class OfflineDeliveryState extends Equatable {
   const OfflineDeliveryState();
@@ -34,6 +35,10 @@ class OfflineDeliveryLoaded extends OfflineDeliveryState {
   final List<OfflineDeliveryCompany> companies;
   final int? lastSelectedCompanyId;
 
+  final bool showAllVerifications;
+
+  final List<ObligationDirector> obligationDirectors;
+
   OfflineDeliveryLoaded({
     required this.systemStatus,
     required this.distributionPoints,
@@ -49,6 +54,8 @@ class OfflineDeliveryLoaded extends OfflineDeliveryState {
     this.searchQuery = '',
     this.companies = const [],
     this.lastSelectedCompanyId,
+    this.showAllVerifications = false,
+    this.obligationDirectors = const [],
   }) : selectedDate = selectedDate ?? DateTime.now();
 
   @override
@@ -58,6 +65,7 @@ class OfflineDeliveryLoaded extends OfflineDeliveryState {
     hasMoreTokens, hasMoreVerifications,
     isLoadingMoreTokens, isLoadingMoreVerifications,
     searchQuery, companies, lastSelectedCompanyId,
+    showAllVerifications, obligationDirectors,
   ];
 }
 
@@ -121,6 +129,52 @@ class VerificationCreated extends OfflineDeliveryState {
 
   @override
   List<Object> get props => [verification];
+}
+
+class ConsumerLookupLoading extends OfflineDeliveryState {}
+
+class ConsumerLookupResult extends OfflineDeliveryState {
+  final List<Map<String, dynamic>> records;
+  const ConsumerLookupResult(this.records);
+
+  @override
+  List<Object> get props => [records];
+}
+
+class ConsumerLookupError extends OfflineDeliveryState {
+  final String message;
+  const ConsumerLookupError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}
+
+class PartnerTokensLoading extends OfflineDeliveryState {}
+
+class PartnerTokensLoaded extends OfflineDeliveryState {
+  final List<OfflineDeliveryToken> tokens;
+  const PartnerTokensLoaded(this.tokens);
+
+  @override
+  List<Object> get props => [tokens];
+}
+
+class TokenScanning extends OfflineDeliveryState {}
+
+class TokenScanned extends OfflineDeliveryState {
+  final OfflineDeliveryToken token;
+  const TokenScanned(this.token);
+
+  @override
+  List<Object> get props => [token];
+}
+
+class TokenScanError extends OfflineDeliveryState {
+  final String message;
+  const TokenScanError(this.message);
+
+  @override
+  List<Object> get props => [message];
 }
 
 class OfflineDeliveryError extends OfflineDeliveryState {

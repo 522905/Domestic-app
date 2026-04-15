@@ -25,8 +25,9 @@ import 'token_image_upload_widget.dart';
 class TokenDetailSheet extends StatefulWidget {
   final OfflineDeliveryToken token;
   final bool printOnly;
+  final bool hidePrint;
 
-  const TokenDetailSheet({Key? key, required this.token, this.printOnly = false}) : super(key: key);
+  const TokenDetailSheet({Key? key, required this.token, this.printOnly = false, this.hidePrint = false}) : super(key: key);
 
   @override
   State<TokenDetailSheet> createState() => _TokenDetailSheetState();
@@ -199,7 +200,12 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
     return BlocListener<OfflineDeliveryBloc, OfflineDeliveryState>(
       listener: (context, state) {
         if (state is TokenDelivered && state.token.id == widget.token.id) {
-          Navigator.of(context).pop();
+          if (widget.hidePrint) {
+            // Opened from scan — re-fetch token for fresh available_actions
+            context.read<OfflineDeliveryBloc>().add(ScanToken(uuid: widget.token.id));
+          } else {
+            Navigator.of(context).pop();
+          }
         }
       },
       child: Container(
@@ -215,12 +221,18 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
           builder: (context, scrollController) {
             return BlocBuilder<OfflineDeliveryBloc, OfflineDeliveryState>(
               buildWhen: (prev, curr) =>
-                  curr is OfflineDeliveryLoaded || curr is ImagesAttached,
+                  curr is OfflineDeliveryLoaded || curr is ImagesAttached || curr is TokenScanned,
               builder: (context, state) {
-                // Get the latest token data from the bloc cache
+                // Get the latest token data from action states or bloc cache
                 OfflineDeliveryToken currentToken = widget.token;
                 bool isSupervisor = false;
-                if (state is OfflineDeliveryLoaded) {
+                if (state is TokenScanned && state.token.id == widget.token.id) {
+                  // Fresh token from re-scan (after delivery/action)
+                  currentToken = state.token;
+                } else if (state is ImagesAttached && state.token.id == widget.token.id) {
+                  // Updated token from attach response
+                  currentToken = state.token;
+                } else if (state is OfflineDeliveryLoaded) {
                   isSupervisor = state.isSupervisor;
                   final updated = state.tokens.where((t) => t.id == widget.token.id);
                   if (updated.isNotEmpty) {
@@ -334,100 +346,55 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
                           DateFormat('dd/MM/yyyy hh:mm a').format(currentToken.deliveredAt!),
                           valueColor: AppColorsEnhanced.successGreen,
                         ),
-                      SizedBox(height: AppSpacing.xl),
 
-                      if (!widget.printOnly) ...[
-                        // Image upload section — show for PENDING tokens
-                        if (currentToken.isPending && !currentToken.imagesUploaded) ...[
-                          TokenImageUploadWidget(tokenId: currentToken.id),
-                          SizedBox(height: AppSpacing.md),
-                        ],
+                      // Obligation details section
+                      if (currentToken.isObligation && currentToken.obligationDetail != null) ...[
+                        SizedBox(height: AppSpacing.md),
+                        _buildObligationDetailsSection(currentToken),
+                      ],
 
-                        // Uploaded indicator
-                        if (currentToken.imagesUploaded) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.all(AppSpacing.sm),
-                            decoration: BoxDecoration(
-                              color: AppColorsEnhanced.successGreen.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: AppColorsEnhanced.successGreen.withOpacity(0.3),
-                              ),
+                      // System obligation badge
+                      if (currentToken.isSystemObligation) ...[
+                        SizedBox(height: AppSpacing.md),
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColorsEnhanced.infoBlue.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColorsEnhanced.infoBlue.withOpacity(0.3),
                             ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.check_circle,
-                                    color: AppColorsEnhanced.successGreen, size: 18.sp),
-                                SizedBox(width: AppSpacing.sm),
-                                Text(
-                                  'Photos uploaded',
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  color: AppColorsEnhanced.infoBlue, size: 18.sp),
+                              SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'System Obligation - Sale already posted in SDMS',
                                   style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColorsEnhanced.successGreen,
+                                    color: AppColorsEnhanced.infoBlue,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: AppSpacing.md),
-                        ],
-
-                        // Actions
-                        if (currentToken.isPending) ...[
-                          // Evidence gate: if evidence required but images not uploaded, block delivery
-                          if (currentToken.evidenceRequired && !currentToken.imagesUploaded) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.symmetric(vertical: 14.h),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(24.r),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.camera_alt, color: Colors.grey, size: 20.sp),
-                                  SizedBox(width: AppSpacing.sm),
-                                  Text(
-                                    'Upload photo first',
-                                    style: TextStyle(
-                                      fontSize: 16.sp,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _showDeliveryDialog(context, currentToken),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColorsEnhanced.successGreen,
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(vertical: 14.h),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24.r),
-                                  ),
-                                ),
-                                icon: Icon(Icons.check_circle_outline, size: 20.sp),
-                                label: Text(
-                                  'Mark Delivered',
-                                  style: TextStyle(
-                                      fontSize: 16.sp, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ),
-                          ],
-                          SizedBox(height: AppSpacing.md),
-                        ],
+                        ),
                       ],
 
-                      // Inline printer section
-                      _buildPrinterSection(currentToken, isSupervisor),
+                      SizedBox(height: AppSpacing.xl),
+
+                      if (!widget.printOnly) ...[
+                        // Actions driven by available_actions from API
+                        ..._buildAvailableActions(context, currentToken),
+                      ],
+
+                      // Inline printer section (hidden when opened from scan)
+                      if (!widget.hidePrint)
+                        _buildPrinterSection(currentToken, isSupervisor),
 
                       SizedBox(height: AppSpacing.lg),
                     ],
@@ -738,6 +705,533 @@ class _TokenDetailSheetState extends State<TokenDetailSheet> {
         fontWeight: FontWeight.w600,
         letterSpacing: 0.5,
       ),
+    );
+  }
+
+  List<Widget> _buildAvailableActions(BuildContext context, OfflineDeliveryToken token) {
+    final actions = token.availableActions;
+    final widgets = <Widget>[];
+
+    // If API returns available_actions, use them
+    if (actions.isNotEmpty) {
+      // attach_images action
+      if (token.hasAction('attach_images')) {
+        widgets.add(TokenImageUploadWidget(tokenId: token.id));
+        widgets.add(SizedBox(height: AppSpacing.md));
+      }
+
+      // Uploaded indicator (when images are uploaded but no attach_images action)
+      if (token.imagesUploaded && !token.hasAction('attach_images')) {
+        widgets.add(Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: AppColorsEnhanced.successGreen.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColorsEnhanced.successGreen.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle,
+                  color: AppColorsEnhanced.successGreen, size: 18.sp),
+              SizedBox(width: AppSpacing.sm),
+              Text(
+                'Photo uploaded',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColorsEnhanced.successGreen,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ));
+        widgets.add(SizedBox(height: AppSpacing.md));
+      }
+
+      // deliver action
+      if (token.hasAction('deliver')) {
+        widgets.add(SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _showDeliveryDialog(context, token),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColorsEnhanced.successGreen,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 14.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.r),
+              ),
+            ),
+            icon: Icon(Icons.check_circle_outline, size: 20.sp),
+            label: Text(
+              'Mark Delivered',
+              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ));
+        widgets.add(SizedBox(height: AppSpacing.md));
+      }
+
+      // collect_empties action
+      if (token.hasAction('collect_empties')) {
+        final action = token.getAction('collect_empties')!;
+        final label = action['label']?.toString() ?? 'Collect Empties';
+        widgets.add(SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _showCollectEmptiesDialog(context, token, action),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColorsEnhanced.warningYellow,
+              side: BorderSide(color: AppColorsEnhanced.warningYellow),
+              padding: EdgeInsets.symmetric(vertical: 14.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.r),
+              ),
+            ),
+            icon: Icon(Icons.swap_vert, size: 20.sp),
+            label: Text(
+              label,
+              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ));
+        widgets.add(SizedBox(height: AppSpacing.md));
+      }
+
+      // collect_cash action
+      if (token.hasAction('collect_cash')) {
+        widgets.add(SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _collectCash(context, token),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColorsEnhanced.successGreen,
+              side: BorderSide(color: AppColorsEnhanced.successGreen),
+              padding: EdgeInsets.symmetric(vertical: 14.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.r),
+              ),
+            ),
+            icon: Icon(Icons.payments, size: 20.sp),
+            label: Text(
+              'Mark Cash Collected',
+              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ));
+        widgets.add(SizedBox(height: AppSpacing.md));
+      }
+    } else {
+      // Fallback: no available_actions
+      // Obligation tokens: only print (deliver/photo handled via scan flow)
+      // Other tokens: show deliver button
+      if (token.isPending && !token.isObligation) {
+        widgets.add(SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _showDeliveryDialog(context, token),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColorsEnhanced.successGreen,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 14.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24.r),
+              ),
+            ),
+            icon: Icon(Icons.check_circle_outline, size: 20.sp),
+            label: Text(
+              'Mark Delivered',
+              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ));
+        widgets.add(SizedBox(height: AppSpacing.md));
+      }
+    }
+
+    return widgets;
+  }
+
+  void _showCollectEmptiesDialog(
+      BuildContext context, OfflineDeliveryToken token, Map<String, dynamic> action) {
+    final remaining = action['empties_remaining'] ?? token.obligationDetail?.emptiesRemaining ?? 0;
+    final controller = TextEditingController(text: remaining.toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Collect Empties'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'Count',
+            hintText: 'Max: $remaining',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColorsEnhanced.brandBlue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final count = int.tryParse(controller.text.trim());
+              if (count == null || count < 1 || count > remaining) return;
+              Navigator.pop(ctx);
+              try {
+                final apiService = await ServiceProvider.getApiService();
+                await apiService.collectEmpties(token.id, count);
+                if (context.mounted) {
+                  context.showSuccessSnackBar('$count empties collected');
+                  // Re-scan to get fresh available_actions
+                  context.read<OfflineDeliveryBloc>().add(ScanToken(uuid: token.id));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  context.showErrorSnackBar('Failed: ${e.toString().replaceAll('Exception: ', '')}');
+                }
+              }
+            },
+            child: const Text('Collect'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _collectCash(BuildContext context, OfflineDeliveryToken token) {
+    // Direct API call via service provider for cash collection
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Cash Collection'),
+        content: const Text('Mark deferred cash as collected?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final apiService = await ServiceProvider.getApiService();
+                await apiService.collectCash(token.id);
+                if (context.mounted) {
+                  context.showSuccessSnackBar('Cash collection recorded');
+                  // Re-scan to get fresh available_actions
+                  context.read<OfflineDeliveryBloc>().add(ScanToken(uuid: token.id));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  context.showErrorSnackBar('Failed: ${e.toString().replaceAll('Exception: ', '')}');
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColorsEnhanced.successGreen,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildObligationDetailsSection(OfflineDeliveryToken token) {
+    final detail = token.obligationDetail!;
+
+    // Resolve director name: from nested object, from directed_by_name, or from cached directors
+    String? directorLabel;
+    if (detail.directedBy != null && detail.directedBy!.name.isNotEmpty) {
+      directorLabel = '${detail.directedBy!.name} (${detail.directedBy!.role})';
+    } else if (detail.directedByName != null && detail.directedByName!.isNotEmpty) {
+      directorLabel = detail.directedByName;
+    } else if (detail.directedBy != null) {
+      // Look up from cached directors in the BLoC state
+      final state = context.read<OfflineDeliveryBloc>().state;
+      if (state is OfflineDeliveryLoaded) {
+        final match = state.obligationDirectors
+            .where((d) => d.id == detail.directedBy!.id);
+        if (match.isNotEmpty) {
+          directorLabel = '${match.first.name} (${match.first.role})';
+        }
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Obligation Details'),
+        SizedBox(height: AppSpacing.sm),
+        if (directorLabel != null)
+          _buildInfoRow('Authorized By', directorLabel),
+        _buildInfoRow('Delivery Type', detail.deliveryTypeDisplay),
+        _buildInfoRow('Cylinder', '${detail.itemDisplayName} x${detail.quantity}'),
+        if (detail.assignedToName != null)
+          _buildInfoRow('Assigned To', detail.assignedToName!),
+
+        // Empty collection status
+        if (detail.emptiesExpected > 0) ...[
+          SizedBox(height: AppSpacing.md),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: detail.emptiesCompleted
+                  ? AppColorsEnhanced.successGreen.withOpacity(0.05)
+                  : detail.isOverdueEmpties
+                      ? AppColorsEnhanced.errorRed.withOpacity(0.05)
+                      : AppColorsEnhanced.warningYellow.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: detail.emptiesCompleted
+                    ? AppColorsEnhanced.successGreen.withOpacity(0.3)
+                    : detail.isOverdueEmpties
+                        ? AppColorsEnhanced.errorRed.withOpacity(0.3)
+                        : AppColorsEnhanced.warningYellow.withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.swap_vert,
+                      size: 22.sp,
+                      color: detail.emptiesCompleted
+                          ? AppColorsEnhanced.successGreen
+                          : detail.isOverdueEmpties
+                              ? AppColorsEnhanced.errorRed
+                              : AppColorsEnhanced.warningYellow,
+                    ),
+                    SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'Empty Collection',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (detail.emptiesCompleted)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: AppColorsEnhanced.successGreen.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle, size: 14.sp, color: AppColorsEnhanced.successGreen),
+                            SizedBox(width: 4.w),
+                            Text('Complete', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColorsEnhanced.successGreen)),
+                          ],
+                        ),
+                      )
+                    else if (detail.isOverdueEmpties)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: AppColorsEnhanced.errorRed.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text('OVERDUE', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColorsEnhanced.errorRed)),
+                      ),
+                  ],
+                ),
+                SizedBox(height: AppSpacing.sm),
+                // Progress bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: detail.emptiesExpected > 0
+                        ? detail.emptiesCollected / detail.emptiesExpected
+                        : 0,
+                    minHeight: 8.h,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      detail.emptiesCompleted
+                          ? AppColorsEnhanced.successGreen
+                          : AppColorsEnhanced.warningYellow,
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Collected: ${detail.emptiesCollected}',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                    Text(
+                      'Expected: ${detail.emptiesExpected}',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColorsEnhanced.secondaryText,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                  ],
+                ),
+                if (!detail.emptiesCompleted && detail.emptiesRemaining > 0) ...[
+                  SizedBox(height: 4),
+                  Text(
+                    '${detail.emptiesRemaining} remaining',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColorsEnhanced.warningYellow,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.sp,
+                    ),
+                  ),
+                ],
+                if (detail.emptiesDueDate != null && !detail.emptiesCompleted) ...[
+                  SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, size: 14.sp,
+                          color: detail.isOverdueEmpties ? AppColorsEnhanced.errorRed : AppColorsEnhanced.secondaryText),
+                      SizedBox(width: 4.w),
+                      Text(
+                        'Due: ${detail.emptiesDueDate!.day}/${detail.emptiesDueDate!.month}/${detail.emptiesDueDate!.year}',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: detail.isOverdueEmpties
+                              ? AppColorsEnhanced.errorRed
+                              : AppColorsEnhanced.secondaryText,
+                          fontWeight: detail.isOverdueEmpties ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 13.sp,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+
+        // Cash status — show for all arrangements
+        if (detail.cashArrangement != null) ...[
+          SizedBox(height: AppSpacing.md),
+          Builder(builder: (_) {
+            final arrangement = detail.cashArrangement!;
+            final Color cardColor;
+            final IconData cardIcon;
+            final String cardTitle;
+            final String cardSubtitle;
+            Widget? trailing;
+
+            if (arrangement == 'COLLECT_AT_DELIVERY') {
+              cardColor = AppColorsEnhanced.brandBlue;
+              cardIcon = Icons.payments;
+              cardTitle = 'Cash';
+              cardSubtitle = 'Collect at delivery';
+            } else if (arrangement == 'DEFERRED') {
+              if (detail.cashCollectedLater) {
+                cardColor = AppColorsEnhanced.successGreen;
+                cardIcon = Icons.check_circle;
+                cardTitle = 'Cash Collected';
+                cardSubtitle = 'Deferred cash has been collected';
+                trailing = Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: AppColorsEnhanced.successGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 14.sp, color: AppColorsEnhanced.successGreen),
+                      SizedBox(width: 4.w),
+                      Text('Done', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColorsEnhanced.successGreen)),
+                    ],
+                  ),
+                );
+              } else {
+                cardColor = detail.isOverdueCash ? AppColorsEnhanced.errorRed : AppColorsEnhanced.warningYellow;
+                cardIcon = Icons.schedule;
+                cardTitle = 'Cash Pending';
+                cardSubtitle = detail.cashDueDate != null
+                    ? 'Due: ${detail.cashDueDate!.day}/${detail.cashDueDate!.month}/${detail.cashDueDate!.year}'
+                    : 'Deferred — collect later';
+                trailing = detail.isOverdueCash
+                    ? Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: AppColorsEnhanced.errorRed.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text('OVERDUE', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColorsEnhanced.errorRed)),
+                      )
+                    : null;
+              }
+            } else if (arrangement == 'ALREADY_PAID') {
+              cardColor = AppColorsEnhanced.successGreen;
+              cardIcon = Icons.check_circle;
+              cardTitle = 'Cash';
+              cardSubtitle = 'Already paid';
+            } else {
+              cardColor = AppColorsEnhanced.secondaryText;
+              cardIcon = Icons.remove_circle_outline;
+              cardTitle = 'Cash';
+              cardSubtitle = 'Not applicable';
+            }
+
+            return Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: cardColor.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cardColor.withOpacity(0.25)),
+              ),
+              child: Row(
+                children: [
+                  Icon(cardIcon, size: 22.sp, color: cardColor),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cardTitle,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          cardSubtitle,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: cardColor,
+                            fontSize: 13.sp,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (trailing != null) trailing,
+                ],
+              ),
+            );
+          }),
+        ],
+      ],
     );
   }
 

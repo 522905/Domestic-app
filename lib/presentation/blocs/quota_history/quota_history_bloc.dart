@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/services/api_service_interface.dart';
 import '../../../domain/entities/quota/quota_history_response.dart';
+import '../../../domain/entities/quota/quota_history_detail_response.dart';
 import '../../../domain/entities/quota/quota_history_filters.dart';
 import '../../../utils/error_handler.dart';
 import 'quota_history_event.dart';
@@ -18,6 +20,7 @@ class QuotaHistoryBloc extends Bloc<QuotaHistoryEvent, QuotaHistoryState> {
     on<LoadMoreHistory>(_onLoadMoreHistory);
     on<UpdateHistoryFilters>(_onUpdateHistoryFilters);
     on<UpdateHistorySort>(_onUpdateHistorySort);
+    on<LoadHistoryDetail>(_onLoadHistoryDetail);
   }
 
   Future<void> _onLoadQuotaHistory(
@@ -183,6 +186,33 @@ class QuotaHistoryBloc extends Bloc<QuotaHistoryEvent, QuotaHistoryState> {
         message: errorMessage,
         filters: updatedFilters,
       ));
+    }
+  }
+
+  Future<void> _onLoadHistoryDetail(
+    LoadHistoryDetail event,
+    Emitter<QuotaHistoryState> emit,
+  ) async {
+    // Save current state to restore after emitting detail
+    final previousState = state;
+    try {
+      final response = await apiService.getQuotaHistoryDetail(
+        entryDate: event.entryDate,
+        itemCode: event.itemCode,
+      );
+      final detailResponse = QuotaHistoryDetailResponse.fromJson(response);
+      final dateStr = event.entryDate.toIso8601String().split('T')[0];
+      emit(QuotaHistoryDetailLoaded(
+        entryDate: dateStr,
+        itemCode: event.itemCode,
+        entries: detailResponse.transactions,
+      ));
+    } catch (e) {
+      debugPrint('Load history detail failed: $e');
+    }
+    // Re-emit previous loaded state so the main list isn't lost
+    if (previousState is QuotaHistoryLoaded) {
+      emit(previousState);
     }
   }
 }

@@ -4,7 +4,7 @@ class ApiEndpoints {
   final String baseUrl;
 
   final String tempUrl = 'https://lpg.ops.arungas.com';
-  // final String tempUrl = 'http://192.168.171.12:9900';
+  // final String tempUrl = 'http://192.168.171.132:9900';
 
   ApiEndpoints(this.baseUrl);
   // Dashboard endpoints
@@ -246,4 +246,11 @@ class ApiEndpoints {
   String get offlineDeliveryQuickDeliver => '$tempUrl/api/offline-delivery/tokens/quick-deliver/';
   String offlineDeliveryTokenPrint(String id) => '$tempUrl/api/offline-delivery/tokens/$id/print/';
   String get offlineDeliveryCompanies => '$tempUrl/api/offline-delivery/companies/';
+  String get offlineDeliveryDirectors => '$tempUrl/api/offline-delivery/directors/';
+  String get offlineDeliveryLookup => '$tempUrl/api/offline-delivery/lookup/';
+  String get offlineDeliveryCollectionsDue => '$tempUrl/api/offline-delivery/collections/due/';
+  String offlineDeliveryTokenCollectEmpties(String id) => '$tempUrl/api/offline-delivery/tokens/$id/collect-empties/';
+  String offlineDeliveryTokenCollectCash(String id) => '$tempUrl/api/offline-delivery/tokens/$id/collect-cash/';
+  String get offlineDeliveryTokenScan => '$tempUrl/api/offline-delivery/tokens/scan/';
+  String get offlineDeliveryMyPartner => '$tempUrl/api/offline-delivery/tokens/my-partner/';
 }

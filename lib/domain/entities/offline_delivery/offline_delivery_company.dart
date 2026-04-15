@@ -16,9 +16,9 @@ class OfflineDeliveryCompany extends Equatable {
   factory OfflineDeliveryCompany.fromJson(Map<String, dynamic> json) {
     return OfflineDeliveryCompany(
       id: json['id'] as int,
-      name: json['name'] ?? '',
-      shortCode: json['short_code'] ?? '',
-      sdmsDistCode: json['sdms_dist_code'],
+      name: json['name']?.toString() ?? '',
+      shortCode: json['short_code']?.toString() ?? '',
+      sdmsDistCode: json['sdms_dist_code']?.toString(),
     );
   }
 

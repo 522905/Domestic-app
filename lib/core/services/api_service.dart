@@ -3326,4 +3326,123 @@ class ApiService implements ApiServiceInterface {
     }
   }
 
+  @override
+  Future<List<dynamic>> getObligationDirectors(int companyId) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryDirectors,
+        queryParameters: {'company_id': companyId},
+      );
+      final data = response.data;
+      if (data is List) return data;
+      if (data is Map && data.containsKey('results')) {
+        return data['results'] as List<dynamic>;
+      }
+      return data as List<dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> lookupConsumer(String consumerNumber) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryLookup,
+        queryParameters: {'consumer_number': consumerNumber},
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getDueCollections(int companyId, String date) async {
+    try {
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryCollectionsDue,
+        queryParameters: {'company_id': companyId, 'date': date},
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> collectEmpties(String tokenId, int count) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryTokenCollectEmpties(tokenId),
+        data: {'count': count},
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> collectCash(String tokenId) async {
+    try {
+      final response = await apiClient.post(
+        apiClient.endpoints.offlineDeliveryTokenCollectCash(tokenId),
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> scanToken({String? uuid, int? tokenNumber, String? distributionPointId}) async {
+    try {
+      final queryParameters = <String, dynamic>{};
+      if (uuid != null && uuid.isNotEmpty) {
+        queryParameters['uuid'] = uuid;
+      }
+      if (tokenNumber != null) {
+        queryParameters['token_number'] = tokenNumber;
+      }
+      if (distributionPointId != null && distributionPointId.isNotEmpty) {
+        queryParameters['distribution_point_id'] = distributionPointId;
+      }
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryTokenScan,
+        queryParameters: queryParameters,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getMyPartnerTokens(int companyId, {String? date, String? status}) async {
+    try {
+      final queryParameters = <String, dynamic>{'company_id': companyId};
+      if (date != null && date.isNotEmpty) {
+        queryParameters['date'] = date;
+      }
+      if (status != null && status.isNotEmpty) {
+        queryParameters['status'] = status;
+      }
+      final response = await apiClient.get(
+        apiClient.endpoints.offlineDeliveryMyPartner,
+        queryParameters: queryParameters,
+      );
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      _handleError(e);
+      rethrow;
+    }
+  }
+
 }

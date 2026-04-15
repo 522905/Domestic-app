@@ -26,13 +26,15 @@ class QuotaHistoryDetailResponse extends Equatable {
   int get netChange => closingBalance - openingBalance;
 
   factory QuotaHistoryDetailResponse.fromJson(Map<String, dynamic> json) {
+    // API returns 'entries' not 'transactions'
+    final entriesList = (json['entries'] ?? json['transactions'] ?? []) as List;
     return QuotaHistoryDetailResponse(
       entryDate: DateTime.parse(json['entry_date'] as String),
-      itemCode: json['item_code'] as String,
-      itemName: json['item_name'] as String,
-      openingBalance: json['opening_balance'] as int,
-      closingBalance: json['closing_balance'] as int,
-      transactions: (json['transactions'] as List)
+      itemCode: json['item_code']?.toString() ?? '',
+      itemName: json['item_name']?.toString() ?? '',
+      openingBalance: (json['opening_balance'] as int?) ?? 0,
+      closingBalance: (json['closing_balance'] as int?) ?? 0,
+      transactions: entriesList
           .map((e) =>
               QuotaLedgerDetailEntry.fromJson(e as Map<String, dynamic>))
           .toList(),

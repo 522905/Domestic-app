@@ -9,6 +9,8 @@ class QuotaLedgerDetailEntry extends Equatable {
   final String company;
   final String? journalNumber;
   final String? notes;
+  final String? orderNumber;
+  final String? orderDate;
 
   const QuotaLedgerDetailEntry({
     required this.time,
@@ -18,6 +20,8 @@ class QuotaLedgerDetailEntry extends Equatable {
     required this.company,
     this.journalNumber,
     this.notes,
+    this.orderNumber,
+    this.orderDate,
   });
 
   /// Whether this is a positive (credit) transaction
@@ -30,10 +34,14 @@ class QuotaLedgerDetailEntry extends Equatable {
   EntryTypeColor get colorIndicator {
     switch (entryType) {
       case 'PICKUP':
+      case 'ADJUSTMENT_NEGATIVE':
+      case 'TRANSFER_OUT':
+      case 'GODOWN_FULFILLED':
         return EntryTypeColor.negative;
       case 'RETURN':
       case 'SALE_OTP':
       case 'SALE_OVERRIDE':
+      case 'TOKEN_CREDIT':
       case 'BONUS_CONSUMED':
       case 'ADJUSTMENT_POSITIVE':
       case 'TRANSFER_IN':
@@ -45,13 +53,15 @@ class QuotaLedgerDetailEntry extends Equatable {
 
   factory QuotaLedgerDetailEntry.fromJson(Map<String, dynamic> json) {
     return QuotaLedgerDetailEntry(
-      time: json['time'] as String,
-      entryType: json['entry_type'] as String,
-      entryTypeDisplay: json['entry_type_display'] as String,
-      quantity: json['quantity'] as int,
-      company: json['company'] as String,
-      journalNumber: json['journal_number'] as String?,
-      notes: json['notes'] as String?,
+      time: json['time']?.toString() ?? '',
+      entryType: json['entry_type']?.toString() ?? '',
+      entryTypeDisplay: json['entry_type_display']?.toString() ?? '',
+      quantity: (json['quantity'] as int?) ?? 0,
+      company: json['company']?.toString() ?? '',
+      journalNumber: json['journal_number']?.toString(),
+      notes: json['notes']?.toString(),
+      orderNumber: json['order_number']?.toString(),
+      orderDate: json['order_date']?.toString(),
     );
   }
 
@@ -64,6 +74,8 @@ class QuotaLedgerDetailEntry extends Equatable {
       'company': company,
       'journal_number': journalNumber,
       'notes': notes,
+      'order_number': orderNumber,
+      'order_date': orderDate,
     };
   }
 
@@ -76,6 +88,8 @@ class QuotaLedgerDetailEntry extends Equatable {
         company,
         journalNumber,
         notes,
+        orderNumber,
+        orderDate,
       ];
 }
 

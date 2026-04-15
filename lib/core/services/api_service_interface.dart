@@ -414,4 +414,11 @@ abstract class ApiServiceInterface {
   Future<Map<String, dynamic>> createBookingVerification(Map<String, dynamic> data);
   Future<Map<String, dynamic>> retryBookingVerification(String verificationId);
   Future<List<dynamic>> getOfflineDeliveryCompanies();
+  Future<List<dynamic>> getObligationDirectors(int companyId);
+  Future<Map<String, dynamic>> lookupConsumer(String consumerNumber);
+  Future<Map<String, dynamic>> getDueCollections(int companyId, String date);
+  Future<Map<String, dynamic>> collectEmpties(String tokenId, int count);
+  Future<Map<String, dynamic>> collectCash(String tokenId);
+  Future<Map<String, dynamic>> scanToken({String? uuid, int? tokenNumber, String? distributionPointId});
+  Future<Map<String, dynamic>> getMyPartnerTokens(int companyId, {String? date, String? status});
 }

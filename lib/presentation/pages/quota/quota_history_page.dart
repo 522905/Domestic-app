@@ -41,22 +41,11 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
     // Initialize available items from widget if provided
     if (widget.initialAvailableItems != null) {
       _availableItems = Map.from(widget.initialAvailableItems!);
-      print('QuotaHistoryPage - Initialized _availableItems from widget: ${_availableItems.keys.toList()}');
-    } else {
-      print('QuotaHistoryPage - No initialAvailableItems provided');
     }
 
     // Get initial item code from bloc if set
     final bloc = context.read<QuotaHistoryBloc>();
-    final hasInitialFilter = bloc.initialItemCode != null;
     _selectedItemCode = bloc.initialItemCode;
-
-    // Debug: Log page initialization
-    print('QuotaHistoryPage - initState:');
-    print('  bloc.initialItemCode: ${bloc.initialItemCode}');
-    print('  _selectedItemCode: $_selectedItemCode');
-    print('  hasInitialFilter: $hasInitialFilter');
-    print('  initialAvailableItems: ${widget.initialAvailableItems?.keys.toList()}');
 
     // Load initial data
     bloc.add(const LoadQuotaHistory());
@@ -290,12 +279,6 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
           }
 
           if (state is QuotaHistoryLoaded) {
-            // Debug: Log what's being displayed
-            print('QuotaHistoryPage - Displaying ${state.allEntries.length} entries');
-            for (var entry in state.allEntries) {
-              print('  Display: ${entry.entryDate} - ${entry.itemName}');
-            }
-
             return RefreshIndicator(
               onRefresh: () async {
                 context.read<QuotaHistoryBloc>().add(const LoadQuotaHistory(refresh: true));
@@ -464,7 +447,6 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
 
   Widget _buildItemFilterChips(QuotaHistoryState state) {
     if (state is! QuotaHistoryLoaded || state.allEntries.isEmpty) {
-      print('_buildItemFilterChips - Returning empty (no entries or not loaded)');
       return const SizedBox.shrink();
     }
 
@@ -494,13 +476,6 @@ class _QuotaHistoryPageState extends State<QuotaHistoryPage> {
     for (final entry in state.allEntries) {
       itemGroups.putIfAbsent(entry.itemCode, () => []).add(entry);
     }
-
-    // Debug: Log what we're building
-    print('_buildItemFilterChips:');
-    print('  _availableItems: ${_availableItems.keys.toList()}');
-    print('  itemGroups from current entries: ${itemGroups.keys.toList()}');
-    print('  currentItemCode (filter): $currentItemCode');
-    print('  Will build ${_availableItems.isEmpty ? itemGroups.length : _availableItems.length} chips');
 
     return Container(
       height: 50.h,
@@ -631,16 +606,19 @@ class _SummaryHeaderDelegate extends SliverPersistentHeaderDelegate {
   });
 
   @override
-  double get minExtent => minHeight;
+  double get minExtent => minHeight.roundToDouble();
 
   @override
-  double get maxExtent => maxHeight;
+  double get maxExtent => minHeight.roundToDouble();
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.grey[50],
-      child: QuotaAggregatesCard(aggregates: aggregates),
+    return SizedBox(
+      height: maxExtent,
+      child: Container(
+        color: Colors.grey[50],
+        child: QuotaAggregatesCard(aggregates: aggregates),
+      ),
     );
   }
 
@@ -665,16 +643,19 @@ class _FilterChipsHeaderDelegate extends SliverPersistentHeaderDelegate {
   });
 
   @override
-  double get minExtent => minHeight;
+  double get minExtent => minHeight.roundToDouble();
 
   @override
-  double get maxExtent => maxHeight;
+  double get maxExtent => minHeight.roundToDouble();
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.grey[50],
-      child: buildChips(),
+    return SizedBox(
+      height: maxExtent,
+      child: Container(
+        color: Colors.grey[50],
+        child: buildChips(),
+      ),
     );
   }
 

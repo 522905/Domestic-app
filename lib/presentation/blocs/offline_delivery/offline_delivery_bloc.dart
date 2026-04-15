@@ -8,6 +8,7 @@ import '../../../domain/entities/offline_delivery/distribution_point.dart';
 import '../../../domain/entities/offline_delivery/booking_verification.dart';
 import '../../../domain/entities/offline_delivery/offline_delivery_token.dart';
 import '../../../domain/entities/offline_delivery/offline_delivery_company.dart';
+import '../../../domain/entities/offline_delivery/obligation_director.dart';
 import '../../../utils/error_handler.dart';
 import 'offline_delivery_event.dart';
 import 'offline_delivery_state.dart';
@@ -28,6 +29,10 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
 
   // Search
   String _searchQuery = '';
+  bool _isTokenSearch = false;
+
+  // Show all verifications toggle
+  bool _showAllVerifications = false;
 
   // Pagination tracking
   String? _nextTokensUrl;
@@ -36,6 +41,9 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
   bool _hasMoreVerifications = false;
   bool _isLoadingMoreTokens = false;
   bool _isLoadingMoreVerifications = false;
+
+  // Obligation directors cache
+  List<ObligationDirector> _directors = [];
 
   OfflineDeliveryBloc({required ApiServiceInterface apiService})
       : _apiService = apiService,
@@ -60,9 +68,31 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     on<LoadMoreVerifications>(_onLoadMoreVerifications);
     on<SearchTokens>(_onSearchTokens);
     on<SearchVerifications>(_onSearchVerifications);
+    on<ToggleShowAllVerifications>(_onToggleShowAll);
+    on<LoadObligationDirectors>(_onLoadObligationDirectors);
+    on<LookupConsumer>(_onLookupConsumer);
+    on<ScanToken>(_onScanToken);
+    on<LoadPartnerTokens>(_onLoadPartnerTokens);
   }
 
   String get _dateString => _selectedDate.toIso8601String().split('T')[0];
+
+  /// Preserve locally-set dacCode values that the API doesn't return
+  void _preserveLocalDacCodes(List<BookingVerification> oldList, List<BookingVerification> newList) {
+    final dacMap = <String, String>{};
+    for (final v in oldList) {
+      if (v.dacCode != null && v.dacCode!.isNotEmpty) {
+        dacMap[v.id] = v.dacCode!;
+      }
+    }
+    if (dacMap.isEmpty) return;
+    for (int i = 0; i < newList.length; i++) {
+      final saved = dacMap[newList[i].id];
+      if (saved != null && newList[i].dacCode == null) {
+        newList[i] = newList[i].copyWith(dacCode: saved);
+      }
+    }
+  }
 
   void _emitLoaded(Emitter<OfflineDeliveryState> emit) {
     emit(OfflineDeliveryLoaded(
@@ -80,6 +110,8 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       searchQuery: _searchQuery,
       companies: _companies,
       lastSelectedCompanyId: _lastSelectedCompanyId,
+      showAllVerifications: _showAllVerifications,
+      obligationDirectors: _directors,
     ));
   }
 
@@ -107,9 +139,12 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       // Check user roles for supervisor access
       try {
         final roleNames = await User().getRoleNames();
-        _isSupervisor = roleNames.any(
-          (r) => r.toUpperCase() == 'GM' || r.toUpperCase() == 'WM',
-        );
+        debugPrint('[OFFLINE] User roles: $roleNames');
+        _isSupervisor = roleNames.any((r) {
+          final lower = r.toLowerCase();
+          return lower == 'general manager' || lower == 'warehouse manager';
+        });
+        debugPrint('[OFFLINE] isSupervisor: $_isSupervisor');
       } catch (e) {
         debugPrint('Failed to load user roles: $e');
       }
@@ -153,6 +188,7 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     SelectDistributionPoint event,
     Emitter<OfflineDeliveryState> emit,
   ) async {
+    if (_points.isEmpty) return;
     _selectedPoint = _points.firstWhere(
       (p) => p.id == event.pointId,
       orElse: () => _points.first,
@@ -197,7 +233,7 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       final response = await _apiService.getOfflineDeliveryTokensPaginated(
         distributionPointId: _selectedPoint!.id,
         date: _dateString,
-        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        search: (_isTokenSearch && _searchQuery.isNotEmpty) ? _searchQuery : null,
       );
 
       final results = (response['results'] ?? []) as List<dynamic>;
@@ -225,7 +261,7 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       final response = await _apiService.getOfflineDeliveryTokensPaginated(
         distributionPointId: _selectedPoint!.id,
         date: _dateString,
-        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        search: (_isTokenSearch && _searchQuery.isNotEmpty) ? _searchQuery : null,
       );
 
       final results = (response['results'] ?? []) as List<dynamic>;
@@ -317,8 +353,43 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
         data['consumer_name_manual'] = event.consumerNameManual;
       }
 
+      // Obligation-specific fields
+      if (event.initiationSource != null && event.initiationSource!.isNotEmpty) {
+        data['initiation_source'] = event.initiationSource;
+      }
+      if (event.sourceDeliveryRecordId != null) {
+        data['source_delivery_record_id'] = event.sourceDeliveryRecordId;
+      }
+      if (event.directedById != null) {
+        data['directed_by_id'] = event.directedById;
+      }
+      if (event.deliveryType != null && event.deliveryType!.isNotEmpty) {
+        data['delivery_type'] = event.deliveryType;
+      }
+      if (event.itemCode != null && event.itemCode!.isNotEmpty) {
+        data['item_code'] = event.itemCode;
+      }
+      if (event.quantity != null) {
+        data['quantity'] = event.quantity;
+      }
+      if (event.assignedToId != null) {
+        data['assigned_to_id'] = event.assignedToId;
+      }
+      if (event.emptyArrangement != null && event.emptyArrangement!.isNotEmpty) {
+        data['empty_arrangement'] = event.emptyArrangement;
+      }
+      if (event.emptiesDueDate != null && event.emptiesDueDate!.isNotEmpty) {
+        data['empties_due_date'] = event.emptiesDueDate;
+      }
+      if (event.cashArrangement != null && event.cashArrangement!.isNotEmpty) {
+        data['cash_arrangement'] = event.cashArrangement;
+      }
+      if (event.cashDueDate != null && event.cashDueDate!.isNotEmpty) {
+        data['cash_due_date'] = event.cashDueDate;
+      }
+
       // Set evidence_required for supervisor types
-      if (creationType == 'SUPERVISOR_OVERRIDE' || creationType == 'OWNERS_REFERENCE') {
+      if (creationType == 'SUPERVISOR_OVERRIDE' || creationType == 'OBLIGATION') {
         data['evidence_required'] = true;
       }
 
@@ -334,7 +405,7 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       if (event.bookingVerificationId != null && event.bookingVerificationId!.isNotEmpty) {
         final vIdx = _verifications.indexWhere((v) => v.id == event.bookingVerificationId);
         if (vIdx != -1) {
-          _verifications[vIdx] = _verifications[vIdx].copyWith(hasToken: true);
+          _verifications[vIdx] = _verifications[vIdx].copyWith(hasToken: true, tokenId: token.id);
         }
       }
 
@@ -345,7 +416,13 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     } on DioException catch (e) {
       final statusCode = e.response?.statusCode;
       if (statusCode == 409) {
-        emit(const OfflineDeliveryError('Token already exists for this consumer today'));
+        final data = e.response?.data;
+        String message = 'Token already exists for this consumer today';
+        if (data is Map<String, dynamic>) {
+          if (data['error'] is String) message = data['error'];
+          else if (data['message'] is String) message = data['message'];
+        }
+        emit(OfflineDeliveryError(message));
       } else if (statusCode == 400) {
         final data = e.response?.data;
         String message = 'Validation error';
@@ -385,11 +462,15 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     try {
       emit(TokenDelivering());
 
-      final data = <String, dynamic>{
-        'cash_collected': event.cashCollected,
-      };
+      final data = <String, dynamic>{};
+      if (event.cashCollected != null) {
+        data['cash_collected'] = event.cashCollected;
+      }
       if (event.dacCode != null && event.dacCode!.isNotEmpty) {
         data['dac_code'] = event.dacCode;
+      }
+      if (event.emptiesCollected != null) {
+        data['empties_collected'] = event.emptiesCollected;
       }
 
       final response = await _apiService.deliverOfflineDeliveryToken(
@@ -401,10 +482,12 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
         response['token'] as Map<String, dynamic>? ?? response,
       );
 
-      // Update in cache
+      // Update in cache (or add if from scan flow)
       final index = _tokens.indexWhere((t) => t.id == event.tokenId);
       if (index != -1) {
         _tokens[index] = updatedToken;
+      } else {
+        _tokens.insert(0, updatedToken);
       }
 
       final message = response['message'] as String? ?? 'Token delivered successfully';
@@ -438,19 +521,22 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     LoadVerifications event,
     Emitter<OfflineDeliveryState> emit,
   ) async {
-    if (_selectedPoint == null || _cachedStatus == null) return;
+    if (_cachedStatus == null) return;
 
     try {
       final response = await _apiService.getOfflineDeliveryVerificationsPaginated(
-        distributionPointId: _selectedPoint!.id,
+        distributionPointId: _selectedPoint?.id,
         date: _dateString,
         search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        showAll: _showAllVerifications ? true : null,
       );
 
       final results = (response['results'] ?? []) as List<dynamic>;
+      final oldVerifications = _verifications;
       _verifications = results
           .map((json) => BookingVerification.fromJson(json as Map<String, dynamic>))
           .toList();
+      _preserveLocalDacCodes(oldVerifications, _verifications);
       _nextVerificationsUrl = response['next'] as String?;
       _hasMoreVerifications = _nextVerificationsUrl != null;
 
@@ -520,6 +606,9 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       final index = _tokens.indexWhere((t) => t.id == event.tokenId);
       if (index != -1) {
         _tokens[index] = updatedToken;
+      } else {
+        // Token from scan flow — add to cache so detail sheet can find it
+        _tokens.insert(0, updatedToken);
       }
 
       emit(ImagesAttached(updatedToken));
@@ -604,11 +693,13 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
 
       final data = <String, dynamic>{
         'distribution_point_id': event.distributionPointId,
-        'cash_collected': event.cashCollected,
         'idempotency_key': event.idempotencyKey,
         'company_id': event.companyId,
       };
       _lastSelectedCompanyId = event.companyId;
+      if (event.cashCollected != null) {
+        data['cash_collected'] = event.cashCollected;
+      }
       if (event.consumerId != null && event.consumerId!.isNotEmpty) {
         data['consumer_id'] = event.consumerId;
       }
@@ -677,10 +768,12 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       emit(VerificationCreating());
 
       final data = <String, dynamic>{
-        'distribution_point_id': event.distributionPointId,
         'idempotency_key': event.idempotencyKey,
         'company_id': event.companyId,
       };
+      if (event.distributionPointId != null && event.distributionPointId!.isNotEmpty) {
+        data['distribution_point_id'] = event.distributionPointId;
+      }
       _lastSelectedCompanyId = event.companyId;
       if (event.consumerId != null && event.consumerId!.isNotEmpty) {
         data['consumer_id'] = event.consumerId;
@@ -691,27 +784,47 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
       if (event.orderNumber != null && event.orderNumber!.isNotEmpty) {
         data['order_number'] = event.orderNumber;
       }
+      if (event.dacCode != null && event.dacCode!.isNotEmpty) {
+        data['dac_code'] = event.dacCode;
+      }
 
       final response = await _apiService.createBookingVerification(data);
 
-      final verification = BookingVerification.fromJson(
+      var verification = BookingVerification.fromJson(
         response['verification'] as Map<String, dynamic>? ?? response,
       );
+
+      // Preserve dacCode locally since API may not return it
+      final sentDacCode = event.dacCode;
+      if (sentDacCode != null && sentDacCode.isNotEmpty && verification.dacCode == null) {
+        verification = verification.copyWith(dacCode: sentDacCode);
+      }
 
       emit(VerificationCreated(verification));
 
       // Reload all verifications from API to ensure complete list
       try {
         final allVerifications = await _apiService.getOfflineDeliveryVerificationsPaginated(
-          distributionPointId: _selectedPoint!.id,
+          distributionPointId: _selectedPoint?.id,
           date: _dateString,
+          showAll: _showAllVerifications ? true : null,
         );
         final results = (allVerifications['results'] ?? []) as List<dynamic>;
+        final oldVerifications = _verifications;
         _verifications = results
             .map((json) => BookingVerification.fromJson(json as Map<String, dynamic>))
             .toList();
+        _preserveLocalDacCodes(oldVerifications, _verifications);
         _nextVerificationsUrl = allVerifications['next'] as String?;
         _hasMoreVerifications = _nextVerificationsUrl != null;
+
+        // Also preserve dacCode for the newly created verification
+        if (sentDacCode != null && sentDacCode.isNotEmpty) {
+          final idx = _verifications.indexWhere((v) => v.id == verification.id);
+          if (idx != -1 && _verifications[idx].dacCode == null) {
+            _verifications[idx] = _verifications[idx].copyWith(dacCode: sentDacCode);
+          }
+        }
       } catch (_) {
         // Fallback: insert locally if reload fails
         if (!_verifications.any((v) => v.id == verification.id)) {
@@ -783,19 +896,22 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     PollVerifications event,
     Emitter<OfflineDeliveryState> emit,
   ) async {
-    if (_selectedPoint == null || _cachedStatus == null) return;
+    if (_cachedStatus == null) return;
 
     try {
       final response = await _apiService.getOfflineDeliveryVerificationsPaginated(
-        distributionPointId: _selectedPoint!.id,
+        distributionPointId: _selectedPoint?.id,
         date: _dateString,
         search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        showAll: _showAllVerifications ? true : null,
       );
 
       final results = (response['results'] ?? []) as List<dynamic>;
+      final oldVerifications = _verifications;
       _verifications = results
           .map((json) => BookingVerification.fromJson(json as Map<String, dynamic>))
           .toList();
+      _preserveLocalDacCodes(oldVerifications, _verifications);
       _nextVerificationsUrl = response['next'] as String?;
       _hasMoreVerifications = _nextVerificationsUrl != null;
 
@@ -850,6 +966,7 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     SearchTokens event,
     Emitter<OfflineDeliveryState> emit,
   ) async {
+    _isTokenSearch = true;
     _searchQuery = event.query;
     // Reset pagination and reload
     _tokens = [];
@@ -881,23 +998,27 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
     SearchVerifications event,
     Emitter<OfflineDeliveryState> emit,
   ) async {
+    _isTokenSearch = false;
     _searchQuery = event.query;
     // Reset pagination and reload
+    final oldVerifications = _verifications;
     _verifications = [];
     _nextVerificationsUrl = null;
     _hasMoreVerifications = false;
-    if (_selectedPoint != null && _cachedStatus != null) {
+    if (_cachedStatus != null) {
       _emitLoaded(emit);
       try {
         final response = await _apiService.getOfflineDeliveryVerificationsPaginated(
-          distributionPointId: _selectedPoint!.id,
+          distributionPointId: _selectedPoint?.id,
           date: _dateString,
           search: _searchQuery.isNotEmpty ? _searchQuery : null,
+          showAll: _showAllVerifications ? true : null,
         );
         final results = (response['results'] ?? []) as List<dynamic>;
         _verifications = results
             .map((json) => BookingVerification.fromJson(json as Map<String, dynamic>))
             .toList();
+        _preserveLocalDacCodes(oldVerifications, _verifications);
         _nextVerificationsUrl = response['next'] as String?;
         _hasMoreVerifications = _nextVerificationsUrl != null;
         _emitLoaded(emit);
@@ -905,6 +1026,133 @@ class OfflineDeliveryBloc extends Bloc<OfflineDeliveryEvent, OfflineDeliveryStat
         debugPrint('Search verifications failed: $e');
         _emitLoaded(emit);
       }
+    }
+  }
+
+  Future<void> _onToggleShowAll(
+    ToggleShowAllVerifications event,
+    Emitter<OfflineDeliveryState> emit,
+  ) async {
+    _showAllVerifications = event.showAll;
+    if (_cachedStatus == null) return;
+    _emitLoaded(emit);
+    add(const LoadVerifications());
+  }
+
+  Future<void> _onLoadObligationDirectors(
+    LoadObligationDirectors event,
+    Emitter<OfflineDeliveryState> emit,
+  ) async {
+    try {
+      final results = await _apiService.getObligationDirectors(event.companyId);
+      _directors = results
+          .map((json) => ObligationDirector.fromJson(json as Map<String, dynamic>))
+          .toList();
+      if (_cachedStatus != null) {
+        _emitLoaded(emit);
+      }
+    } catch (e) {
+      debugPrint('Load obligation directors failed: $e');
+    }
+  }
+
+  Future<void> _onLookupConsumer(
+    LookupConsumer event,
+    Emitter<OfflineDeliveryState> emit,
+  ) async {
+    try {
+      emit(ConsumerLookupLoading());
+      final response = await _apiService.lookupConsumer(event.consumerNumber);
+      final records = (response['results'] ?? []) as List<dynamic>;
+      emit(ConsumerLookupResult(
+        records.map((r) => r as Map<String, dynamic>).toList(),
+      ));
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      String message = 'Lookup failed';
+      if (data is Map<String, dynamic> && data['message'] is String) {
+        message = data['message'];
+      }
+      emit(ConsumerLookupError(message));
+    } catch (e) {
+      emit(ConsumerLookupError(ErrorHandler.handleError(e)));
+    }
+    if (_cachedStatus != null) {
+      _emitLoaded(emit);
+    }
+  }
+
+  Future<void> _onScanToken(
+    ScanToken event,
+    Emitter<OfflineDeliveryState> emit,
+  ) async {
+    try {
+      emit(TokenScanning());
+      final response = await _apiService.scanToken(
+        uuid: event.uuid,
+        tokenNumber: event.tokenNumber,
+        distributionPointId: event.distributionPointId,
+      );
+      final token = OfflineDeliveryToken.fromJson(response);
+      // Update cache so detail sheet can find it with fresh available_actions
+      final index = _tokens.indexWhere((t) => t.id == token.id);
+      if (index != -1) {
+        _tokens[index] = token;
+      } else {
+        _tokens.insert(0, token);
+      }
+      emit(TokenScanned(token));
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      String message = 'Token not found';
+      if (statusCode == 404) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          message = data['detail']?.toString() ?? data['message']?.toString() ?? 'Token not found';
+        }
+      } else if (statusCode == 400) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          final errors = <String>[];
+          data.forEach((key, value) {
+            if (value is List) {
+              errors.add('${value.join(', ')}');
+            } else if (value is String) {
+              errors.add(value);
+            }
+          });
+          message = errors.isNotEmpty ? errors.join('\n') : 'Invalid request';
+        }
+      } else {
+        message = ErrorHandler.handleError(e);
+      }
+      emit(TokenScanError(message));
+    } catch (e) {
+      emit(TokenScanError(ErrorHandler.handleError(e)));
+    }
+    if (_cachedStatus != null) {
+      _emitLoaded(emit);
+    }
+  }
+
+  Future<void> _onLoadPartnerTokens(
+    LoadPartnerTokens event,
+    Emitter<OfflineDeliveryState> emit,
+  ) async {
+    try {
+      emit(PartnerTokensLoading());
+      final response = await _apiService.getMyPartnerTokens(
+        event.companyId,
+        status: event.status,
+      );
+      final results = (response['results'] ?? []) as List<dynamic>;
+      final tokens = results
+          .map((json) => OfflineDeliveryToken.fromJson(json as Map<String, dynamic>))
+          .toList();
+      emit(PartnerTokensLoaded(tokens));
+    } catch (e) {
+      debugPrint('Load partner tokens failed: $e');
+      emit(PartnerTokensLoaded(const []));
     }
   }
 }

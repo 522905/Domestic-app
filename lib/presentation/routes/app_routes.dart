@@ -38,8 +38,12 @@ import '../blocs/defect_inspection/defect_inspection_bloc.dart';
 import '../blocs/ujjwala_installations/ujjwala_installations_bloc.dart';
 import '../blocs/ujjwala_installations/ujjwala_installations_event.dart';
 import '../pages/offline_delivery/offline_delivery_page.dart';
+import '../pages/offline_delivery/offline_booking_page.dart';
+import '../pages/offline_delivery/collections_due_page.dart';
+import '../pages/offline_delivery/scan_token_page.dart';
 import '../blocs/offline_delivery/offline_delivery_bloc.dart';
 import '../blocs/offline_delivery/offline_delivery_event.dart';
+import '../blocs/obligation_collection/obligation_collection_bloc.dart';
 import '../pages/ujjwala_installations/pending_installations_page.dart';
 import '../pages/ujjwala_installations/installation_submit_page.dart';
 import '../pages/ujjwala_installations/my_uploads_page.dart';
@@ -95,6 +99,9 @@ class AppRoutes {
 
   // Offline Delivery route
   static const String offlineDelivery = 'offline-delivery';
+
+  // Offline Booking route
+  static const String offlineBooking = 'offline-booking';
 
   // Profile route
   static const String profile = '/profile';
@@ -580,6 +587,43 @@ class AppRoutes {
               apiService: context.read<ApiServiceInterface>(),
             )..add(const LoadInitialData()),
             child: const OfflineDeliveryPage(),
+          ),
+        );
+
+      // OFFLINE BOOKING
+      case 'offline-booking':
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => OfflineDeliveryBloc(
+              apiService: context.read<ApiServiceInterface>(),
+            )..add(const LoadInitialData()),
+            child: const OfflineBookingPage(),
+          ),
+        );
+
+      // OFFLINE DELIVERY COLLECTIONS
+      case 'offline-delivery-collections':
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => ObligationCollectionBloc(
+              apiService: context.read<ApiServiceInterface>(),
+            ),
+            child: CollectionsDuePage(
+              companies: args?['companies'] ?? [],
+              initialCompanyId: args?['initialCompanyId'],
+            ),
+          ),
+        );
+
+      // SCAN TOKEN
+      case 'scan-token':
+        return MaterialPageRoute(
+          builder: (context) => BlocProvider(
+            create: (context) => OfflineDeliveryBloc(
+              apiService: context.read<ApiServiceInterface>(),
+            )..add(const LoadInitialData()),
+            child: const ScanTokenPage(),
           ),
         );
 

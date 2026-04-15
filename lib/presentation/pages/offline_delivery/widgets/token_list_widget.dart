@@ -422,9 +422,10 @@ class _TokenCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (token.consumerName != null || token.consumerNameManual != null)
+                  // Name: use displayName which handles obligation tokens
+                  if (token.displayName != 'Unknown')
                     Text(
-                      token.consumerName ?? token.consumerNameManual!,
+                      token.displayName,
                       style: AppTextStyles.bodyMedium.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -438,6 +439,42 @@ class _TokenCard extends StatelessWidget {
                   if (token.consumerId != null && token.consumerId!.isNotEmpty) ...[
                     SizedBox(height: 2),
                     _infoRow('Consumer ID', token.consumerId!.length > 1 ? token.consumerId!.substring(1) : token.consumerId!, prefix: '7'),
+                  ],
+                  // Obligation badge
+                  if (token.isObligation) ...[
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: AppColorsEnhanced.warningYellow.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: AppColorsEnhanced.warningYellow.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Text(
+                            'OBLIGATION',
+                            style: TextStyle(
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.w700,
+                              color: AppColorsEnhanced.warningYellow,
+                            ),
+                          ),
+                        ),
+                        if (token.obligationDetail != null) ...[
+                          SizedBox(width: 4.w),
+                          Text(
+                            '${token.obligationDetail!.itemDisplayName} x${token.obligationDetail!.quantity}',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColorsEnhanced.secondaryText,
+                              fontSize: 10.sp,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                   if (token.dacCode != null && token.dacCode!.isNotEmpty) ...[
                     SizedBox(height: 2),

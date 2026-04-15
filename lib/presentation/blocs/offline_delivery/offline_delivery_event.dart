@@ -53,6 +53,18 @@ class CreateToken extends OfflineDeliveryEvent {
   final String? overrideReason;
   final String? consumerNameManual;
   final int companyId;
+  // Obligation fields
+  final String? initiationSource;
+  final int? sourceDeliveryRecordId;
+  final int? directedById;
+  final String? deliveryType;
+  final String? itemCode;
+  final int? quantity;
+  final int? assignedToId;
+  final String? emptyArrangement;
+  final String? emptiesDueDate;
+  final String? cashArrangement;
+  final String? cashDueDate;
 
   const CreateToken({
     required this.distributionPointId,
@@ -67,6 +79,17 @@ class CreateToken extends OfflineDeliveryEvent {
     this.overrideReason,
     this.consumerNameManual,
     required this.companyId,
+    this.initiationSource,
+    this.sourceDeliveryRecordId,
+    this.directedById,
+    this.deliveryType,
+    this.itemCode,
+    this.quantity,
+    this.assignedToId,
+    this.emptyArrangement,
+    this.emptiesDueDate,
+    this.cashArrangement,
+    this.cashDueDate,
   });
 
   @override
@@ -74,22 +97,27 @@ class CreateToken extends OfflineDeliveryEvent {
     distributionPointId, consumerId, consumerNumber,
     orderNumber, dacCode, remark, idempotencyKey, bookingVerificationId,
     creationType, overrideReason, consumerNameManual, companyId,
+    initiationSource, sourceDeliveryRecordId, directedById,
+    deliveryType, itemCode, quantity, assignedToId,
+    emptyArrangement, emptiesDueDate, cashArrangement, cashDueDate,
   ];
 }
 
 class DeliverToken extends OfflineDeliveryEvent {
   final String tokenId;
-  final double cashCollected;
+  final double? cashCollected;
   final String? dacCode;
+  final int? emptiesCollected;
 
   const DeliverToken({
     required this.tokenId,
-    required this.cashCollected,
+    this.cashCollected,
     this.dacCode,
+    this.emptiesCollected,
   });
 
   @override
-  List<Object?> get props => [tokenId, cashCollected, dacCode];
+  List<Object?> get props => [tokenId, cashCollected, dacCode, emptiesCollected];
 }
 
 class LoadVerifications extends OfflineDeliveryEvent {
@@ -136,7 +164,7 @@ class QuickDeliver extends OfflineDeliveryEvent {
   final String? consumerNumber;
   final String? orderNumber;
   final String? dacCode;
-  final double cashCollected;
+  final double? cashCollected;
   final String? referenceImage1Url;
   final String idempotencyKey;
   final int companyId;
@@ -147,7 +175,7 @@ class QuickDeliver extends OfflineDeliveryEvent {
     this.consumerNumber,
     this.orderNumber,
     this.dacCode,
-    required this.cashCollected,
+    this.cashCollected,
     this.referenceImage1Url,
     required this.idempotencyKey,
     required this.companyId,
@@ -162,27 +190,37 @@ class QuickDeliver extends OfflineDeliveryEvent {
 }
 
 class CreateVerification extends OfflineDeliveryEvent {
-  final String distributionPointId;
+  final String? distributionPointId;
   final String? consumerId;
   final String? consumerNumber;
   final String? orderNumber;
+  final String? dacCode;
   final String idempotencyKey;
   final int companyId;
 
   const CreateVerification({
-    required this.distributionPointId,
+    this.distributionPointId,
     this.consumerId,
     this.consumerNumber,
     this.orderNumber,
+    this.dacCode,
     required this.idempotencyKey,
     required this.companyId,
   });
 
   @override
   List<Object?> get props => [
-    distributionPointId, consumerId, consumerNumber, orderNumber, idempotencyKey,
+    distributionPointId, consumerId, consumerNumber, orderNumber, dacCode, idempotencyKey,
     companyId,
   ];
+}
+
+class ToggleShowAllVerifications extends OfflineDeliveryEvent {
+  final bool showAll;
+  const ToggleShowAllVerifications(this.showAll);
+
+  @override
+  List<Object> get props => [showAll];
 }
 
 class RetryVerification extends OfflineDeliveryEvent {
@@ -244,4 +282,41 @@ class SearchVerifications extends OfflineDeliveryEvent {
 
   @override
   List<Object> get props => [query];
+}
+
+class LoadObligationDirectors extends OfflineDeliveryEvent {
+  final int companyId;
+  const LoadObligationDirectors(this.companyId);
+
+  @override
+  List<Object> get props => [companyId];
+}
+
+class LookupConsumer extends OfflineDeliveryEvent {
+  final String consumerNumber;
+  const LookupConsumer(this.consumerNumber);
+
+  @override
+  List<Object> get props => [consumerNumber];
+}
+
+class ScanToken extends OfflineDeliveryEvent {
+  final String? uuid;
+  final int? tokenNumber;
+  final String? distributionPointId;
+
+  const ScanToken({this.uuid, this.tokenNumber, this.distributionPointId});
+
+  @override
+  List<Object?> get props => [uuid, tokenNumber, distributionPointId];
+}
+
+class LoadPartnerTokens extends OfflineDeliveryEvent {
+  final int companyId;
+  final String? status;
+
+  const LoadPartnerTokens({required this.companyId, this.status});
+
+  @override
+  List<Object?> get props => [companyId, status];
 }

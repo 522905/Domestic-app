@@ -19,6 +19,8 @@ class QuotaHistoryEntry extends Equatable {
   final int closingBalance;
   final double? postingRatio;
   final int adjustment;
+  final int tokenDeductions;
+  final int tokenCredits;
 
   const QuotaHistoryEntry({
     required this.id,
@@ -37,6 +39,8 @@ class QuotaHistoryEntry extends Equatable {
     required this.closingBalance,
     this.postingRatio,
     this.adjustment = 0,
+    this.tokenDeductions = 0,
+    this.tokenCredits = 0,
   });
 
   /// Net pickups = pickups - returns
@@ -96,22 +100,6 @@ class QuotaHistoryEntry extends Equatable {
     final returns = json['returns'] as int;
     final otpSales = json['otp_sales'] as int;
 
-    // Always print for 17 Jan entries to debug
-    if (entryDateStr.contains('2026-01-17')) {
-      print('=== QuotaHistoryEntry DEBUG - Date: $entryDateStr ===');
-      print('  JSON has "adjustments"? ${json.containsKey('adjustments')} = ${json['adjustments']}');
-      print('  JSON has "adjustment"? ${json.containsKey('adjustment')} = ${json['adjustment']}');
-      print('  Final adjustment value: $adjustmentValue');
-      print('  Opening: $openingBalance, Closing: $closingBalance, NetChange: $netChange');
-      print('  Pickups: $pickups, Returns: $returns, OTP: $otpSales');
-
-      // Verify the balance calculation
-      final expectedClosing = openingBalance + netChange;
-      print('  Expected Closing (opening + netChange): $expectedClosing');
-      print('  Actual Closing from API: $closingBalance');
-      print('  Match? ${expectedClosing == closingBalance}');
-    }
-
     return QuotaHistoryEntry(
       id: json['id'] as int,
       entryDate: DateTime.parse(entryDateStr),
@@ -131,6 +119,8 @@ class QuotaHistoryEntry extends Equatable {
           ? (json['posting_ratio'] as num).toDouble()
           : null,
       adjustment: adjustmentValue,
+      tokenDeductions: (json['token_deductions'] as int?) ?? 0,
+      tokenCredits: (json['token_credits'] as int?) ?? 0,
     );
   }
 
@@ -151,7 +141,9 @@ class QuotaHistoryEntry extends Equatable {
       'opening_balance': openingBalance,
       'closing_balance': closingBalance,
       'posting_ratio': postingRatio,
-      'adjustments': adjustment, // API uses 'adjustments' (plural)
+      'adjustments': adjustment,
+      'token_deductions': tokenDeductions,
+      'token_credits': tokenCredits,
     };
   }
 
@@ -173,6 +165,8 @@ class QuotaHistoryEntry extends Equatable {
         closingBalance,
         postingRatio,
         adjustment,
+        tokenDeductions,
+        tokenCredits,
       ];
 }
 

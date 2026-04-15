@@ -66,14 +66,14 @@ class GlobalDrawer {
       //     );
       //   },
       // ),
-      // My Bonuses menu item
-      ListTile(
-        leading: const Icon(Icons.card_giftcard),
-        title: const Text('My Bonuses'),
-        onTap: () {
-          Navigator.pushNamed(navigatorContext!, '/bonus-list');
-        },
-      ),
+      // My Bonuses - temporarily hidden
+      // ListTile(
+      //   leading: const Icon(Icons.card_giftcard),
+      //   title: const Text('My Bonuses'),
+      //   onTap: () {
+      //     Navigator.pushNamed(navigatorContext!, '/bonus-list');
+      //   },
+      // ),
 
       // SDMS Claims menu item
       ListTile(
@@ -152,6 +152,15 @@ class GlobalDrawer {
             Navigator.pushNamed(navigatorContext!, '/offline-delivery');
           },
         ),
+
+      // Scan Token - available to all users
+      ListTile(
+        leading: const Icon(Icons.qr_code_scanner),
+        title: const Text('Scan Token'),
+        onTap: () {
+          Navigator.pushNamed(navigatorContext!, '/scan-token');
+        },
+      ),
 
       // Booking menu item
       ListTile(

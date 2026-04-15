@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import '../../../domain/entities/quota/quota_history_entry.dart';
 import '../../../domain/entities/quota/quota_history_aggregates.dart';
 import '../../../domain/entities/quota/quota_history_filters.dart';
+import '../../../domain/entities/quota/quota_ledger_detail_entry.dart';
 
 /// Base class for all quota history states
 abstract class QuotaHistoryState extends Equatable {
@@ -67,6 +68,22 @@ class QuotaHistoryLoaded extends QuotaHistoryState {
         currentPage,
         hasMorePages,
       ];
+}
+
+/// State when detail entries are loaded for a specific day
+class QuotaHistoryDetailLoaded extends QuotaHistoryState {
+  final String entryDate;
+  final String itemCode;
+  final List<QuotaLedgerDetailEntry> entries;
+
+  const QuotaHistoryDetailLoaded({
+    required this.entryDate,
+    required this.itemCode,
+    required this.entries,
+  });
+
+  @override
+  List<Object?> get props => [entryDate, itemCode, entries];
 }
 
 /// State when an error occurs

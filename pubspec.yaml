@@ -1,7 +1,7 @@
 name: lpg_distribution_app
 description: A digital platform for domestic LPG distribution business.
 
-version: 1.1.1
+version: 1.1.4
 
 environment:
 
@@ -12,9 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # UIz
+  # UI
   lottie: ^3.1.2
-  cupertino_icons: ^1.0.5
   flutter_screenutil: ^5.8.4
   flutter_localizations:
     sdk: flutter
@@ -37,7 +36,6 @@ dependencies:
   path_provider: ^2.1.0
 
   # Utilities
-  get_it: ^7.6.0
   uuid: ^4.5.0
 
   # Images

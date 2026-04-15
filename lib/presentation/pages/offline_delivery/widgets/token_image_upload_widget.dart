@@ -24,68 +24,41 @@ class TokenImageUploadWidget extends StatefulWidget {
 class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
   final ImagePicker _imagePicker = ImagePicker();
 
-  // Slot 1
-  XFile? _file1;
-  String? _uploadedUrl1;
-  bool _uploading1 = false;
-  double _progress1 = 0;
-  String? _error1;
-
-  // Slot 2
-  XFile? _file2;
-  String? _uploadedUrl2;
-  bool _uploading2 = false;
-  double _progress2 = 0;
-  String? _error2;
-
+  XFile? _file;
+  String? _uploadedUrl;
+  bool _uploading = false;
+  double _progress = 0;
+  String? _error;
   bool _isAttaching = false;
 
-  bool get _hasAtLeastOneUrl => _uploadedUrl1 != null || _uploadedUrl2 != null;
-
-  Future<void> _capturePhoto(int slot) async {
+  Future<void> _capturePhoto() async {
     try {
       final xfile = await _imagePicker.pickImage(
         source: ImageSource.camera,
         maxWidth: 800,
         imageQuality: 70,
       );
-      if (xfile == null) return;
-      if (!mounted) return;
+      if (xfile == null || !mounted) return;
 
       setState(() {
-        if (slot == 1) {
-          _file1 = xfile;
-          _uploadedUrl1 = null;
-          _error1 = null;
-        } else {
-          _file2 = xfile;
-          _uploadedUrl2 = null;
-          _error2 = null;
-        }
+        _file = xfile;
+        _uploadedUrl = null;
+        _error = null;
       });
 
-      _uploadPhoto(slot, xfile);
+      _uploadPhoto(xfile);
     } catch (e) {
       if (mounted) {
-        setState(() {
-          if (slot == 1) _error1 = 'Camera error: $e';
-          else _error2 = 'Camera error: $e';
-        });
+        setState(() => _error = 'Camera error: $e');
       }
     }
   }
 
-  Future<void> _uploadPhoto(int slot, XFile xfile) async {
+  Future<void> _uploadPhoto(XFile xfile) async {
     setState(() {
-      if (slot == 1) {
-        _uploading1 = true;
-        _progress1 = 0;
-        _error1 = null;
-      } else {
-        _uploading2 = true;
-        _progress2 = 0;
-        _error2 = null;
-      }
+      _uploading = true;
+      _progress = 0;
+      _error = null;
     });
 
     try {
@@ -95,66 +68,43 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
         uri: Uri.parse('https://tus.dca.arungas.com/files/'),
         onProgress: (double progress, Duration total) {
           if (!mounted) return;
-          setState(() {
-            if (slot == 1) _progress1 = progress;
-            else _progress2 = progress;
-          });
+          setState(() => _progress = progress);
         },
         onComplete: () {
           if (!mounted) return;
-          final url = tusClient.uploadUrl?.toString();
           setState(() {
-            if (slot == 1) {
-              _uploading1 = false;
-              _uploadedUrl1 = url;
-            } else {
-              _uploading2 = false;
-              _uploadedUrl2 = url;
-            }
+            _uploading = false;
+            _uploadedUrl = tusClient.uploadUrl?.toString();
           });
         },
       ).timeout(const Duration(seconds: 90));
     } catch (e) {
       if (mounted) {
         setState(() {
-          if (slot == 1) {
-            _uploading1 = false;
-            _error1 = 'Upload failed: $e';
-          } else {
-            _uploading2 = false;
-            _error2 = 'Upload failed: $e';
-          }
+          _uploading = false;
+          _error = 'Upload failed: $e';
         });
       }
     }
   }
 
-  void _deletePhoto(int slot) {
+  void _deletePhoto() {
     setState(() {
-      if (slot == 1) {
-        _file1 = null;
-        _uploadedUrl1 = null;
-        _error1 = null;
-        _uploading1 = false;
-        _progress1 = 0;
-      } else {
-        _file2 = null;
-        _uploadedUrl2 = null;
-        _error2 = null;
-        _uploading2 = false;
-        _progress2 = 0;
-      }
+      _file = null;
+      _uploadedUrl = null;
+      _error = null;
+      _uploading = false;
+      _progress = 0;
     });
   }
 
-  void _attachImages() {
-    if (!_hasAtLeastOneUrl || _isAttaching) return;
+  void _attachImage() {
+    if (_uploadedUrl == null || _isAttaching) return;
     setState(() => _isAttaching = true);
 
     context.read<OfflineDeliveryBloc>().add(AttachTokenImages(
       tokenId: widget.tokenId,
-      referenceImage1Url: _uploadedUrl1,
-      referenceImage2Url: _uploadedUrl2,
+      referenceImage1Url: _uploadedUrl,
     ));
   }
 
@@ -164,7 +114,7 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
       listener: (context, state) {
         if (state is ImagesAttached && state.token.id == widget.tokenId) {
           setState(() => _isAttaching = false);
-          context.showSuccessSnackBar('Images attached successfully');
+          context.showSuccessSnackBar('Photo attached successfully');
         } else if (state is OfflineDeliveryError && _isAttaching) {
           setState(() => _isAttaching = false);
         }
@@ -180,55 +130,29 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Reference Photos',
+              'Reference Photo',
               style: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
             SizedBox(height: AppSpacing.sm),
             Text(
-              'Upload photos for delivery evidence',
+              'Upload a photo for delivery evidence',
               style: AppTextStyles.labelSmall.copyWith(
                 color: AppColorsEnhanced.secondaryText,
               ),
             ),
             SizedBox(height: AppSpacing.md),
 
-            // Two photo slots in a row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildPhotoSlot(
-                    slot: 1,
-                    label: 'Photo 1',
-                    file: _file1,
-                    uploadedUrl: _uploadedUrl1,
-                    uploading: _uploading1,
-                    progress: _progress1,
-                    error: _error1,
-                  ),
-                ),
-                SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: _buildPhotoSlot(
-                    slot: 2,
-                    label: 'Photo 2',
-                    file: _file2,
-                    uploadedUrl: _uploadedUrl2,
-                    uploading: _uploading2,
-                    progress: _progress2,
-                    error: _error2,
-                  ),
-                ),
-              ],
-            ),
+            // Single photo slot
+            _buildPhotoSlot(),
             SizedBox(height: AppSpacing.lg),
 
             // Attach button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _hasAtLeastOneUrl && !_isAttaching ? _attachImages : null,
+                onPressed: _uploadedUrl != null && !_isAttaching ? _attachImage : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColorsEnhanced.brandBlue,
                   foregroundColor: Colors.white,
@@ -249,7 +173,7 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
                       )
                     : Icon(Icons.cloud_upload_outlined, size: 20.sp),
                 label: Text(
-                  _isAttaching ? 'Attaching...' : 'Attach Images',
+                  _isAttaching ? 'Attaching...' : 'Attach Photo',
                   style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -260,21 +184,13 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
     );
   }
 
-  Widget _buildPhotoSlot({
-    required int slot,
-    required String label,
-    XFile? file,
-    String? uploadedUrl,
-    required bool uploading,
-    required double progress,
-    String? error,
-  }) {
+  Widget _buildPhotoSlot() {
     Color borderColor = AppColorsEnhanced.border;
-    if (error != null) {
+    if (_error != null) {
       borderColor = AppColorsEnhanced.errorRed;
-    } else if (uploadedUrl != null) {
+    } else if (_uploadedUrl != null) {
       borderColor = AppColorsEnhanced.successGreen;
-    } else if (uploading) {
+    } else if (_uploading) {
       borderColor = AppColorsEnhanced.brandBlue;
     }
 
@@ -285,74 +201,48 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
       ),
       child: Column(
         children: [
-          // Label
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
-            ),
-            decoration: BoxDecoration(
-              color: borderColor.withOpacity(0.08),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(6.r)),
-            ),
-            child: Text(
-              label,
-              style: AppTextStyles.labelSmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: borderColor == AppColorsEnhanced.border
-                    ? AppColorsEnhanced.secondaryText
-                    : borderColor,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-
-          // Content area
-          if (file != null)
-            // Preview
+          if (_file != null)
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(6.r)),
+                  borderRadius: BorderRadius.circular(6.r),
                   child: Image.file(
-                    File(file.path),
-                    height: 100.h,
+                    File(_file!.path),
+                    height: 160.h,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),
                 ),
-                // Status overlay
-                if (uploading)
+                if (_uploading)
                   Positioned.fill(
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.4),
-                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(6.r)),
+                        borderRadius: BorderRadius.circular(6.r),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           SizedBox(
-                            width: 80.w,
+                            width: 120.w,
                             child: LinearProgressIndicator(
-                              value: progress / 100,
+                              value: _progress / 100,
                               backgroundColor: Colors.white24,
                               valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           ),
                           SizedBox(height: 4),
                           Text(
-                            '${progress.toStringAsFixed(0)}%',
-                            style: TextStyle(color: Colors.white, fontSize: 11.sp),
+                            '${_progress.toStringAsFixed(0)}%',
+                            style: TextStyle(color: Colors.white, fontSize: 12.sp),
                           ),
                         ],
                       ),
                     ),
                   ),
-                if (uploadedUrl != null)
+                if (_uploadedUrl != null)
                   Positioned(
-                    top: 4, right: 4,
+                    top: 8, right: 8,
                     child: Container(
                       padding: EdgeInsets.all(2),
                       decoration: const BoxDecoration(
@@ -362,16 +252,15 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
                       child: Icon(
                         Icons.check_circle,
                         color: AppColorsEnhanced.successGreen,
-                        size: 18.sp,
+                        size: 22.sp,
                       ),
                     ),
                   ),
-                // Delete button
-                if (!uploading)
+                if (!_uploading)
                   Positioned(
-                    top: 4, left: 4,
+                    top: 8, left: 8,
                     child: GestureDetector(
-                      onTap: () => _deletePhoto(slot),
+                      onTap: _deletePhoto,
                       child: Container(
                         padding: EdgeInsets.all(2),
                         decoration: const BoxDecoration(
@@ -381,7 +270,7 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
                         child: Icon(
                           Icons.close,
                           color: AppColorsEnhanced.errorRed,
-                          size: 16.sp,
+                          size: 18.sp,
                         ),
                       ),
                     ),
@@ -389,13 +278,12 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
               ],
             )
           else
-            // Capture button
             InkWell(
-              onTap: () => _capturePhoto(slot),
+              onTap: _capturePhoto,
               child: Container(
-                height: 100.h,
+                height: 120.h,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(6.r)),
+                  borderRadius: BorderRadius.circular(6.r),
                 ),
                 child: Center(
                   child: Column(
@@ -403,13 +291,13 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
                     children: [
                       Icon(
                         Icons.camera_alt,
-                        size: 28.r,
+                        size: 36.r,
                         color: AppColorsEnhanced.brandBlue,
                       ),
-                      SizedBox(height: 4),
+                      SizedBox(height: AppSpacing.xs),
                       Text(
                         'Take Photo',
-                        style: AppTextStyles.labelSmall.copyWith(
+                        style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColorsEnhanced.brandBlue,
                           fontWeight: FontWeight.w600,
                         ),
@@ -420,8 +308,7 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
               ),
             ),
 
-          // Error message
-          if (error != null)
+          if (_error != null)
             Padding(
               padding: EdgeInsets.all(AppSpacing.xs),
               child: Row(
@@ -430,8 +317,8 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
                   SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      error,
-                      style: TextStyle(fontSize: 9.sp, color: AppColorsEnhanced.errorRed),
+                      _error!,
+                      style: TextStyle(fontSize: 10.sp, color: AppColorsEnhanced.errorRed),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -440,12 +327,11 @@ class _TokenImageUploadWidgetState extends State<TokenImageUploadWidget> {
               ),
             ),
 
-          // Retry button on error
-          if (error != null && file != null)
+          if (_error != null && _file != null)
             Padding(
               padding: EdgeInsets.only(bottom: AppSpacing.xs),
               child: GestureDetector(
-                onTap: () => _uploadPhoto(slot, file),
+                onTap: () => _uploadPhoto(_file!),
                 child: Text(
                   'Retry',
                   style: AppTextStyles.labelSmall.copyWith(

@@ -134,9 +134,20 @@ class QuotaAggregatesCard extends StatelessWidget {
                   color: Colors.white.withOpacity(0.3),
                 ),
                 _buildMetric(
-                  label: 'Bonus',
-                  value: aggregates.totalBonusConsumed,
-                  icon: Icons.card_giftcard,
+                  label: 'Tkn Ded',
+                  value: aggregates.totalTokenDeductions,
+                  icon: Icons.remove_circle_outline,
+                  isPositive: false,
+                ),
+                Container(
+                  width: 1,
+                  height: 32.h,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                _buildMetric(
+                  label: 'Tkn Cr',
+                  value: aggregates.totalTokenCredits,
+                  icon: Icons.add_circle_outline,
                   isPositive: true,
                 ),
               ],

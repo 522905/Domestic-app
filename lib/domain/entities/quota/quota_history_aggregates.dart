@@ -13,6 +13,8 @@ class QuotaHistoryAggregates extends Equatable {
   final int totalSdmsSales;
   final int totalBonusConsumed;
   final int totalNetChange;
+  final int totalTokenDeductions;
+  final int totalTokenCredits;
   final DateTime dateFrom;
   final DateTime dateTo;
   final double? backendPostingRatio;
@@ -28,6 +30,8 @@ class QuotaHistoryAggregates extends Equatable {
     required this.totalSdmsSales,
     required this.totalBonusConsumed,
     required this.totalNetChange,
+    this.totalTokenDeductions = 0,
+    this.totalTokenCredits = 0,
     required this.dateFrom,
     required this.dateTo,
     this.backendPostingRatio,
@@ -78,6 +82,8 @@ class QuotaHistoryAggregates extends Equatable {
       totalSdmsSales: json['total_sdms_sales'] as int,
       totalBonusConsumed: json['total_bonus_consumed'] as int,
       totalNetChange: json['total_net_change'] as int,
+      totalTokenDeductions: json['total_token_deductions'] as int? ?? 0,
+      totalTokenCredits: json['total_token_credits'] as int? ?? 0,
       dateFrom: DateTime.parse(dateRange['from'] as String),
       dateTo: DateTime.parse(dateRange['to'] as String),
       backendPostingRatio: postingRatio,
@@ -96,6 +102,8 @@ class QuotaHistoryAggregates extends Equatable {
       'total_sdms_sales': totalSdmsSales,
       'total_bonus_consumed': totalBonusConsumed,
       'total_net_change': totalNetChange,
+      'total_token_deductions': totalTokenDeductions,
+      'total_token_credits': totalTokenCredits,
       'date_range': {
         'from': dateFrom.toIso8601String().split('T')[0],
         'to': dateTo.toIso8601String().split('T')[0],
@@ -116,6 +124,8 @@ class QuotaHistoryAggregates extends Equatable {
         totalSdmsSales,
         totalBonusConsumed,
         totalNetChange,
+        totalTokenDeductions,
+        totalTokenCredits,
         dateFrom,
         dateTo,
         backendPostingRatio,
