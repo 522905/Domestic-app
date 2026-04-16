@@ -40,8 +40,6 @@ class ObligationTokenForm extends StatefulWidget {
 class _ObligationTokenFormState extends State<ObligationTokenForm> {
   final _formKey = GlobalKey<FormState>();
   final _consumerNameController = TextEditingController();
-  final _consumerNumberController = TextEditingController();
-  final _orderNumberController = TextEditingController();
   final _remarkController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
 
@@ -59,7 +57,6 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
   String _emptyArrangement = 'SAME_DAY';
   DateTime? _emptiesDueDate;
   DateTime? _cashDueDate;
-  bool _selfAuthorized = false;
 
   // Printer state
   PrinterInterface? _printer;
@@ -90,8 +87,6 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
   @override
   void dispose() {
     _consumerNameController.dispose();
-    _consumerNumberController.dispose();
-    _orderNumberController.dispose();
     _remarkController.dispose();
     _quantityController.dispose();
     _scanSubscription?.cancel();
@@ -205,7 +200,7 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
   Future<bool> _handleSubmit() async {
     if (_isSubmitting) return false;
     if (!_formKey.currentState!.validate()) return false;
-    if (!_selfAuthorized && _selectedDirectorId == null) {
+    if (_selectedDirectorId == null) {
       context.showWarningSnackBar('Please select who authorized this delivery');
       return false;
     }
@@ -217,15 +212,7 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
 
     context.read<OfflineDeliveryBloc>().add(CreateToken(
       distributionPointId: widget.distributionPointId,
-      consumerNameManual: _consumerNameController.text.trim().isNotEmpty
-          ? _consumerNameController.text.trim()
-          : null,
-      consumerNumber: _consumerNumberController.text.trim().isNotEmpty
-          ? _consumerNumberController.text.trim()
-          : null,
-      orderNumber: _orderNumberController.text.trim().isNotEmpty
-          ? '2-${_orderNumberController.text.trim()}'
-          : null,
+      consumerNameManual: _consumerNameController.text.trim(),
       remark: _remarkController.text.trim().isNotEmpty
           ? _remarkController.text.trim()
           : null,
@@ -235,7 +222,7 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
       idempotencyKey: idempotencyKey,
       creationType: 'OBLIGATION',
       companyId: widget.companyId,
-      directedById: _selfAuthorized ? null : _selectedDirectorId,
+      directedById: _selectedDirectorId,
       deliveryType: _deliveryType,
       itemCode: _itemCode,
       quantity: quantity,
@@ -286,8 +273,6 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
 
   void _resetForm() {
     _consumerNameController.clear();
-    _consumerNumberController.clear();
-    _orderNumberController.clear();
     _remarkController.clear();
     _quantityController.text = '1';
     setState(() {
@@ -300,7 +285,6 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
       _emptiesDueDate = null;
       _cashDueDate = null;
       _selectedDirectorId = null;
-      _selfAuthorized = false;
     });
   }
 
@@ -344,36 +328,10 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!_submitSuccess) ...[
-                // Sible/Other Sale checkbox
-                CheckboxListTile(
-                  value: _selfAuthorized,
-                  onChanged: (value) => setState(() {
-                    _selfAuthorized = value ?? false;
-                    if (_selfAuthorized) _selectedDirectorId = null;
-                  }),
-                  title: Text(
-                    'Sible/Other Sale',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-                if (!_selfAuthorized) ...[
-                  _buildDirectorDropdown(),
-                  SizedBox(height: AppSpacing.md),
-                  _buildConsumerNumberField(),
-                  SizedBox(height: AppSpacing.md),
-                  _buildOrderNumberField(),
-                  SizedBox(height: AppSpacing.md),
-                ] else ...[
-                  _buildConsumerNameField(),
-                  SizedBox(height: AppSpacing.md),
-                  _buildConsumerNumberField(),
-                  SizedBox(height: AppSpacing.md),
-                ],
+                _buildDirectorDropdown(),
+                SizedBox(height: AppSpacing.md),
+                _buildConsumerNameField(),
+                SizedBox(height: AppSpacing.md),
                 _buildDeliveryTypeSelector(),
                 SizedBox(height: AppSpacing.md),
                 _buildCylinderTypeSelector(),
@@ -441,15 +399,10 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
               borderRadius: BorderRadius.circular(12.r),
             ),
           ),
-          isExpanded: true,
           items: directors.map((d) {
             return DropdownMenuItem<int>(
               value: d.id,
-              child: Text(
-                d.role.isNotEmpty ? '${d.name} (${d.role})' : d.name,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
+              child: Text('${d.name} (${d.role})'),
             );
           }).toList(),
           onChanged: _submitSuccess
@@ -481,60 +434,11 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
       ),
       textInputAction: TextInputAction.next,
       validator: (value) {
-        if (_selfAuthorized && (value == null || value.trim().isEmpty)) {
+        if (value == null || value.trim().isEmpty) {
           return 'Consumer name is required';
         }
         return null;
       },
-    );
-  }
-
-  Widget _buildConsumerNumberField() {
-    return TextFormField(
-      controller: _consumerNumberController,
-      enabled: !_submitSuccess,
-      decoration: InputDecoration(
-        labelText: 'Consumer Number',
-        hintText: 'Enter 10-digit number (optional)',
-        prefixIcon: const Icon(Icons.phone),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-      ),
-      keyboardType: TextInputType.number,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(10),
-      ],
-      textInputAction: TextInputAction.next,
-      validator: (value) {
-        if (value != null && value.trim().isNotEmpty && value.trim().length != 10) {
-          return 'Enter a valid 10-digit number';
-        }
-        return null;
-      },
-    );
-  }
-
-  Widget _buildOrderNumberField() {
-    return TextFormField(
-      controller: _orderNumberController,
-      enabled: !_submitSuccess,
-      decoration: InputDecoration(
-        labelText: 'Order Number',
-        hintText: 'Enter 12-digit order number (optional)',
-        prefixIcon: const Icon(Icons.receipt),
-        prefixText: '2-',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-      ),
-      keyboardType: TextInputType.number,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(12),
-      ],
-      textInputAction: TextInputAction.next,
     );
   }
 
@@ -706,7 +610,7 @@ class _ObligationTokenFormState extends State<ObligationTokenForm> {
         DropdownMenuItem(value: 'COLLECT_AT_DELIVERY', child: Text('Collect at Delivery')),
         DropdownMenuItem(value: 'DEFERRED', child: Text('Deferred (collect later)')),
         DropdownMenuItem(value: 'ALREADY_PAID', child: Text('Already Paid')),
-        DropdownMenuItem(value: 'NOT_APPLICABLE', child: Text('FOC (Free of Cost)')),
+        DropdownMenuItem(value: 'NOT_APPLICABLE', child: Text('Not Applicable')),
       ],
       onChanged: _submitSuccess
           ? null
